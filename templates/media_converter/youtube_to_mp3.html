@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}YouTube to MP3 Converter - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">YouTube to MP3 Converter</h1>
+    
+    <div class="alert alert-info">
+        <strong>Usage Notice:</strong>
+        <pre style="white-space: pre-wrap; margin-top: 0.5rem;">{{ usage_notice }}</pre>
+    </div>
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label" for="youtube_url">YouTube URL</label>
+            <input type="url" class="form-control" id="youtube_url" name="youtube_url" 
+                   placeholder="https://www.youtube.com/watch?v=..." required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert to MP3</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Copy the YouTube video URL</li>
+            <li>Paste it in the field above</li>
+            <li>Click "Convert to MP3"</li>
+            <li>Wait for processing and download your MP3 file</li>
+        </ol>
+    </div>
+</div>
+
+<a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+{% endblock %}
+

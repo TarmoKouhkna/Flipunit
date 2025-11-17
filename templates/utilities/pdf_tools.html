@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}PDF Tools - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">PDF Tools</h1>
+    
+    <div class="alert alert-info">
+        {{ message }}
+    </div>
+    
+    <div style="margin-top: 2rem;">
+        <h3>Available PDF Tools (Coming Soon):</h3>
+        <ul style="margin-left: 1.5rem; margin-top: 1rem;">
+            <li>Merge PDF files</li>
+            <li>Split PDF files</li>
+            <li>Compress PDF files</li>
+            <li>Convert PDF to images</li>
+            <li>Extract text from PDF</li>
+        </ul>
+    </div>
+</div>
+
+<a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+{% endblock %}
+

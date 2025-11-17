@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Image Converter - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">
+        {% if converter_type == 'jpeg-to-png' %}JPEG to PNG Converter
+        {% elif converter_type == 'png-to-jpg' %}PNG to JPG Converter
+        {% elif converter_type == 'webp' %}WebP Converter
+        {% elif converter_type == 'svg-to-png' %}SVG to PNG Converter
+        {% else %}Image Converter{% endif %}
+    </h1>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Image File</label>
+            <div class="file-upload-area">
+                <input type="file" name="image" id="image" accept="image/*" required>
+                <p style="margin-top: 1rem;">Click to select or drag and drop</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: JPG, PNG, WebP, SVG</p>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert & Download</button>
+    </form>
+</div>
+
+<a href="{% url 'image_converter:index' %}" class="btn btn-secondary">← Back to Image Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('image');
+    const uploadArea = document.querySelector('.file-upload-area');
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadArea.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Unit Converters - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Unit Converters</h1>
+    <p>Convert between different units of measurement</p>
+</div>
+
+<div class="grid grid-3">
+    {% for converter in converters %}
+    <a href="{% url 'converters:tool' converter.url %}" class="category-card">
+        <h3>{{ converter.name }}</h3>
+        <p>{{ converter.description }}</p>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
+

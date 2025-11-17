@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block title %}Utilities - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Utilities</h1>
+    <p>PDF tools, calculators, and text utilities</p>
+</div>
+
+<div class="grid grid-3">
+    <a href="{% url 'utilities:calculator' %}" class="category-card">
+        <h3>Calculator</h3>
+        <p>Simple online calculator</p>
+    </a>
+    <a href="{% url 'utilities:pdf_tools' %}" class="category-card">
+        <h3>PDF Tools</h3>
+        <p>Merge, split, and compress PDF files</p>
+    </a>
+    <a href="{% url 'utilities:text_tools' %}" class="category-card">
+        <h3>Text Tools</h3>
+        <p>Word count, character count, and text utilities</p>
+    </a>
+</div>
+{% endblock %}
+

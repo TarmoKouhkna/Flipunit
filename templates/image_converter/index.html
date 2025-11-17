@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Image Converters - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Image Converters</h1>
+    <p>Convert images between different formats</p>
+</div>
+
+<div class="grid grid-2">
+    {% for converter in converters %}
+    <a href="{% url 'image_converter:convert' converter.url %}" class="category-card">
+        <h3>{{ converter.name }}</h3>
+        <p>{{ converter.description }}</p>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
+

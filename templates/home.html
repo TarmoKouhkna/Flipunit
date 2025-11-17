@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Home - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Welcome to {{ SITE_NAME }}</h1>
+    <p>Simple, fast, no-login required online converter hub</p>
+</div>
+
+<div class="tool-categories">
+    <div class="grid grid-2">
+        {% for category in categories %}
+        <a href="{% url category.url %}" class="category-card">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">{{ category.icon }}</div>
+            <h3>{{ category.name }}</h3>
+            <p>{{ category.description }}</p>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+

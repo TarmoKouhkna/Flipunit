@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{% block meta_description %}{{ SITE_DESCRIPTION }}{% endblock %}">
+    <meta name="keywords" content="{% block meta_keywords %}converter, unit converter, image converter, media converter, PDF tools, calculator{% endblock %}">
+    <meta name="author" content="FlipUnit.eu">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://flipunit.eu{% block og_url %}/{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}{{ SITE_NAME }} - Online Converter Hub{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ SITE_DESCRIPTION }}{% endblock %}">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://flipunit.eu{% block twitter_url %}/{% endblock %}">
+    <meta property="twitter:title" content="{% block twitter_title %}{{ SITE_NAME }} - Online Converter Hub{% endblock %}">
+    <meta property="twitter:description" content="{% block twitter_description %}{{ SITE_DESCRIPTION }}{% endblock %}">
+    
+    <title>{% block title %}{{ SITE_NAME }} - Online Converter Hub{% endblock %}</title>
+    
+    <link rel="canonical" href="https://flipunit.eu{% block canonical_url %}{{ request.path }}{% endblock %}">
+    
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="container">
+                <a href="{% url 'home' %}" class="logo">{{ SITE_NAME }}</a>
+                <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-menu">
+                    <li><a href="{% url 'home' %}">Home</a></li>
+                    <li><a href="{% url 'converters:index' %}">Unit Converters</a></li>
+                    <li><a href="{% url 'image_converter:index' %}">Image Converters</a></li>
+                    <li><a href="{% url 'media_converter:index' %}">Media Converters</a></li>
+                    <li><a href="{% url 'utilities:index' %}">Utilities</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {% now "Y" %} {{ SITE_NAME }}. All rights reserved.</p>
+            <p>Fast, simple, no-login required online converters.</p>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+
