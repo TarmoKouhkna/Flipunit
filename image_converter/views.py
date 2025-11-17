@@ -3,6 +3,11 @@ from django.http import HttpResponse
 import os
 from PIL import Image
 import io
+try:
+    import cairosvg
+    CAIROSVG_AVAILABLE = True
+except ImportError:
+    CAIROSVG_AVAILABLE = False
 
 def index(request):
     """Image converters index page"""
@@ -43,12 +48,28 @@ def convert_image(request, converter_type):
         # Read image
         image_data = uploaded_file.read()
         
-        # Handle SVG separately (requires cairosvg or similar)
+        # Handle SVG to PNG conversion
         if file_ext == '.svg' and converter_type == 'svg-to-png':
-            return render(request, 'image_converter/converter.html', {
-                'converter_type': converter_type,
-                'error': 'SVG to PNG conversion requires additional libraries. Please use an online SVG to PNG converter.'
-            })
+            if not CAIROSVG_AVAILABLE:
+                return render(request, 'image_converter/converter.html', {
+                    'converter_type': converter_type,
+                    'error': 'SVG to PNG conversion requires cairosvg library. Please install it: pip install cairosvg'
+                })
+            
+            try:
+                # Convert SVG to PNG using cairosvg
+                # Default output size is 800x600, but we can make it larger for better quality
+                png_data = cairosvg.svg2png(bytestring=image_data, output_width=1920, output_height=1080)
+                
+                # Create response
+                response = HttpResponse(png_data, content_type='image/png')
+                response['Content-Disposition'] = 'attachment; filename="converted.png"'
+                return response
+            except Exception as e:
+                return render(request, 'image_converter/converter.html', {
+                    'converter_type': converter_type,
+                    'error': f'Error converting SVG to PNG: {str(e)}. Make sure Cairo is installed (brew install cairo on macOS).'
+                })
         
         # Open image with PIL
         image = Image.open(io.BytesIO(image_data))

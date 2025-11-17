@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block title %}QR Code Generator - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">QR Code Generator</h1>
+    <p>Generate QR codes from text, URLs, or any text content</p>
+    
+    <form method="post" class="converter-tool" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label" for="text">Text or URL</label>
+            <textarea class="form-control" id="text" name="text" rows="4" 
+                      placeholder="Enter text, URL, or any content to generate QR code..."></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Generate QR Code</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Enter any text, URL, or content in the field above</li>
+            <li>Click "Generate QR Code"</li>
+            <li>Download the generated QR code image</li>
+            <li>Use it in your documents, websites, or print materials</li>
+        </ol>
+    </div>
+</div>
+
+<a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+{% endblock %}
+

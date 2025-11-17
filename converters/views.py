@@ -56,11 +56,15 @@ def converter_tool(request, tool_name):
             'units': [
                 ('liter', 'L', 1.0),
                 ('milliliter', 'mL', 0.001),
-                ('gallon', 'gal', 3.78541),
-                ('quart', 'qt', 0.946353),
-                ('pint', 'pt', 0.473176),
+                ('gallon (US)', 'gal (US)', 3.78541),
+                ('gallon (UK)', 'gal (UK)', 4.54609),
+                ('quart (US)', 'qt (US)', 0.946353),
+                ('quart (UK)', 'qt (UK)', 1.13652),
+                ('pint (US)', 'pt (US)', 0.473176),
+                ('pint (UK)', 'pt (UK)', 0.568261),
                 ('cup', 'cup', 0.236588),
-                ('fluid ounce', 'fl oz', 0.0295735),
+                ('fluid ounce (US)', 'fl oz (US)', 0.0295735),
+                ('fluid ounce (UK)', 'fl oz (UK)', 0.0284131),
             ]
         },
         'area': {
@@ -94,6 +98,7 @@ def converter_tool(request, tool_name):
         raise Http404("Converter not found")
     
     result = None
+    result_unit_symbol = None
     if request.method == 'POST':
         try:
             value = float(request.POST.get('value', 0))
@@ -104,6 +109,9 @@ def converter_tool(request, tool_name):
                 # Temperature conversion
                 from_type = next((u[2] for u in converter['units'] if u[0] == from_unit), None)
                 to_type = next((u[2] for u in converter['units'] if u[0] == to_unit), None)
+                
+                # Get the symbol for the target unit
+                result_unit_symbol = next((u[1] for u in converter['units'] if u[0] == to_unit), '')
                 
                 # Convert to Celsius first
                 if from_type == 'fahrenheit':
@@ -125,14 +133,19 @@ def converter_tool(request, tool_name):
                 from_factor = next((u[2] for u in converter['units'] if u[0] == from_unit), 1.0)
                 to_factor = next((u[2] for u in converter['units'] if u[0] == to_unit), 1.0)
                 result = value * from_factor / to_factor
+                
+                # Get the symbol for the target unit
+                result_unit_symbol = next((u[1] for u in converter['units'] if u[0] == to_unit), '')
             
             result = round(result, 6)
         except (ValueError, TypeError):
             result = None
+            result_unit_symbol = None
     
     context = {
         'converter': converter,
         'tool_name': tool_name,
         'result': result,
+        'result_unit_symbol': result_unit_symbol,
     }
     return render(request, 'converters/converter_tool.html', context)

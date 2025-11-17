@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}Favicon Generator - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Favicon Generator</h1>
+    <p>Generate favicon.ico from any image file</p>
+    
+    <form method="post" class="converter-tool" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label" for="image_file">Upload Image</label>
+            <div class="file-upload-area">
+                <input type="file" class="form-control" id="image_file" name="image_file" 
+                       accept="image/*" required style="display: none;">
+                <div style="text-align: center; padding: 2rem;">
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop an image</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Supported formats: JPG, PNG, GIF, BMP, WebP
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Generate Favicon</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Upload an image file (JPG, PNG, GIF, BMP, or WebP)</li>
+            <li>Click "Generate Favicon"</li>
+            <li>Download the generated favicon.ico file</li>
+            <li>Upload it to your website's root directory</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> The image will be automatically resized to 32x32 pixels (standard favicon size).
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('image_file');
+    const uploadArea = document.querySelector('.file-upload-area');
+    
+    // Prevent double file dialog - main.js already handles the click
+    // Just update the UI when file is selected
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const fileName = e.target.files[0].name;
+            uploadArea.querySelector('p').textContent = `Selected: ${fileName}`;
+        }
+    });
+    
+    // Handle drag and drop (main.js handles basic drag/drop, but we need to update UI)
+    uploadArea.addEventListener('drop', function(e) {
+        // Let main.js handle the file assignment, then update UI
+        setTimeout(function() {
+            if (fileInput.files.length > 0) {
+                const fileName = fileInput.files[0].name;
+                uploadArea.querySelector('p').textContent = `Selected: ${fileName}`;
+            }
+        }, 10);
+    });
+    
+    // Prevent the input itself from triggering double dialog
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

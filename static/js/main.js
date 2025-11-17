@@ -1,22 +1,61 @@
-// Mobile menu toggle
-document.addEventListener('DOMContentLoaded', function() {
-    const mobileMenuToggle = document.querySelector('.mobile-menu-toggle');
-    const navMenu = document.querySelector('.nav-menu');
+// Mobile menu toggle and navbar functionality
+(function() {
+    'use strict';
+    
+    function initNavbar() {
+        const mobileMenuToggle = document.querySelector('.mobile-menu-toggle');
+        const navMenu = document.querySelector('.nav-menu');
 
-    if (mobileMenuToggle && navMenu) {
-        mobileMenuToggle.addEventListener('click', function() {
+        if (!mobileMenuToggle || !navMenu) return;
+
+        // Mobile menu toggle button
+        mobileMenuToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
             navMenu.classList.toggle('active');
+        });
+
+        // Ensure all navbar links always work - close mobile menu on click
+        const allNavLinks = document.querySelectorAll('.nav-menu a, .navbar a.logo');
+        allNavLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                // Close mobile menu if open
+                if (navMenu.classList.contains('active')) {
+                    navMenu.classList.remove('active');
+                }
+                // Allow normal navigation - don't prevent default
+            }, { passive: true });
         });
 
         // Close menu when clicking outside
         document.addEventListener('click', function(event) {
-            if (!navMenu.contains(event.target) && !mobileMenuToggle.contains(event.target)) {
+            const clickedNavLink = event.target.closest('.nav-menu a');
+            const clickedToggle = event.target.closest('.mobile-menu-toggle');
+            const clickedLogo = event.target.closest('.navbar a.logo');
+            
+            // Don't interfere with navbar links or toggle
+            if (clickedNavLink || clickedToggle || clickedLogo) {
+                return;
+            }
+            
+            // Close menu if clicking outside
+            if (navMenu.classList.contains('active') && 
+                !navMenu.contains(event.target) && 
+                !mobileMenuToggle.contains(event.target)) {
                 navMenu.classList.remove('active');
             }
         });
     }
+    
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initNavbar);
+    } else {
+        initNavbar();
+    }
+})();
 
-    // File upload drag and drop
+// File upload drag and drop
+document.addEventListener('DOMContentLoaded', function() {
     const fileUploadAreas = document.querySelectorAll('.file-upload-area');
     fileUploadAreas.forEach(area => {
         const input = area.querySelector('input[type="file"]');
@@ -42,8 +81,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        area.addEventListener('click', function() {
-            input.click();
+        area.addEventListener('click', function(e) {
+            // Only trigger file input if click is not directly on the input itself
+            if (e.target !== input && !input.contains(e.target)) {
+                input.click();
+            }
         });
     });
 });

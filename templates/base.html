@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,18 +14,24 @@
     <meta property="og:url" content="https://flipunit.eu{% block og_url %}/{% endblock %}">
     <meta property="og:title" content="{% block og_title %}{{ SITE_NAME }} - Online Converter Hub{% endblock %}">
     <meta property="og:description" content="{% block og_description %}{{ SITE_DESCRIPTION }}{% endblock %}">
+    <meta property="og:image" content="https://flipunit.eu{% static 'images/logo.png' %}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="{{ SITE_NAME }}">
     
     <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://flipunit.eu{% block twitter_url %}/{% endblock %}">
-    <meta property="twitter:title" content="{% block twitter_title %}{{ SITE_NAME }} - Online Converter Hub{% endblock %}">
-    <meta property="twitter:description" content="{% block twitter_description %}{{ SITE_DESCRIPTION }}{% endblock %}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://flipunit.eu{% block twitter_url %}/{% endblock %}">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ SITE_NAME }} - Online Converter Hub{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ SITE_DESCRIPTION }}{% endblock %}">
+    <meta name="twitter:image" content="https://flipunit.eu{% static 'images/logo.png' %}">
     
     <title>{% block title %}{{ SITE_NAME }} - Online Converter Hub{% endblock %}</title>
     
     <link rel="canonical" href="https://flipunit.eu{% block canonical_url %}{{ request.path }}{% endblock %}">
-    
-    {% load static %}
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
@@ -32,7 +39,10 @@
     <header>
         <nav class="navbar">
             <div class="container">
-                <a href="{% url 'home' %}" class="logo">{{ SITE_NAME }}</a>
+                <a href="{% url 'home' %}" class="logo">
+                    <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                    <span class="logo-text">{{ SITE_NAME }}</span>
+                </a>
                 <button class="mobile-menu-toggle" aria-label="Toggle menu">
                     <span></span>
                     <span></span>
@@ -74,6 +84,34 @@
 
     <script src="{% static 'js/main.js' %}"></script>
     {% block extra_js %}{% endblock %}
+    
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "{{ SITE_NAME }}",
+        "url": "https://flipunit.eu",
+        "description": "{{ SITE_DESCRIPTION }}",
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://flipunit.eu/?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+        }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "{{ SITE_NAME }}",
+        "url": "https://flipunit.eu",
+        "logo": "https://flipunit.eu{% static 'images/logo.png' %}",
+        "description": "{{ SITE_DESCRIPTION }}",
+        "sameAs": []
+    }
+    </script>
+    {% block structured_data %}{% endblock %}
 </body>
 </html>
 

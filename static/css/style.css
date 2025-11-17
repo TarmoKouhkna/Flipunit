@@ -57,10 +57,34 @@ header {
 }
 
 .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--primary-color);
     text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+.logo:hover {
+    opacity: 0.8;
+}
+
+.logo-img {
+    height: 24px;
+    width: auto;
+    max-width: 80px;
+    object-fit: contain;
+    display: inline-block;
+}
+
+.logo-text {
+    display: inline-block;
+}
+
+.logo-img[style*="display: none"] + .logo-text {
+    display: inline-block;
 }
 
 .nav-menu {
@@ -340,6 +364,15 @@ footer p {
 @media (max-width: 768px) {
     .mobile-menu-toggle {
         display: flex;
+    }
+
+    .logo-img {
+        height: 20px;
+        max-width: 60px;
+    }
+
+    .logo {
+        font-size: 1.25rem;
     }
 
     .nav-menu {

@@ -9,17 +9,37 @@
 </div>
 
 <div class="grid grid-3">
+    <a href="{% url 'utilities:pdf_tools' %}" class="category-card">
+        <h3>PDF Tools</h3>
+        <p>Merge, split, and convert PDF files</p>
+    </a>
     <a href="{% url 'utilities:calculator' %}" class="category-card">
         <h3>Calculator</h3>
         <p>Simple online calculator</p>
     </a>
-    <a href="{% url 'utilities:pdf_tools' %}" class="category-card">
-        <h3>PDF Tools</h3>
-        <p>Merge, split, and compress PDF files</p>
-    </a>
     <a href="{% url 'utilities:text_tools' %}" class="category-card">
         <h3>Text Tools</h3>
         <p>Word count, character count, and text utilities</p>
+    </a>
+    <a href="{% url 'utilities:color_converter' %}" class="category-card">
+        <h3>Color Converter</h3>
+        <p>Convert between HEX, RGB, HSL, and CMYK</p>
+    </a>
+    <a href="{% url 'utilities:qr_code_generator' %}" class="category-card">
+        <h3>QR Code Generator</h3>
+        <p>Generate QR codes from text or URLs</p>
+    </a>
+    <a href="{% url 'utilities:timezone_converter' %}" class="category-card">
+        <h3>Time Zone Converter</h3>
+        <p>Convert time between different time zones</p>
+    </a>
+    <a href="{% url 'utilities:roman_numeral_converter' %}" class="category-card">
+        <h3>Roman Numeral Converter</h3>
+        <p>Convert between Roman and Arabic numerals</p>
+    </a>
+    <a href="{% url 'utilities:favicon_generator' %}" class="category-card">
+        <h3>Favicon Generator</h3>
+        <p>Generate favicon.ico from any image</p>
     </a>
 </div>
 {% endblock %}

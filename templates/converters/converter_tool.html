@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 
 {% block title %}{{ converter.title }} - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online {{ converter.title|lower }} - Convert between different units instantly. Fast, accurate, no registration required.{% endblock %}
+{% block og_title %}{{ converter.title }} - {{ SITE_NAME }}{% endblock %}
+{% block og_description %}Free online {{ converter.title|lower }} - Convert between different units instantly.{% endblock %}
 
 {% block content %}
 <div class="card">
@@ -41,7 +44,7 @@
     <div class="converter-result">
         <h3>Result:</h3>
         <p style="font-size: 1.5rem; font-weight: 600; color: var(--primary-color);">
-            {{ result }}
+            {{ result }} {% if result_unit_symbol %}{{ result_unit_symbol }}{% endif %}
         </p>
     </div>
     {% endif %}

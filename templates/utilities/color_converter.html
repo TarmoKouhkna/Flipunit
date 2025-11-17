@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Color Converter - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Color Converter</h1>
+    <p>Convert colors between HEX, RGB, HSL, and CMYK formats</p>
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="input_format">From Format</label>
+                <select class="form-select" id="input_format" name="input_format" required>
+                    <option value="hex" {% if input_format == 'hex' %}selected{% endif %}>HEX</option>
+                    <option value="rgb" {% if input_format == 'rgb' %}selected{% endif %}>RGB</option>
+                    <option value="hsl" {% if input_format == 'hsl' %}selected{% endif %}>HSL</option>
+                    <option value="cmyk" {% if input_format == 'cmyk' %}selected{% endif %}>CMYK</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="output_format">To Format</label>
+                <select class="form-select" id="output_format" name="output_format" required>
+                    <option value="hex" {% if output_format == 'hex' %}selected{% endif %}>HEX</option>
+                    <option value="rgb" {% if output_format == 'rgb' %}selected{% endif %}>RGB</option>
+                    <option value="hsl" {% if output_format == 'hsl' %}selected{% endif %}>HSL</option>
+                    <option value="cmyk" {% if output_format == 'cmyk' %}selected{% endif %}>CMYK</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="color_input">Color Value</label>
+            <input type="text" class="form-control" id="color_input" name="color_input" 
+                   placeholder="e.g., #FF5733 or 255, 87, 51" required>
+            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">
+                <strong>Format examples:</strong><br>
+                HEX: #FF5733 or FF5733<br>
+                RGB: 255, 87, 51<br>
+                HSL: 9, 100%, 60%<br>
+                CMYK: 0%, 66%, 80%, 0%
+            </small>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert</button>
+    </form>
+    
+    {% if error %}
+    <div class="alert alert-error" style="margin-top: 1.5rem;">
+        {{ error }}
+    </div>
+    {% endif %}
+    
+    {% if result %}
+    <div class="converter-result" style="margin-top: 1.5rem;">
+        <h3>Result:</h3>
+        <div style="display: flex; align-items: center; gap: 1rem; margin-top: 1rem;">
+            <div style="width: 80px; height: 80px; border-radius: 8px; border: 2px solid var(--border-color);" id="color-preview"></div>
+            <div>
+                <p style="font-size: 1.5rem; font-weight: 600; color: var(--primary-color); margin: 0;">
+                    {{ result }}
+                </p>
+                <button type="button" class="btn btn-secondary" onclick="copyToClipboard('{{ result }}')" style="margin-top: 0.5rem; padding: 0.5rem 1rem; font-size: 0.9rem;">
+                    Copy
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard!');
+    });
+}
+
+// Update color preview when result changes
+{% if result %}
+document.addEventListener('DOMContentLoaded', function() {
+    const preview = document.getElementById('color-preview');
+    const resultText = '{{ result|escapejs }}';
+    
+    // Extract color from result
+    let color = '#000000';
+    if (resultText.startsWith('#')) {
+        color = resultText;
+    } else if (resultText.startsWith('rgb')) {
+        const rgbMatch = resultText.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (rgbMatch) {
+            color = `rgb(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]})`;
+        }
+    } else if (resultText.startsWith('hsl')) {
+        color = resultText;
+    } else if (resultText.startsWith('cmyk')) {
+        // Convert CMYK to RGB for preview (simplified)
+        color = '#000000';
+    }
+    
+    if (preview) {
+        preview.style.backgroundColor = color;
+    }
+});
+{% endif %}
+</script>
+{% endblock %}
+{% endblock %}
+

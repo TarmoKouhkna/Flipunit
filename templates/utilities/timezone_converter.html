@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Time Zone Converter - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Time Zone Converter</h1>
+    <p>Convert time between different time zones</p>
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="from_timezone">From Time Zone</label>
+                <select class="form-select" id="from_timezone" name="from_timezone" required style="height: auto; max-height: 300px;">
+                    <option value="">Select time zone...</option>
+                    {% for tz_code, tz_name in timezones %}
+                    <option value="{{ tz_code }}">{{ tz_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="to_timezone">To Time Zone</label>
+                <select class="form-select" id="to_timezone" name="to_timezone" required style="height: auto; max-height: 300px;">
+                    <option value="">Select time zone...</option>
+                    {% for tz_code, tz_name in timezones %}
+                    <option value="{{ tz_code }}">{{ tz_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="date">Date (optional)</label>
+                <input type="date" class="form-control" id="date" name="date" 
+                       value="{% now 'Y-m-d' %}">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="time">Time (optional)</label>
+                <input type="time" class="form-control" id="time" name="time" 
+                       value="{% now 'H:i' %}">
+            </div>
+        </div>
+        
+        <small style="color: var(--text-secondary); margin-bottom: 1rem; display: block;">
+            Leave date and time empty to use current time
+        </small>
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert</button>
+    </form>
+    
+    {% if error %}
+    <div class="alert alert-error" style="margin-top: 1.5rem;">
+        {{ error }}
+    </div>
+    {% endif %}
+    
+    {% if result %}
+    <div class="converter-result" style="margin-top: 1.5rem;">
+        <h3>Result:</h3>
+        <div style="margin-top: 1rem;">
+            <p><strong>Original Time:</strong> {{ result.original }}</p>
+            <p style="font-size: 1.5rem; font-weight: 600; color: var(--primary-color); margin-top: 0.5rem;">
+                <strong>Converted Time:</strong> {{ result.converted }}
+            </p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+{% endblock %}
+

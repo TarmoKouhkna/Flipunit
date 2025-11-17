@@ -39,6 +39,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('image');
     const uploadArea = document.querySelector('.file-upload-area');
     
+    // Prevent click event from bubbling to the upload area
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
             uploadArea.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;

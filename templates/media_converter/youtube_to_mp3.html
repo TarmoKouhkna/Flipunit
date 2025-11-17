@@ -11,7 +11,14 @@
         <pre style="white-space: pre-wrap; margin-top: 0.5rem;">{{ usage_notice }}</pre>
     </div>
     
-    <form method="post" class="converter-tool">
+    {% if debug_post %}
+    <div class="alert alert-info">
+        <strong>Debug Info:</strong> POST keys received: {{ debug_post|join:", " }}
+        <br>If you see this, the form is submitting but the URL field is empty.
+    </div>
+    {% endif %}
+    
+    <form method="post" class="converter-tool" id="youtube-form" enctype="application/x-www-form-urlencoded">
         {% csrf_token %}
         <div class="form-group">
             <label class="form-label" for="youtube_url">YouTube URL</label>
@@ -19,8 +26,40 @@
                    placeholder="https://www.youtube.com/watch?v=..." required>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block">Convert to MP3</button>
+        <button type="submit" class="btn btn-primary btn-block" id="convert-btn">Convert to MP3</button>
     </form>
+    
+    <!-- Progress Overlay -->
+    <div id="progress-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 99999; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 2.5rem; border-radius: 12px; max-width: 450px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+            <div class="spinner" style="border: 5px solid #f3f3f3; border-top: 5px solid var(--primary-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 0 auto 1.5rem;"></div>
+            <h2 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1.5rem;">Processing Your Request</h2>
+            <p id="progress-status" style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 1.1rem; font-weight: 500;">Initializing conversion...</p>
+            <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+                <strong>Please wait...</strong><br>
+                Processing time varies depending on video length and quality.<br>
+                <span style="font-size: 0.85rem; color: #64748b;">Do not close this page</span>
+            </p>
+            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+                <div style="background: #f1f5f9; border-radius: 4px; padding: 0.75rem; font-size: 0.9rem; color: #475569;">
+                    <strong>What's happening:</strong><br>
+                    <span id="current-action">Preparing download...</span>
+                </div>
+            </div>
+            <div style="margin-top: 1.5rem;">
+                <button id="cancel-btn" type="button" class="btn btn-secondary" style="padding: 0.75rem 2rem; font-size: 1rem;">
+                    Cancel Process
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
@@ -34,5 +73,291 @@
 </div>
 
 <a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('youtube-form');
+    const progressOverlay = document.getElementById('progress-overlay');
+    const progressStatus = document.getElementById('progress-status');
+    const convertBtn = document.getElementById('convert-btn');
+    const urlInput = document.getElementById('youtube_url');
+    const cancelBtn = document.getElementById('cancel-btn');
+    let progressInterval = null;
+    
+    // Use window-level flags to prevent duplicates across all instances
+    if (!window.ytMp3Processing) {
+        window.ytMp3Processing = false;
+    }
+    if (!window.ytMp3DownloadTriggered) {
+        window.ytMp3DownloadTriggered = false;
+    }
+    if (!window.ytMp3DownloadLink) {
+        window.ytMp3DownloadLink = null;
+    }
+    
+    let progressSteps = [
+        { status: 'Validating YouTube URL...', action: 'Checking URL format...' },
+        { status: 'Connecting to YouTube...', action: 'Establishing connection...' },
+        { status: 'Downloading video...', action: 'Downloading video data (this may take a while)...' },
+        { status: 'Extracting audio...', action: 'Extracting audio stream from video...' },
+        { status: 'Converting to MP3...', action: 'Converting audio to MP3 format...' },
+        { status: 'Finalizing...', action: 'Preparing your MP3 file...' }
+    ];
+    let currentStep = 0;
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault(); // Prevent default form submission
+        
+        // Prevent multiple submissions using window-level flag
+        if (window.ytMp3Processing) {
+            console.log('Already processing, ignoring duplicate submission');
+            return false;
+        }
+        
+        // Validate URL is not empty before showing overlay
+        const urlValue = urlInput.value.trim();
+        console.log('Form submitted with URL:', urlValue);
+        
+        if (!urlValue) {
+            alert('Please enter a YouTube URL.');
+            return false;
+        }
+        
+        // Mark as processing immediately using window-level flag
+        window.ytMp3Processing = true;
+        window.ytMp3DownloadTriggered = false;
+        
+        // Show progress overlay immediately
+        progressOverlay.style.display = 'flex';
+        progressOverlay.style.alignItems = 'center';
+        progressOverlay.style.justifyContent = 'center';
+        
+        // Disable button and input
+        convertBtn.disabled = true;
+        urlInput.readOnly = true;
+        
+        // Update progress status periodically
+        const currentActionEl = document.getElementById('current-action');
+        progressInterval = setInterval(function() {
+            if (currentStep < progressSteps.length) {
+                const step = progressSteps[currentStep];
+                progressStatus.textContent = step.status;
+                if (currentActionEl) {
+                    currentActionEl.textContent = step.action;
+                }
+                currentStep++;
+            } else {
+                // Loop back to show it's still processing (focus on download/convert steps)
+                currentStep = 2; // Start from "Downloading video..."
+                const step = progressSteps[currentStep];
+                progressStatus.textContent = step.status;
+                if (currentActionEl) {
+                    currentActionEl.textContent = step.action;
+                }
+                currentStep++;
+            }
+        }, 4000); // Update every 4 seconds
+        
+        // Submit form via fetch to detect when download completes
+        const formData = new FormData(form);
+        
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+            // Prevent browser from auto-downloading
+            cache: 'no-cache'
+        })
+        .then(response => {
+            if (!response.ok) {
+                // If response is not ok, it might be an HTML error page
+                return response.text().then(text => {
+                    throw new Error('Server returned an error');
+                });
+            }
+            
+            // Check if response is actually an MP3 file
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('audio/mpeg')) {
+                // Extract filename from custom X-Filename header (we set this instead of Content-Disposition)
+                let filename = response.headers.get('x-filename') || 'converted.mp3';
+                
+                // Decode filename if needed
+                try {
+                    filename = decodeURIComponent(filename);
+                } catch(e) {
+                    // Keep original if decode fails
+                }
+                
+                return response.blob().then(blob => ({ blob, filename }));
+            } else {
+                // Response is HTML (error page), reload to show error messages
+                window.location.reload();
+                return Promise.reject(new Error('Expected MP3 file but got HTML response'));
+            }
+        })
+        .then(({ blob, filename }) => {
+            // Atomic check-and-set: only proceed if download hasn't been triggered
+            if (window.ytMp3DownloadTriggered) {
+                console.log('Download already triggered, skipping duplicate');
+                window.ytMp3Processing = false;
+                return;
+            }
+            if (!window.ytMp3Processing) {
+                console.log('Processing stopped, skipping download');
+                return;
+            }
+            
+            // ATOMIC: Set download triggered flag IMMEDIATELY to prevent any race conditions
+            window.ytMp3DownloadTriggered = true;
+            
+            // Stop progress updates immediately
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            
+            // Mark as processing complete
+            window.ytMp3Processing = false;
+            
+            // Close overlay first
+            progressOverlay.style.display = 'none';
+            convertBtn.disabled = false;
+            urlInput.readOnly = false;
+            currentStep = 0;
+            
+            // Clean up any existing download links
+            if (window.ytMp3DownloadLink) {
+                try {
+                    if (window.ytMp3DownloadLink.href && window.ytMp3DownloadLink.href.startsWith('blob:')) {
+                        window.URL.revokeObjectURL(window.ytMp3DownloadLink.href);
+                    }
+                    if (document.body.contains(window.ytMp3DownloadLink)) {
+                        document.body.removeChild(window.ytMp3DownloadLink);
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+                window.ytMp3DownloadLink = null;
+            }
+            
+            // Remove any other download links (safety)
+            const existingLinks = document.querySelectorAll('a[data-yt-download]');
+            existingLinks.forEach(link => {
+                try {
+                    if (link.href && link.href.startsWith('blob:')) {
+                        window.URL.revokeObjectURL(link.href);
+                    }
+                    if (document.body.contains(link)) {
+                        document.body.removeChild(link);
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+            });
+            
+            // Create download link only once and store it globally
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            a.setAttribute('data-yt-download', 'true');
+            
+            // Store globally to prevent duplicates
+            window.ytMp3DownloadLink = a;
+            document.body.appendChild(a);
+            
+            // Trigger download exactly once - use immediate synchronous execution
+            // No setTimeout, no requestAnimationFrame - just immediate click
+            try {
+                a.click();
+            } catch(e) {
+                console.error('Error triggering download:', e);
+            }
+            
+            // Clean up after a delay
+            setTimeout(function() {
+                try {
+                    if (window.ytMp3DownloadLink && window.ytMp3DownloadLink.href === url) {
+                        window.URL.revokeObjectURL(url);
+                        if (document.body.contains(window.ytMp3DownloadLink)) {
+                            document.body.removeChild(window.ytMp3DownloadLink);
+                        }
+                        window.ytMp3DownloadLink = null;
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+            }, 1000);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            window.ytMp3Processing = false;
+            window.ytMp3DownloadTriggered = false;
+            
+            // Close overlay on error
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            progressOverlay.style.display = 'none';
+            convertBtn.disabled = false;
+            urlInput.readOnly = false;
+            currentStep = 0;
+            
+            // Show error - page will reload with error message
+            alert('An error occurred during conversion. Please try again.');
+            // Reload page to show server error messages
+            window.location.reload();
+        });
+    });
+    
+    // Cancel button handler
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to cancel? The server process may continue, but you can navigate away from this page.')) {
+                // Stop processing to prevent any downloads
+                window.ytMp3Processing = false;
+                window.ytMp3DownloadTriggered = true; // Prevent any pending downloads
+                
+                // Clear progress interval
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                }
+                
+                // Hide progress overlay
+                progressOverlay.style.display = 'none';
+                
+                // Re-enable form
+                convertBtn.disabled = false;
+                urlInput.readOnly = false;
+                
+                // Reset progress step
+                currentStep = 0;
+                
+                // Note: The server-side process will continue, but the user can navigate away
+                // In a production system, you'd want to implement proper task cancellation
+            }
+        });
+    }
+    
+           // If page reloads with an error, hide progress overlay and reset flags
+           if (document.querySelector('.alert-error')) {
+               if (progressInterval) {
+                   clearInterval(progressInterval);
+                   progressInterval = null;
+               }
+               window.ytMp3Processing = false;
+               window.ytMp3DownloadTriggered = false;
+               progressOverlay.style.display = 'none';
+               convertBtn.disabled = false;
+               urlInput.readOnly = false;
+           }
+});
+</script>
+{% endblock %}
 {% endblock %}
 

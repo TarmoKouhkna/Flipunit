@@ -34,19 +34,29 @@ def youtube_to_mp3(request):
     }
     
     if request.method == 'POST':
+        # Debug: Check what we're receiving
         youtube_url = request.POST.get('youtube_url', '').strip()
         
+        # Also check if it's coming through differently
         if not youtube_url:
-            messages.error(request, 'Please enter a YouTube URL.')
+            # Try alternative field names
+            youtube_url = request.POST.get('youtube-url', '').strip()
+        if not youtube_url:
+            youtube_url = request.POST.get('url', '').strip()
+        
+        # Debug output - show what we received
+        if not youtube_url:
+            all_post_keys = list(request.POST.keys())
+            all_post_values = {k: request.POST.getlist(k) for k in all_post_keys}
+            messages.error(request, f'Please enter a YouTube URL. Received POST keys: {all_post_keys}. Check browser console for details.')
+            # Also log to console via template
+            context['debug_post'] = all_post_keys
             return render(request, 'media_converter/youtube_to_mp3.html', context)
         
-        # Validate YouTube URL
-        youtube_regex = re.compile(
-            r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/'
-            r'(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})'
-        )
-        
-        if not youtube_regex.match(youtube_url):
+        # Basic validation - check if it looks like a YouTube URL
+        # yt-dlp will handle the actual validation and can work with many formats
+        youtube_indicators = ['youtube.com', 'youtu.be', 'youtube-nocookie.com', 'youtube']
+        if not any(indicator in youtube_url.lower() for indicator in youtube_indicators):
             messages.error(request, 'Please enter a valid YouTube URL.')
             return render(request, 'media_converter/youtube_to_mp3.html', context)
         
@@ -72,9 +82,9 @@ def youtube_to_mp3(request):
             if ffmpeg_dir not in original_path:
                 os.environ['PATH'] = f"{ffmpeg_dir}:{original_path}"
             
-            # Configure yt-dlp options
+            # Configure yt-dlp options for faster processing
             ydl_opts = {
-                'format': 'bestaudio/best',
+                'format': 'bestaudio[ext=m4a]/bestaudio/best',  # Prefer m4a for faster processing
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -84,6 +94,10 @@ def youtube_to_mp3(request):
                 'quiet': True,
                 'no_warnings': True,
                 'ffmpeg_location': ffmpeg_dir,
+                'noplaylist': True,  # Don't download playlists
+                'extract_flat': False,
+                # Optimize for speed
+                'concurrent_fragments': 4,  # Download multiple fragments in parallel
             }
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -125,9 +139,13 @@ def youtube_to_mp3(request):
                     safe_filename = 'youtube_audio'
                 
                 # Create HTTP response
+                # Note: We don't set Content-Disposition here to prevent browser auto-download
+                # JavaScript will handle the download programmatically
                 response = HttpResponse(file_content, content_type='audio/mpeg')
-                response['Content-Disposition'] = f'attachment; filename="{safe_filename}.mp3"'
                 response['Content-Length'] = len(file_content)
+                # Add custom header with filename for JavaScript to use
+                response['X-Filename'] = f'{safe_filename}.mp3'
+                response['X-Content-Type'] = 'audio/mpeg'
                 
                 return response
                 

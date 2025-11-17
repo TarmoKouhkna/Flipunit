@@ -146,3 +146,7 @@ SITE_DESCRIPTION = 'Simple, fast, no-login online converter hub - unit converter
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
+
+# Request timeout settings (for long-running operations like YouTube conversion)
+# Note: For production, consider using async tasks (Celery) for long operations
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
