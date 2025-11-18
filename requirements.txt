@@ -22,3 +22,5 @@ webencodings==0.5.1
 yt-dlp==2025.11.12
 qrcode[pil]==8.0
 pytz==2024.2
+whitenoise==6.8.2
+gunicorn==23.0.0
