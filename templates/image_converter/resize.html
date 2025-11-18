@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}Image Resizer - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online image resizer - Resize images to custom dimensions while maintaining aspect ratio. Fast, simple, no registration required.{% endblock %}
+{% block og_title %}Image Resizer - {{ SITE_NAME }}{% endblock %}
+{% block og_description %}Free online image resizer - Resize images to custom dimensions.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Image Resizer</h1>
+    <p>Resize images to custom dimensions</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Image File</label>
+            <div class="file-upload-area">
+                <input type="file" name="image" id="image" accept="image/jpeg,image/png,image/webp" required>
+                <div style="text-align: center; padding: 2rem;">
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: JPG, PNG, WebP</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-2" style="margin-top: 1.5rem;">
+            <div class="form-group">
+                <label class="form-label" for="width">Width (pixels)</label>
+                <input type="number" class="form-control" id="width" name="width" 
+                       min="1" max="10000" placeholder="Leave empty for auto">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="height">Height (pixels)</label>
+                <input type="number" class="form-control" id="height" name="height" 
+                       min="1" max="10000" placeholder="Leave empty for auto">
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="maintain_aspect" id="maintain_aspect" checked>
+                <span>Maintain aspect ratio</span>
+            </label>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem; margin-left: 1.75rem;">
+                When checked, the image will be resized proportionally to fit within the specified dimensions.
+            </p>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label" for="output_format">Output Format</label>
+            <select class="form-select" id="output_format" name="output_format">
+                <option value="same">Same as input</option>
+                <option value="JPEG">JPEG</option>
+                <option value="PNG">PNG</option>
+                <option value="WEBP">WebP</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">Resize & Download</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Upload an image file (JPG, PNG, or WebP)</li>
+            <li>Enter desired width and/or height (leave one empty to maintain aspect ratio)</li>
+            <li>Choose whether to maintain aspect ratio</li>
+            <li>Select output format (or keep same as input)</li>
+            <li>Click "Resize & Download"</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Tip:</strong> If you specify both width and height with "Maintain aspect ratio" checked, the image will be resized to fit within those dimensions while preserving proportions.
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'image_converter:index' %}" class="btn btn-secondary">← Back to Image Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('image');
+    const uploadArea = document.querySelector('.file-upload-area');
+    const widthInput = document.getElementById('width');
+    const heightInput = document.getElementById('height');
+    const maintainAspectCheckbox = document.getElementById('maintain_aspect');
+    
+    // Update UI when file is selected
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const fileName = e.target.files[0].name;
+            uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
+            
+            // Show image dimensions if possible
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const info = document.createElement('p');
+                    info.style.cssText = 'color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;';
+                    info.textContent = `Original size: ${img.width} × ${img.height} pixels`;
+                    
+                    // Remove previous info if exists
+                    const existingInfo = uploadArea.querySelector('p:last-of-type');
+                    if (existingInfo && existingInfo.textContent.includes('Original size')) {
+                        existingInfo.remove();
+                    }
+                    
+                    uploadArea.appendChild(info);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    });
+    
+    // Prevent click event from bubbling to the upload area
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Auto-fill height when width changes (if maintain aspect is checked)
+    let originalWidth = null;
+    let originalHeight = null;
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    originalWidth = img.width;
+                    originalHeight = img.height;
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    });
+    
+    widthInput.addEventListener('input', function() {
+        if (maintainAspectCheckbox.checked && originalWidth && originalHeight && this.value) {
+            const newWidth = parseInt(this.value);
+            if (!isNaN(newWidth) && newWidth > 0) {
+                const aspectRatio = originalHeight / originalWidth;
+                heightInput.value = Math.round(newWidth * aspectRatio);
+            }
+        }
+    });
+    
+    heightInput.addEventListener('input', function() {
+        if (maintainAspectCheckbox.checked && originalWidth && originalHeight && this.value) {
+            const newHeight = parseInt(this.value);
+            if (!isNaN(newHeight) && newHeight > 0) {
+                const aspectRatio = originalWidth / originalHeight;
+                widthInput.value = Math.round(newHeight * aspectRatio);
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

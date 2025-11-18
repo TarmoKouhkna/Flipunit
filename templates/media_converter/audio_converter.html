@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block title %}Audio Converter - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online audio converter - Convert between MP3, WAV, OGG, FLAC, and AAC formats. Fast, simple, no registration required.{% endblock %}
+{% block og_title %}Audio Converter - {{ SITE_NAME }}{% endblock %}
+{% block og_description %}Free online audio converter - Convert between different audio formats.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Audio Converter</h1>
+    <p>Convert between different audio formats</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Audio File</label>
+            <div class="file-upload-area">
+                <input type="file" name="audio_file" id="audio_file" accept="audio/*" required>
+                <div style="text-align: center; padding: 2rem;">
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: MP3, WAV, OGG, FLAC, AAC, M4A</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label" for="output_format">Output Format</label>
+            <select class="form-select" id="output_format" name="output_format" required>
+                <option value="mp3">MP3</option>
+                <option value="wav">WAV</option>
+                <option value="ogg">OGG</option>
+                <option value="flac">FLAC</option>
+                <option value="aac">AAC</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert & Download</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Upload an audio file (MP3, WAV, OGG, FLAC, or AAC)</li>
+            <li>Select the desired output format</li>
+            <li>Click "Convert & Download"</li>
+            <li>Download the converted audio file</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> Lossy formats (MP3, OGG, AAC) are converted at 192 kbps quality. Lossless formats (WAV, FLAC) preserve original quality.
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.converter-tool');
+    const fileInput = document.getElementById('audio_file');
+    const uploadArea = document.querySelector('.file-upload-area');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    // Update UI when file is selected
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const fileName = e.target.files[0].name;
+            uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
+        }
+    });
+    
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Handle form submission with fetch to keep page responsive
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!fileInput.files.length) {
+            alert('Please select an audio file.');
+            return;
+        }
+        
+        // Disable button during processing
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        
+        const formData = new FormData(form);
+        
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error('Server returned an error');
+                });
+            }
+            
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('audio/')) {
+                return response.blob().then(blob => {
+                    const filename = response.headers.get('x-filename') || 'converted.audio';
+                    return { blob, filename };
+                });
+            } else {
+                // Error page - reload to show error
+                window.location.reload();
+                return Promise.reject(new Error('Expected audio file but got HTML response'));
+            }
+        })
+        .then(({ blob, filename }) => {
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(function() {
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }, 100);
+            
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Convert & Download';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Convert & Download';
+            // Reload to show error message
+            window.location.reload();
+        });
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

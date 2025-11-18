@@ -25,11 +25,16 @@ class StaticViewSitemap(Sitemap):
             # Image converters
             ('image_converter:convert', 'jpeg-to-png'),
             ('image_converter:convert', 'png-to-jpg'),
-            ('image_converter:convert', 'webp-to-png'),
+            ('image_converter:convert', 'webp'),
             ('image_converter:convert', 'svg-to-png'),
+            'image_converter:resize',
             
             # Media converters
             'media_converter:youtube_to_mp3',
+            'media_converter:mp4_to_mp3',
+            'media_converter:audio_converter',
+            'media_converter:video_to_gif',
+            'media_converter:video_converter',
             
             # Utilities
             'utilities:calculator',

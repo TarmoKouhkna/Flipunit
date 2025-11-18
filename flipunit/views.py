@@ -19,13 +19,13 @@ def home(request):
             {
                 'name': 'Media Converters',
                 'url': 'media_converter:index',
-                'description': 'Convert media files and download audio',
+                'description': 'Convert media files and download audio. YouTube to mp3 & etc.',
                 'icon': '🎵'
             },
             {
                 'name': 'Utilities',
                 'url': 'utilities:index',
-                'description': 'PDF tools, calculators, and text utilities',
+                'description': 'PDF tools, calculators, text utilities and more',
                 'icon': '🛠️'
             },
         ]

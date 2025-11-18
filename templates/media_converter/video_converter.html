@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+
+{% block title %}Video Converter - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online video converter - Convert between MP4, AVI, MOV, MKV, and WebM formats. Fast, simple, no registration required.{% endblock %}
+{% block og_title %}Video Converter - {{ SITE_NAME }}{% endblock %}
+{% block og_description %}Free online video converter - Convert between different video formats.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Video Converter</h1>
+    <p>Convert between different video formats</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Video File</label>
+            <div class="file-upload-area">
+                <input type="file" name="video_file" id="video_file" accept="video/*" required>
+                <div style="text-align: center; padding: 2rem;">
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: MP4, AVI, MOV, MKV, WebM, FLV, WMV</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label" for="output_format">Output Format</label>
+            <select class="form-select" id="output_format" name="output_format" required>
+                <option value="mp4">MP4</option>
+                <option value="avi">AVI</option>
+                <option value="mov">MOV</option>
+                <option value="mkv">MKV</option>
+                <option value="webm">WebM</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Convert & Download</button>
+    </form>
+    
+    <!-- Progress indicator -->
+    <div id="processing-indicator" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem;"></div>
+        <span id="processing-message">Processing video... This may take several minutes for large files. Please be patient and do not close this page.</span>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Upload a video file (MP4, AVI, MOV, MKV, WebM, FLV, or WMV)</li>
+            <li>Select the desired output format</li>
+            <li>Click "Convert & Download"</li>
+            <li>Download the converted video file</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> Video conversion is CPU-intensive and may take some time. For best performance:
+        </p>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem; color: var(--text-secondary);">
+            <li><strong>Recommended:</strong> Files under 200 MB for optimal speed and performance</li>
+            <li><strong>Acceptable:</strong> Files up to 500 MB (may take 5-15 minutes to convert)</li>
+            <li><strong>Not recommended:</strong> Files over 500 MB will be rejected - use a dedicated desktop tool for very large files</li>
+            <li>Close other applications during conversion to speed up processing</li>
+            <li>Conversion is optimized for speed (may slightly reduce quality)</li>
+        </ul>
+    </div>
+</div>
+
+<a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.converter-tool');
+    const fileInput = document.getElementById('video_file');
+    const uploadArea = document.querySelector('.file-upload-area');
+    const submitBtn = document.getElementById('submit-btn') || form.querySelector('button[type="submit"]');
+    const processingIndicator = document.getElementById('processing-indicator');
+    
+    // Update UI when file is selected
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const fileName = e.target.files[0].name;
+            uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
+        }
+    });
+    
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Prevent multiple submissions and dialog appearances
+    let isProcessing = false;
+    let isShowingDialog = false;
+    
+    // Use window-level flags to prevent duplicates across all instances
+    if (!window.videoConverterProcessing) {
+        window.videoConverterProcessing = false;
+    }
+    if (!window.videoConverterDownloadTriggered) {
+        window.videoConverterDownloadTriggered = false;
+    }
+    if (!window.videoConverterDownloadLink) {
+        window.videoConverterDownloadLink = null;
+    }
+    
+    // Handle form submission with fetch to keep page responsive
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        // Prevent multiple submissions
+        if (isProcessing || isShowingDialog || window.videoConverterProcessing) {
+            console.log('Already processing, ignoring duplicate submission');
+            return false;
+        }
+        
+        if (!fileInput.files.length) {
+            alert('Please select a video file.');
+            return false;
+        }
+        
+        // Warn user about large files
+        const fileSizeMB = fileInput.files[0].size / (1024 * 1024);
+        let userConfirmed = false;
+        
+        if (fileSizeMB > 200) {
+            isShowingDialog = true;
+            const estimatedTime = fileSizeMB > 400 ? '10-15 minutes' : '5-10 minutes';
+            userConfirmed = confirm(`Warning: This file is ${fileSizeMB.toFixed(1)} MB (${(fileSizeMB / 1024).toFixed(2)} GB).\n\nVideo conversion will use significant CPU resources and may take ${estimatedTime}.\n\nFor best performance, files under 200 MB are recommended.\n\nContinue with conversion?`);
+            isShowingDialog = false;
+            
+            if (!userConfirmed) {
+                // Explicitly prevent any further processing
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return false;
+            }
+        } else if (fileSizeMB > 100) {
+            isShowingDialog = true;
+            userConfirmed = confirm(`This file is ${fileSizeMB.toFixed(1)} MB. Conversion may take a few minutes. Continue?`);
+            isShowingDialog = false;
+            
+            if (!userConfirmed) {
+                // Explicitly prevent any further processing
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return false;
+            }
+        }
+        
+        // Mark as processing (both local and window-level)
+        isProcessing = true;
+        window.videoConverterProcessing = true;
+        window.videoConverterDownloadTriggered = false;
+        
+        // Disable button during processing
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        
+        // Show progress indicator with file size info
+        if (processingIndicator) {
+            processingIndicator.style.display = 'block';
+            const processingMessage = document.getElementById('processing-message');
+            if (processingMessage) {
+                let timeEstimate = 'a few minutes';
+                if (fileSizeMB > 400) {
+                    timeEstimate = '10-15 minutes';
+                } else if (fileSizeMB > 200) {
+                    timeEstimate = '5-10 minutes';
+                } else if (fileSizeMB > 100) {
+                    timeEstimate = '3-5 minutes';
+                }
+                processingMessage.textContent = `Processing video (${fileSizeMB.toFixed(1)} MB)... This may take ${timeEstimate}. Please be patient and do not close this page.`;
+            }
+        }
+        
+        const formData = new FormData(form);
+        
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+        })
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            
+            // Check if we got a video file
+            if (contentType.includes('video/')) {
+                return response.blob().then(blob => {
+                    if (blob.size === 0) {
+                        throw new Error('Downloaded file is empty. Conversion may have failed.');
+                    }
+                    const filename = response.headers.get('x-filename') || 'converted.video';
+                    return { blob, filename };
+                });
+            }
+            
+            // If we got HTML, it's an error page - extract the error message
+            if (contentType.includes('text/html')) {
+                return response.text().then(html => {
+                    // Try to extract error message from the HTML
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    let errorMessage = 'Video conversion failed.';
+                    
+                    // Try multiple selectors to find the error message
+                    const errorDiv = doc.querySelector('.alert-error') || 
+                                    doc.querySelector('.alert.alert-error') ||
+                                    doc.querySelector('[class*="alert-error"]') ||
+                                    doc.querySelector('.error') ||
+                                    doc.querySelector('.alert');
+                    
+                    if (errorDiv) {
+                        errorMessage = errorDiv.textContent.trim();
+                        // Remove any extra whitespace
+                        errorMessage = errorMessage.replace(/\s+/g, ' ').trim();
+                    }
+                    
+                    // If still no error found, log the HTML for debugging
+                    if (errorMessage === 'Video conversion failed.') {
+                        console.error('Could not extract error message from HTML response');
+                        console.log('HTML response:', html.substring(0, 500));
+                    }
+                    
+                    throw new Error(errorMessage);
+                });
+            }
+            
+            // Unexpected content type
+            return response.text().then(text => {
+                throw new Error('Unexpected response type: ' + contentType + '. Response: ' + text.substring(0, 200));
+            });
+        })
+        .then(({ blob, filename }) => {
+            // Atomic check-and-set: only proceed if download hasn't been triggered
+            if (window.videoConverterDownloadTriggered) {
+                console.log('Download already triggered, skipping duplicate');
+                isProcessing = false;
+                window.videoConverterProcessing = false;
+                return;
+            }
+            if (!window.videoConverterProcessing) {
+                console.log('Processing stopped, skipping download');
+                return;
+            }
+            
+            // ATOMIC: Set download triggered flag IMMEDIATELY to prevent any race conditions
+            window.videoConverterDownloadTriggered = true;
+            
+            // Mark as processing complete
+            isProcessing = false;
+            window.videoConverterProcessing = false;
+            
+            // Clean up any existing download links
+            if (window.videoConverterDownloadLink) {
+                try {
+                    if (window.videoConverterDownloadLink.href && window.videoConverterDownloadLink.href.startsWith('blob:')) {
+                        window.URL.revokeObjectURL(window.videoConverterDownloadLink.href);
+                    }
+                    if (document.body.contains(window.videoConverterDownloadLink)) {
+                        document.body.removeChild(window.videoConverterDownloadLink);
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+                window.videoConverterDownloadLink = null;
+            }
+            
+            // Remove any other download links (safety)
+            const existingLinks = document.querySelectorAll('a[data-video-download]');
+            existingLinks.forEach(link => {
+                try {
+                    if (link.href && link.href.startsWith('blob:')) {
+                        window.URL.revokeObjectURL(link.href);
+                    }
+                    if (document.body.contains(link)) {
+                        document.body.removeChild(link);
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+            });
+            
+            // Create download link only once and store it globally
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            a.setAttribute('data-video-download', 'true');
+            
+            // Store globally to prevent duplicates
+            window.videoConverterDownloadLink = a;
+            document.body.appendChild(a);
+            
+            // Trigger download exactly once - use immediate synchronous execution
+            try {
+                a.click();
+            } catch(e) {
+                console.error('Error triggering download:', e);
+            }
+            
+            // Clean up after a delay
+            setTimeout(function() {
+                try {
+                    if (window.videoConverterDownloadLink && window.videoConverterDownloadLink.href === url) {
+                        window.URL.revokeObjectURL(url);
+                        if (document.body.contains(window.videoConverterDownloadLink)) {
+                            document.body.removeChild(window.videoConverterDownloadLink);
+                        }
+                        window.videoConverterDownloadLink = null;
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+            }, 1000);
+            
+            // Hide progress indicator
+            if (processingIndicator) {
+                processingIndicator.style.display = 'none';
+            }
+            
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Convert & Download';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            
+            // Reset processing flags
+            isProcessing = false;
+            window.videoConverterProcessing = false;
+            window.videoConverterDownloadTriggered = false;
+            
+            // Hide progress indicator
+            if (processingIndicator) {
+                processingIndicator.style.display = 'none';
+            }
+            
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Convert & Download';
+            
+            // Show error message
+            alert('Error: ' + error.message);
+            
+            // Reload to show error message
+            setTimeout(function() {
+                window.location.reload();
+            }, 1000);
+        });
+    });
+    
+});
+</script>
+{% endblock %}
+{% endblock %}
+

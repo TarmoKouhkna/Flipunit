@@ -1,0 +1,331 @@
+{% extends 'base.html' %}
+
+{% block title %}Video to GIF Converter - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online video to GIF converter - Convert video clips to animated GIFs. Fast, simple, no registration required.{% endblock %}
+{% block og_title %}Video to GIF Converter - {{ SITE_NAME }}{% endblock %}
+{% block og_description %}Free online video to GIF converter - Convert video clips to animated GIFs.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Video to GIF Converter</h1>
+    <p>Convert video clips to animated GIFs</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Video File</label>
+            <div class="file-upload-area">
+                <input type="file" name="video_file" id="video_file" accept="video/*" required>
+                <div style="text-align: center; padding: 2rem;">
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: MP4, AVI, MOV, MKV, WebM, FLV, WMV</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-2" style="margin-top: 1.5rem;">
+            <div class="form-group">
+                <label class="form-label" for="start_time">Start Time (seconds)</label>
+                <input type="number" class="form-control" id="start_time" name="start_time" 
+                       value="0" min="0" step="0.1" placeholder="0">
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+                    Start extracting from this time
+                </p>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="duration">Duration (seconds)</label>
+                <input type="number" class="form-control" id="duration" name="duration" 
+                       value="5" min="0.1" max="30" step="0.1" placeholder="5">
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+                    Maximum 30 seconds
+                </p>
+            </div>
+        </div>
+        
+        <div class="grid grid-2" style="margin-top: 1rem;">
+            <div class="form-group">
+                <label class="form-label" for="width">Width (pixels)</label>
+                <input type="number" class="form-control" id="width" name="width" 
+                       value="640" min="1" max="1920" placeholder="640">
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+                    Height will be calculated automatically
+                </p>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="fps">Frames Per Second (FPS)</label>
+                <input type="number" class="form-control" id="fps" name="fps" 
+                       value="10" min="1" max="30" placeholder="10">
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+                    Lower FPS = smaller file size
+                </p>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;" id="submit-btn">Convert to GIF & Download</button>
+    </form>
+    
+    <!-- Progress indicator -->
+    <div id="processing-indicator" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem;"></div>
+        <span>Processing video... This may take a while for large files.</span>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Upload a video file</li>
+            <li>Set the start time (when to begin extracting)</li>
+            <li>Set the duration (how long the GIF should be, max 30 seconds)</li>
+            <li>Set the width (height will be calculated to maintain aspect ratio)</li>
+            <li>Set the FPS (frames per second - lower = smaller file)</li>
+            <li>Click "Convert to GIF & Download"</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Tip:</strong> For smaller file sizes, use lower FPS (5-10) and shorter durations. GIFs are best for short clips (5-10 seconds).
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.converter-tool');
+    const fileInput = document.getElementById('video_file');
+    const uploadArea = document.querySelector('.file-upload-area');
+    const submitBtn = document.getElementById('submit-btn') || form.querySelector('button[type="submit"]');
+    
+    // Update UI when file is selected
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const fileName = e.target.files[0].name;
+            uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
+        }
+    });
+    
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Use window-level flags to prevent duplicates across all instances
+    if (!window.videoToGifProcessing) {
+        window.videoToGifProcessing = false;
+    }
+    if (!window.videoToGifDownloadTriggered) {
+        window.videoToGifDownloadTriggered = false;
+    }
+    if (!window.videoToGifDownloadLink) {
+        window.videoToGifDownloadLink = null;
+    }
+    
+    // Handle form submission with fetch to keep page responsive
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Prevent multiple submissions
+        if (window.videoToGifProcessing) {
+            console.log('Already processing, ignoring duplicate submission');
+            return false;
+        }
+        
+        if (!fileInput.files.length) {
+            alert('Please select a video file.');
+            return;
+        }
+        
+        // Mark as processing immediately
+        window.videoToGifProcessing = true;
+        window.videoToGifDownloadTriggered = false;
+        
+        // Disable button during processing
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        
+        // Show progress indicator
+        const processingIndicator = document.getElementById('processing-indicator');
+        if (processingIndicator) {
+            processingIndicator.style.display = 'block';
+        }
+        
+        const formData = new FormData(form);
+        
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+        })
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            
+            // Check if we got an error page (HTML response)
+            if (contentType.includes('text/html')) {
+                // Try to extract error message from response
+                return response.text().then(html => {
+                    // Check if there's an error message in the HTML
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const errorDiv = doc.querySelector('.alert-error');
+                    if (errorDiv) {
+                        throw new Error(errorDiv.textContent.trim());
+                    }
+                    throw new Error('Conversion failed. Please check the video file and try again.');
+                });
+            }
+            
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error('Server returned an error: ' + (text.substring(0, 200) || 'Unknown error'));
+                });
+            }
+            
+            if (contentType.includes('image/gif')) {
+                return response.blob().then(blob => {
+                    // Verify blob is not empty
+                    if (blob.size === 0) {
+                        throw new Error('Downloaded file is empty. Conversion may have failed.');
+                    }
+                    const filename = response.headers.get('x-filename') || 'converted.gif';
+                    return { blob, filename };
+                });
+            } else {
+                // Unexpected content type
+                return response.text().then(text => {
+                    throw new Error('Expected GIF file but got: ' + contentType + '. Response: ' + text.substring(0, 200));
+                });
+            }
+        })
+        .then(({ blob, filename }) => {
+            // Atomic check-and-set: only proceed if download hasn't been triggered
+            if (window.videoToGifDownloadTriggered) {
+                console.log('Download already triggered, skipping duplicate');
+                window.videoToGifProcessing = false;
+                return;
+            }
+            if (!window.videoToGifProcessing) {
+                console.log('Processing stopped, skipping download');
+                return;
+            }
+            
+            // ATOMIC: Set download triggered flag IMMEDIATELY to prevent any race conditions
+            window.videoToGifDownloadTriggered = true;
+            
+            // Mark as processing complete
+            window.videoToGifProcessing = false;
+            
+            // Clean up any existing download links
+            if (window.videoToGifDownloadLink) {
+                try {
+                    if (window.videoToGifDownloadLink.href && window.videoToGifDownloadLink.href.startsWith('blob:')) {
+                        window.URL.revokeObjectURL(window.videoToGifDownloadLink.href);
+                    }
+                    if (document.body.contains(window.videoToGifDownloadLink)) {
+                        document.body.removeChild(window.videoToGifDownloadLink);
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+                window.videoToGifDownloadLink = null;
+            }
+            
+            // Remove any other download links (safety)
+            const existingLinks = document.querySelectorAll('a[data-gif-download]');
+            existingLinks.forEach(link => {
+                try {
+                    if (link.href && link.href.startsWith('blob:')) {
+                        window.URL.revokeObjectURL(link.href);
+                    }
+                    if (document.body.contains(link)) {
+                        document.body.removeChild(link);
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+            });
+            
+            // Create download link only once and store it globally
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            a.setAttribute('data-gif-download', 'true');
+            
+            // Store globally to prevent duplicates
+            window.videoToGifDownloadLink = a;
+            document.body.appendChild(a);
+            
+            // Trigger download exactly once - use immediate synchronous execution
+            try {
+                a.click();
+            } catch(e) {
+                console.error('Error triggering download:', e);
+            }
+            
+            // Clean up after a delay
+            setTimeout(function() {
+                try {
+                    if (window.videoToGifDownloadLink && window.videoToGifDownloadLink.href === url) {
+                        window.URL.revokeObjectURL(url);
+                        if (document.body.contains(window.videoToGifDownloadLink)) {
+                            document.body.removeChild(window.videoToGifDownloadLink);
+                        }
+                        window.videoToGifDownloadLink = null;
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+            }, 1000);
+            
+            // Hide progress indicator
+            if (processingIndicator) {
+                processingIndicator.style.display = 'none';
+            }
+            
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Convert to GIF & Download';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            
+            // Reset processing flags
+            window.videoToGifProcessing = false;
+            window.videoToGifDownloadTriggered = false;
+            
+            // Hide progress indicator
+            if (processingIndicator) {
+                processingIndicator.style.display = 'none';
+            }
+            
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Convert to GIF & Download';
+            
+            // Show error message to user
+            alert('Error: ' + error.message);
+            
+            // Reload to show error message from server if available
+            setTimeout(function() {
+                window.location.reload();
+            }, 1000);
+        });
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

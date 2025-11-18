@@ -5,12 +5,12 @@
 {% block content %}
 <div class="hero">
     <h1>Media Converters</h1>
-    <p>Convert media files and download audio</p>
+    <p>Convert media files and download audio. YouTube to mp3 & etc.</p>
 </div>
 
 <div class="grid grid-2">
     {% for converter in converters %}
-    <a href="{% url 'media_converter:youtube_to_mp3' %}" class="category-card">
+    <a href="{% url converter.url %}" class="category-card">
         <h3>{{ converter.name }}</h3>
         <p>{{ converter.description }}</p>
         {% if converter.notice %}
