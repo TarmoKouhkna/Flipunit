@@ -12,6 +12,22 @@
         {% endfor %}
     {% endif %}
     
+    <div id="js-error-message" style="display: none;" class="alert alert-error"></div>
+    
+    <script>
+    // Display error message from sessionStorage if available
+    if (sessionStorage.getItem('youtubeError')) {
+        const errorMsg = sessionStorage.getItem('youtubeError');
+        const errorDiv = document.getElementById('js-error-message');
+        if (errorDiv) {
+            errorDiv.textContent = errorMsg;
+            errorDiv.style.display = 'block';
+            // Clear after displaying
+            sessionStorage.removeItem('youtubeError');
+        }
+    }
+    </script>
+    
     <div class="alert alert-info">
         <strong>Usage Notice:</strong>
         <pre style="white-space: pre-wrap; margin-top: 0.5rem;">{{ usage_notice }}</pre>
@@ -176,19 +192,12 @@ document.addEventListener('DOMContentLoaded', function() {
             cache: 'no-cache'
         })
         .then(response => {
-            if (!response.ok) {
-                // If response is not ok, it might be an HTML error page
-                return response.text().then(text => {
-                    throw new Error('Server returned an error');
-                });
-            }
-            
             // Check for custom content type header or check if it's an octet-stream (our audio file)
             const contentType = response.headers.get('content-type');
             const xContentType = response.headers.get('x-content-type');
             const isAudioFile = (contentType && (contentType.includes('audio/mpeg') || contentType.includes('application/octet-stream'))) || xContentType;
             
-            if (isAudioFile) {
+            if (isAudioFile && response.ok) {
                 // Extract filename from custom X-Filename header
                 let filename = response.headers.get('x-filename') || 'converted.mp3';
                 
@@ -202,9 +211,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 const actualContentType = xContentType || contentType || 'audio/mpeg';
                 return response.blob().then(blob => ({ blob, filename, contentType: actualContentType }));
             } else {
-                // Response is HTML (error page), reload to show error messages
-                window.location.reload();
-                return Promise.reject(new Error('Expected MP3 file but got HTML response'));
+                // Response is HTML (error page), try to extract error message
+                return response.text().then(html => {
+                    // Try to find error message in the HTML
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const errorAlert = doc.querySelector('.alert-error, .alert-danger, [class*="alert-error"], [class*="alert-danger"]');
+                    let errorMessage = 'An error occurred during conversion. Please try again.';
+                    
+                    if (errorAlert) {
+                        errorMessage = errorAlert.textContent.trim() || errorMessage;
+                    } else {
+                        // Check for Django messages
+                        const messages = doc.querySelectorAll('.messages .alert, .alert');
+                        if (messages.length > 0) {
+                            errorMessage = Array.from(messages).map(m => m.textContent.trim()).join(' ');
+                        }
+                    }
+                    
+                    // Store error message and reload
+                    sessionStorage.setItem('youtubeError', errorMessage);
+                    window.location.reload();
+                    return Promise.reject(new Error(errorMessage));
+                });
             }
         })
         .then(({ blob, filename, contentType }) => {
