@@ -336,18 +336,47 @@ if (window.audioConverterInitialized) {
         // Attach our handler LAST, with highest priority
         form.addEventListener('submit', submitHandler, { capture: false, once: false });
         
-        // Update file name display (main.js handles the click/drag handlers, so we don't need to restore them)
+        // Ensure file input is working - main.js should handle it, but verify
         const fileInput = form.querySelector('#audio_file');
         const uploadArea = form.querySelector('.file-upload-area');
+        console.log('📁 File input found:', fileInput);
+        console.log('📁 Upload area found:', uploadArea);
+        
         if (fileInput && uploadArea) {
+            // Make sure file input is accessible
+            fileInput.style.display = 'block';
+            fileInput.style.opacity = '0';
+            fileInput.style.position = 'absolute';
+            fileInput.style.width = '100%';
+            fileInput.style.height = '100%';
+            fileInput.style.cursor = 'pointer';
+            
+            // Ensure upload area is clickable
+            uploadArea.style.cursor = 'pointer';
+            uploadArea.style.position = 'relative';
+            
+            // Add a backup click handler in case main.js didn't attach one
+            uploadArea.addEventListener('click', function(e) {
+                console.log('🖱️ Upload area clicked');
+                if (e.target !== fileInput && !fileInput.contains(e.target)) {
+                    console.log('🖱️ Triggering file input click');
+                    fileInput.click();
+                }
+            }, { capture: false });
+            
             // Update display when file is selected
             fileInput.addEventListener('change', (e) => {
+                console.log('📁 File selected:', e.target.files[0]?.name);
                 const fileName = e.target.files[0]?.name;
                 const p = uploadArea.querySelector('p');
                 if (p && fileName) {
                     p.textContent = 'Selected: ' + fileName;
                 }
             });
+            
+            console.log('✅ File input handlers attached');
+        } else {
+            console.error('❌ File input or upload area not found!');
         }
     });
 }
