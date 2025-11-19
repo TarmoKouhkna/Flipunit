@@ -472,9 +472,14 @@ def audio_converter(request):
         
         # Create response
         # Use JSON to prevent browser auto-download - JavaScript will extract and download
-        safe_filename = os.path.splitext(uploaded_file.name)[0] + f'.{output_ext}'
+        # Ensure we use the correct output extension
+        base_name = os.path.splitext(uploaded_file.name)[0]
+        safe_filename = base_name + f'.{output_ext}'
         safe_filename = re.sub(r'[^\w\s-]', '', safe_filename).strip()
         safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
+        
+        # Debug: Log the filename being sent
+        logger.info(f'Generated filename: {safe_filename}, output_format: {output_format}, output_ext: {output_ext}')
         
         # Encode file as base64 to send as JSON
         file_base64 = base64.b64encode(file_content).decode('utf-8')
@@ -484,6 +489,9 @@ def audio_converter(request):
             'filename': safe_filename,
             'content_type': content_type_map[output_format]
         }
+        
+        # Debug: Log response data (without the large base64 string)
+        logger.info(f'Response filename: {response_data["filename"]}, content_type: {response_data["content_type"]}')
         
         response = HttpResponse(
             json.dumps(response_data),
