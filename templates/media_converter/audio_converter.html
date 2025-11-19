@@ -59,14 +59,20 @@
 
 {% block extra_js %}
 <script>
+// === FORCE CONSOLE LOGS TO APPEAR ===
+console.log('🔵 Audio converter script block loaded at:', new Date().toISOString());
+console.log('🔵 Script location:', window.location.href);
+
 // === GLOBAL FETCH PROTECTION (runs immediately, before anything else) ===
 (function() {
     'use strict';
     if (window._audioConverterFetchProtected) {
-        console.warn('⚠️ Fetch protection already installed - this script may be loaded twice!');
+        console.error('❌❌❌ CRITICAL: Fetch protection already installed - script loaded TWICE!');
+        console.trace('Stack trace:');
         return; // Already protected
     }
     window._audioConverterFetchProtected = true;
+    console.log('✅ Fetch protection installing...');
     
     const originalFetch = window.fetch;
     let isProcessing = false; // Synchronous lock - no Map needed
@@ -116,21 +122,36 @@ if (window.audioConverterInitialized) {
     console.log('✅ Audio converter script initializing...');
 
     document.addEventListener('DOMContentLoaded', () => {
+        console.log('🔵 DOMContentLoaded fired');
         const form = document.querySelector('.converter-tool');
-        if (!form) return;
+        if (!form) {
+            console.error('❌ Form not found!');
+            return;
+        }
+        console.log('✅ Form found:', form);
 
-        let isProcessing = false;
-        let downloadTriggered = false;
-        let abortController = null; // Track AbortController for canceling duplicates
+        // GLOBAL STATE - shared across all instances
+        if (!window._audioConverterState) {
+            window._audioConverterState = {
+                isProcessing: false,
+                downloadTriggered: false,
+                abortController: null,
+                submitCount: 0
+            };
+        }
+        const state = window._audioConverterState;
 
         const submitHandler = async (e) => {
+            state.submitCount++;
+            console.log('📝 Submit handler called, count:', state.submitCount);
+            
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
 
             // === INSTANT DOUBLE-CLICK PROTECTION ===
-            if (isProcessing) {
-                console.log('Submit blocked: already processing');
+            if (state.isProcessing) {
+                console.error('🚫🚫🚫 Submit BLOCKED: already processing (count:', state.submitCount, ')');
                 return false;
             }
 
@@ -141,19 +162,21 @@ if (window.audioConverterInitialized) {
             }
 
             // === LOCK IMMEDIATELY ===
-            isProcessing = true;
-            downloadTriggered = false;
+            state.isProcessing = true;
+            state.downloadTriggered = false;
+            console.log('🔒 Lock set, submit count:', state.submitCount);
+            
             const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
             form.style.pointerEvents = 'none';
 
             // Abort any previous fetch to kill duplicates
-            if (abortController) {
-                abortController.abort();
+            if (state.abortController) {
+                state.abortController.abort();
                 console.log('Previous fetch aborted');
             }
-            abortController = new AbortController(); // Fresh controller
+            state.abortController = new AbortController(); // Fresh controller
 
             // Cleanup any old blob URLs
             document.querySelectorAll('a[data-temp-download]').forEach(a => {
@@ -162,9 +185,9 @@ if (window.audioConverterInitialized) {
                 }
                 a.remove();
             });
-
-            const formData = new FormData(form);
-
+        
+        const formData = new FormData(form);
+        
             try {
                 console.log('📤 About to call fetch...');
                 const fetchUrl = form.action || window.location.href;
@@ -173,10 +196,10 @@ if (window.audioConverterInitialized) {
                 console.log('📤 Is protected?', window._audioConverterFetchProtected);
                 
                 const response = await fetch(fetchUrl, {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin',
-                    signal: abortController.signal // Allows abort
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+                    signal: state.abortController.signal // Allows abort
                 });
                 
                 console.log('📥 Fetch response received:', response.status);
@@ -199,7 +222,7 @@ if (window.audioConverterInitialized) {
                     blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
                     filename = data.filename;
                     contentType = data.content_type || 'audio/mpeg';
-                } else {
+            } else {
                     // Legacy format - direct audio file
                     blob = await response.blob();
                     filename = response.headers.get('x-filename') || 'converted.audio';
@@ -208,11 +231,12 @@ if (window.audioConverterInitialized) {
                 }
 
                 // === FINAL DUPLICATE DOWNLOAD GUARD ===
-                if (downloadTriggered) {
-                    console.log('Download already triggered, skipping');
+                if (state.downloadTriggered) {
+                    console.error('🚫🚫🚫 Download already triggered, skipping (submit count:', state.submitCount, ')');
                     return;
                 }
-                downloadTriggered = true;
+                state.downloadTriggered = true;
+                console.log('✅ Download triggered (submit count:', state.submitCount, ')');
 
                 // Add timestamp to filename to prevent browser de-duping
                 const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
@@ -221,22 +245,22 @@ if (window.audioConverterInitialized) {
                 const uniqueFilename = `${baseName}-${timestamp}${fileExt}`;
 
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
+            const a = document.createElement('a');
+            a.href = url;
                 a.download = uniqueFilename; // Use unique name
                 a.dataset.tempDownload = 'true';
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
                 // Cleanup
                 setTimeout(() => {
                     if (document.body.contains(a)) {
-                        document.body.removeChild(a);
+                document.body.removeChild(a);
                     }
                     URL.revokeObjectURL(url);
-                }, 100);
-
+            }, 100);
+            
             } catch (err) {
                 // Ignore abort errors (expected for duplicates)
                 if (err.name === 'AbortError') {
@@ -248,10 +272,11 @@ if (window.audioConverterInitialized) {
                 window.location.reload();
             } finally {
                 // === ALWAYS RESET ===
-                isProcessing = false;
-                abortController = null; // Clear controller
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Convert & Download';
+                console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
+                state.isProcessing = false;
+                state.abortController = null; // Clear controller
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Convert & Download';
                 form.style.pointerEvents = 'auto';
             }
         };
@@ -273,11 +298,12 @@ if (window.audioConverterInitialized) {
                 e.stopImmediatePropagation();
                 e.stopPropagation();
                 
-                if (isProcessing) {
-                    console.log('Button click blocked: already processing');
+                if (window._audioConverterState?.isProcessing) {
+                    console.error('🚫 Button click blocked: already processing');
                     return false;
                 }
                 
+                console.log('🖱️ Button clicked, dispatching submit event');
                 // Manually trigger submit event
                 const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
                 newForm.dispatchEvent(submitEvent);
