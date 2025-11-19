@@ -229,26 +229,50 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 // Response is HTML (error page), try to extract error message
                 return response.text().then(html => {
+                    console.log('Received HTML response, extracting error message...');
                     // Try to find error message in the HTML
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
-                    const errorAlert = doc.querySelector('.alert-error, .alert-danger, [class*="alert-error"], [class*="alert-danger"]');
+                    
+                    // Try multiple selectors for error messages
                     let errorMessage = 'An error occurred during conversion. Please try again.';
                     
-                    if (errorAlert) {
-                        errorMessage = errorAlert.textContent.trim() || errorMessage;
+                    // Check for Django messages first
+                    const djangoMessages = doc.querySelectorAll('.messages .alert, .messages .alert-error, .messages .alert-danger');
+                    if (djangoMessages.length > 0) {
+                        errorMessage = Array.from(djangoMessages).map(m => m.textContent.trim()).join(' ');
+                        console.log('Found Django message:', errorMessage);
                     } else {
-                        // Check for Django messages
-                        const messages = doc.querySelectorAll('.messages .alert, .alert');
-                        if (messages.length > 0) {
-                            errorMessage = Array.from(messages).map(m => m.textContent.trim()).join(' ');
+                        // Check for alert-error or alert-danger classes
+                        const errorAlert = doc.querySelector('.alert-error, .alert-danger, [class*="alert-error"], [class*="alert-danger"]');
+                        if (errorAlert) {
+                            errorMessage = errorAlert.textContent.trim() || errorMessage;
+                            console.log('Found error alert:', errorMessage);
+                        } else {
+                            // Check for any alert with error text
+                            const allAlerts = doc.querySelectorAll('.alert, [class*="alert"]');
+                            for (let alert of allAlerts) {
+                                const text = alert.textContent.trim().toLowerCase();
+                                if (text.includes('error') || text.includes('failed') || text.includes('blocking')) {
+                                    errorMessage = alert.textContent.trim();
+                                    console.log('Found error in alert:', errorMessage);
+                                    break;
+                                }
+                            }
                         }
                     }
                     
                     // Store error message and reload
                     sessionStorage.setItem('youtubeError', errorMessage);
+                    console.log('Storing error message:', errorMessage);
                     window.location.reload();
                     return Promise.reject(new Error(errorMessage));
+                }).catch(err => {
+                    // If text parsing fails, still reload to show server error
+                    console.error('Error parsing response:', err);
+                    sessionStorage.setItem('youtubeError', 'An error occurred during conversion. Please try again.');
+                    window.location.reload();
+                    return Promise.reject(err);
                 });
             }
         })

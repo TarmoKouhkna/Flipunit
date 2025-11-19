@@ -59,13 +59,20 @@
 
 {% block extra_js %}
 <script>
+// Use global variables to prevent duplicates across page reloads
+if (!window.audioConverterState) {
+    window.audioConverterState = {
+        isProcessing: false,
+        downloadTriggered: false,
+        downloadId: null
+    };
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('.converter-tool');
     const fileInput = document.getElementById('audio_file');
     const uploadArea = document.querySelector('.file-upload-area');
     const submitBtn = form.querySelector('button[type="submit"]');
-    let isProcessing = false; // Flag to prevent duplicate submissions
-    let downloadTriggered = false; // Flag to prevent duplicate downloads
     
     // Update UI when file is selected
     fileInput.addEventListener('change', function(e) {
@@ -83,8 +90,9 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        // Prevent duplicate submissions
-        if (isProcessing) {
+        // Prevent duplicate submissions using global state
+        if (window.audioConverterState.isProcessing) {
+            console.log('Already processing, ignoring duplicate submission');
             return;
         }
         
@@ -93,8 +101,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Set processing flag
-        isProcessing = true;
+        // Set processing flag globally
+        window.audioConverterState.isProcessing = true;
+        window.audioConverterState.downloadTriggered = false;
+        window.audioConverterState.downloadId = Date.now().toString();
         
         // Disable button during processing
         submitBtn.disabled = true;
@@ -144,17 +154,33 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .then(({ blob, filename, contentType }) => {
-            // Prevent duplicate downloads
-            if (downloadTriggered) {
+            // Prevent duplicate downloads using global state
+            if (window.audioConverterState.downloadTriggered) {
                 console.log('Download already triggered, skipping duplicate');
-                isProcessing = false;
+                window.audioConverterState.isProcessing = false;
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Convert & Download';
                 return;
             }
             
             // Mark download as triggered immediately (before any async operations)
-            downloadTriggered = true;
+            window.audioConverterState.downloadTriggered = true;
+            const downloadId = window.audioConverterState.downloadId;
+            
+            // Remove any existing download links first
+            const existingLinks = document.querySelectorAll('a[data-audio-download]');
+            existingLinks.forEach(link => {
+                try {
+                    if (link.href && link.href.startsWith('blob:')) {
+                        window.URL.revokeObjectURL(link.href);
+                    }
+                    if (document.body.contains(link)) {
+                        document.body.removeChild(link);
+                    }
+                } catch(e) {
+                    // Ignore cleanup errors
+                }
+            });
             
             // Create a blob with the correct content type
             const typedBlob = new Blob([blob], { type: contentType || 'audio/mpeg' });
@@ -165,35 +191,39 @@ document.addEventListener('DOMContentLoaded', function() {
             a.href = url;
             a.download = filename;
             a.style.display = 'none';
-            // Add a unique ID to prevent duplicate clicks
-            a.setAttribute('data-download-id', Date.now().toString());
+            a.setAttribute('data-audio-download', downloadId);
             document.body.appendChild(a);
             
             // Trigger download once
             a.click();
             
-            // Remove the element immediately to prevent any browser auto-download
-            setTimeout(function() {
+            // Remove the element IMMEDIATELY (synchronously if possible)
+            requestAnimationFrame(function() {
                 if (document.body.contains(a)) {
                     document.body.removeChild(a);
                 }
-                window.URL.revokeObjectURL(url);
-                // Reset download flag after a delay to allow for retry if needed
+                // Revoke URL after a short delay
                 setTimeout(() => {
-                    downloadTriggered = false;
-                }, 3000);
-            }, 200);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            });
             
-            // Reset processing flag and button
-            isProcessing = false;
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Convert & Download';
+            // Reset processing flag and button after a delay
+            setTimeout(() => {
+                window.audioConverterState.isProcessing = false;
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Convert & Download';
+                // Reset download flag after longer delay
+                setTimeout(() => {
+                    window.audioConverterState.downloadTriggered = false;
+                }, 2000);
+            }, 500);
         })
         .catch(error => {
             console.error('Error:', error);
             // Reset processing flag and button
-            isProcessing = false;
-            downloadTriggered = false;
+            window.audioConverterState.isProcessing = false;
+            window.audioConverterState.downloadTriggered = false;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Convert & Download';
             // Reload to show error message
