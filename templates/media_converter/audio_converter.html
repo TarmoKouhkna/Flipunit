@@ -58,13 +58,19 @@
 <a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
 
 {% block extra_js %}
+<!-- AUDIO CONVERTER SCRIPT v2.0.2025-01-19 - If you see this comment, the template is loading -->
 <script>
 // === VERSION CHECK - FORCE CACHE BUST ===
 const AUDIO_CONVERTER_VERSION = 'v2.0.2025-01-19';
 console.log('🔵🔵🔵 AUDIO CONVERTER SCRIPT LOADED - VERSION:', AUDIO_CONVERTER_VERSION);
 console.log('🔵 Timestamp:', new Date().toISOString());
 console.log('🔵 URL:', window.location.href);
-alert('Audio converter script version: ' + AUDIO_CONVERTER_VERSION); // TEMPORARY - FORCE VISIBILITY
+
+// Force immediate execution - no waiting
+(function() {
+    alert('✅ NEW CODE LOADED! Version: ' + AUDIO_CONVERTER_VERSION);
+    console.error('🔴🔴🔴 ALERT SHOULD HAVE APPEARED - IF NOT, SCRIPT NOT LOADING');
+})();
 
 // === GLOBAL FETCH PROTECTION (runs immediately, before anything else) ===
 (function() {
