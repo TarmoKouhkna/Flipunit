@@ -69,11 +69,7 @@ console.log('🔵 URL:', window.location.href);
 console.log('🔵🔵🔵 CODE FIX: Direct submit handler call (not event dispatch)');
 console.log('🔵🔵🔵 CODE FIX: File input handlers restored');
 
-// Force immediate execution - no waiting
-(function() {
-    alert('✅ NEW CODE v2.1 LOADED! Direct submit handler fix included!');
-    console.error('🔴🔴🔴 ALERT SHOULD HAVE APPEARED - IF NOT, SCRIPT NOT LOADING');
-})();
+// Version check complete
 
 // === GLOBAL FETCH PROTECTION (runs immediately, before anything else) ===
 (function() {
