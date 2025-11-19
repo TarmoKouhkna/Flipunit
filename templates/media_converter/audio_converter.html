@@ -17,7 +17,7 @@
     <form method="post" enctype="multipart/form-data" class="converter-tool">
         {% csrf_token %}
         <div class="form-group">
-            <label class="form-label">Select Audio File</label>
+            <label class="form-label" for="audio_file">Select Audio File</label>
             <div class="file-upload-area">
                 <input type="file" name="audio_file" id="audio_file" accept="audio/*" required>
                 <div style="text-align: center; padding: 2rem;">
@@ -59,100 +59,104 @@
 
 {% block extra_js %}
 <script>
+// CRITICAL: Set up fetch interceptor IMMEDIATELY, before anything else
+// This must happen at the very top, before any other code runs
+(function() {
+    if (!window._audioConverterFetchInterceptorInstalled) {
+        window._audioConverterFetchInterceptorInstalled = true;
+        
+        // Store original fetch
+        if (!window._originalFetch) {
+            window._originalFetch = window.fetch;
+        }
+        
+        // Intercept ALL fetch calls
+        window.fetch = function(...args) {
+            const url = args[0];
+            const options = args[1] || {};
+            
+            // Check if this is a POST to our audio converter endpoint
+            const urlString = typeof url === 'string' ? url : (url && url.toString ? url.toString() : '');
+            if (options.method === 'POST' && urlString.includes('audio-converter')) {
+                // Initialize state if needed
+                if (!window.audioConverterState) {
+                    window.audioConverterState = {
+                        recentFetches: [],
+                        activeFetchLock: false
+                    };
+                }
+                if (!window.audioConverterState.recentFetches) {
+                    window.audioConverterState.recentFetches = [];
+                }
+                if (window.audioConverterState.activeFetchLock === undefined) {
+                    window.audioConverterState.activeFetchLock = false;
+                }
+                
+                // CRITICAL: Use a synchronous lock to prevent race conditions
+                if (window.audioConverterState.activeFetchLock) {
+                    console.warn('❌ DUPLICATE FETCH BLOCKED BY LOCK! URL:', urlString);
+                    console.trace('Stack trace of blocked fetch:');
+                    return Promise.reject(new Error('Duplicate fetch prevented by lock'));
+                }
+                
+                // Set lock IMMEDIATELY (synchronously, before any async operations)
+                window.audioConverterState.activeFetchLock = true;
+                
+                const now = Date.now();
+                const fetchKey = urlString;
+                
+                // Check if we just made a request to this URL (within 2 seconds)
+                const recent = window.audioConverterState.recentFetches.find(f => 
+                    f.key === fetchKey && (now - f.timestamp) < 2000
+                );
+                
+                if (recent) {
+                    // Release lock since we're blocking
+                    window.audioConverterState.activeFetchLock = false;
+                    console.warn('❌ DUPLICATE FETCH INTERCEPTED! URL:', urlString, 'Time since last:', now - recent.timestamp, 'ms');
+                    console.warn('Blocking duplicate request to prevent double conversion');
+                    return Promise.reject(new Error('Duplicate fetch prevented by interceptor'));
+                }
+                
+                // Record this fetch
+                window.audioConverterState.recentFetches.push({
+                    key: fetchKey,
+                    timestamp: now
+                });
+                
+                // Clean up old entries (older than 5 seconds)
+                window.audioConverterState.recentFetches = window.audioConverterState.recentFetches.filter(
+                    f => (now - f.timestamp) < 5000
+                );
+                
+                console.log('✅ Fetch allowed. URL:', urlString, 'Timestamp:', now);
+                
+                // Call original fetch and release lock when done (success or error)
+                const fetchPromise = window._originalFetch.apply(this, args);
+                fetchPromise.finally(() => {
+                    // Release lock after fetch completes (success or error)
+                    setTimeout(() => {
+                        window.audioConverterState.activeFetchLock = false;
+                    }, 100); // Small delay to ensure any pending duplicates are caught
+                });
+                
+                return fetchPromise;
+            }
+            
+            return window._originalFetch.apply(this, args);
+        };
+        
+        console.log('🔒 Fetch interceptor installed at script load time');
+    }
+})();
+
 // CRITICAL: Prevent script from running multiple times
 if (window.audioConverterScriptLoaded) {
-    console.warn('Audio converter script already loaded, skipping duplicate');
+    console.warn('⚠️ Audio converter script already loaded, skipping duplicate');
 } else {
     window.audioConverterScriptLoaded = true;
 
-// CRITICAL: Set up fetch interceptor FIRST, before anything else
-// This must run every time to ensure it's always active
-if (!window.audioConverterFetchInterceptor) {
-    window.audioConverterFetchInterceptor = true;
-    
-    // Store original fetch
-    if (!window._originalFetch) {
-        window._originalFetch = window.fetch;
-    }
-    
-    // Intercept ALL fetch calls
-    window.fetch = function(...args) {
-        const url = args[0];
-        const options = args[1] || {};
-        
-        // Check if this is a POST to our audio converter endpoint
-        const urlString = typeof url === 'string' ? url : (url && url.toString ? url.toString() : '');
-        if (options.method === 'POST' && urlString.includes('audio-converter')) {
-            // Initialize state if needed
-            if (!window.audioConverterState) {
-                window.audioConverterState = {
-                    recentFetches: [],
-                    activeFetchLock: false
-                };
-            }
-            if (!window.audioConverterState.recentFetches) {
-                window.audioConverterState.recentFetches = [];
-            }
-            if (window.audioConverterState.activeFetchLock === undefined) {
-                window.audioConverterState.activeFetchLock = false;
-            }
-            
-            // CRITICAL: Use a synchronous lock to prevent race conditions
-            if (window.audioConverterState.activeFetchLock) {
-                console.warn('❌ DUPLICATE FETCH BLOCKED BY LOCK! URL:', urlString);
-                console.trace('Stack trace of blocked fetch:');
-                return Promise.reject(new Error('Duplicate fetch prevented by lock'));
-            }
-            
-            // Set lock IMMEDIATELY (synchronously, before any async operations)
-            window.audioConverterState.activeFetchLock = true;
-            
-            const now = Date.now();
-            const fetchKey = urlString;
-            
-            // Check if we just made a request to this URL (within 2 seconds)
-            const recent = window.audioConverterState.recentFetches.find(f => 
-                f.key === fetchKey && (now - f.timestamp) < 2000
-            );
-            
-            if (recent) {
-                // Release lock since we're blocking
-                window.audioConverterState.activeFetchLock = false;
-                console.warn('❌ DUPLICATE FETCH INTERCEPTED! URL:', urlString, 'Time since last:', now - recent.timestamp, 'ms');
-                console.warn('Blocking duplicate request to prevent double conversion');
-                return Promise.reject(new Error('Duplicate fetch prevented by interceptor'));
-            }
-            
-            // Record this fetch
-            window.audioConverterState.recentFetches.push({
-                key: fetchKey,
-                timestamp: now
-            });
-            
-            // Clean up old entries (older than 5 seconds)
-            window.audioConverterState.recentFetches = window.audioConverterState.recentFetches.filter(
-                f => (now - f.timestamp) < 5000
-            );
-            
-            console.log('✅ Fetch allowed. URL:', urlString, 'Timestamp:', now);
-            
-            // Call original fetch and release lock when done (success or error)
-            const fetchPromise = window._originalFetch.apply(this, args);
-            fetchPromise.finally(() => {
-                // Release lock after fetch completes (success or error)
-                setTimeout(() => {
-                    window.audioConverterState.activeFetchLock = false;
-                }, 100); // Small delay to ensure any pending duplicates are caught
-            });
-            
-            return fetchPromise;
-        }
-        
-        return window._originalFetch.apply(this, args);
-    };
-    
-    console.log('🔒 Fetch interceptor installed');
-}
+// Fetch interceptor is now set up at the very top of the script (IIFE above)
 
 // Use global variables to prevent duplicates across page reloads
 if (!window.audioConverterState) {
