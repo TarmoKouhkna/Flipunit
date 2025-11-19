@@ -397,6 +397,7 @@ def audio_converter(request):
         }
         
         # Build FFmpeg command with proper flags to force re-encoding
+        # Use -avoid_negative_ts make_zero to prevent stream copy
         cmd = [
             ffmpeg_path,
             '-i', input_path,
@@ -405,15 +406,19 @@ def audio_converter(request):
             '-c:a', codec_map[output_format],  # Use modern -c:a instead of deprecated -acodec
             '-ar', '44100',  # Set sample rate to ensure re-encoding
             '-ac', '2',  # Set to stereo
+            '-avoid_negative_ts', 'make_zero',  # Force re-encoding, prevent stream copy
         ]
         
         # Add quality settings for lossy formats
         if output_format in ['mp3', 'ogg', 'aac']:
             cmd.extend(['-b:a', '192k'])  # Bitrate for lossy formats
         
-        # Add format and output
+        # Explicitly set output format to ensure proper conversion
+        # This prevents FFmpeg from using stream copy
+        cmd.extend(['-f', format_map[output_format]])
+        
+        # Add output
         cmd.extend([
-            '-f', format_map[output_format],  # Explicitly set output format
             '-y',  # Overwrite output file
             output_path
         ])
