@@ -59,11 +59,66 @@
 
 {% block extra_js %}
 <script>
+// === GLOBAL FETCH PROTECTION (runs immediately, before anything else) ===
+(function() {
+    'use strict';
+    if (window._audioConverterFetchProtected) {
+        return; // Already protected
+    }
+    window._audioConverterFetchProtected = true;
+    
+    const originalFetch = window.fetch;
+    const activeRequests = new Map(); // Track active requests by URL
+    
+    window.fetch = function(url, options = {}) {
+        const urlString = typeof url === 'string' ? url : (url?.toString() || '');
+        const isPost = (options.method || 'GET').toUpperCase() === 'POST';
+        const isAudioConverter = urlString.includes('audio-converter');
+        
+        if (isPost && isAudioConverter) {
+            const requestKey = urlString;
+            
+            // Check if this exact request is already in progress
+            if (activeRequests.has(requestKey)) {
+                const existing = activeRequests.get(requestKey);
+                const age = Date.now() - existing.timestamp;
+                
+                if (age < 5000) { // Within 5 seconds
+                    console.warn('🚫 BLOCKED DUPLICATE FETCH:', urlString, 'Age:', age, 'ms');
+                    return Promise.reject(new Error('Duplicate request blocked'));
+                } else {
+                    // Old request, remove it
+                    activeRequests.delete(requestKey);
+                }
+            }
+            
+            // Register this request
+            activeRequests.set(requestKey, { timestamp: Date.now() });
+            console.log('✅ ALLOWED FETCH:', urlString);
+            
+            // Clean up after request completes
+            const fetchPromise = originalFetch.apply(this, arguments);
+            fetchPromise.finally(() => {
+                setTimeout(() => {
+                    activeRequests.delete(requestKey);
+                }, 1000);
+            });
+            
+            return fetchPromise;
+        }
+        
+        return originalFetch.apply(this, arguments);
+    };
+    
+    console.log('🛡️ Global fetch protection installed');
+})();
+
 // === SINGLE EXECUTION GUARD ===
 if (window.audioConverterInitialized) {
-    console.log('Audio converter script already initialized');
+    console.log('⚠️ Audio converter script already initialized - skipping');
 } else {
     window.audioConverterInitialized = true;
+    console.log('✅ Audio converter script initializing...');
 
     document.addEventListener('DOMContentLoaded', () => {
         const form = document.querySelector('.converter-tool');
