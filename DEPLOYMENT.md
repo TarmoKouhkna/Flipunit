@@ -762,12 +762,21 @@ docker-compose restart
 
 ### Update Application (After Code Changes)
 
+**IMPORTANT**: Templates are mounted as a volume, so template changes are immediate without rebuild!
+
 ```bash
 cd /opt/flipunit
-git pull                    # If using Git
-docker-compose build        # Rebuild with new code
-docker-compose up -d        # Restart containers
+git pull                    # Get latest code
+
+# For template changes: Just restart (no rebuild needed!)
+docker-compose restart web
+
+# For Python code changes: Rebuild required
+docker-compose build web
+docker-compose restart web
 ```
+
+**Why this works**: The `docker-compose.yml` mounts `./templates:/app/templates` as a volume, so template files on the VPS are immediately available in the container without rebuilding.
 
 ### Backup Database
 
