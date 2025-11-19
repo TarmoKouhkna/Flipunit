@@ -157,7 +157,9 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 
 # Security settings for production
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # Disable SECURE_SSL_REDIRECT if web server (nginx/proxy) handles SSL termination
+    # Set to True only if Django is directly handling SSL
+    SECURE_SSL_REDIRECT = False  # Changed to False - let web server handle SSL redirects
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
@@ -166,6 +168,10 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    
+    # Trust proxy headers if behind a reverse proxy (nginx, etc.)
+    USE_TZ = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Logging configuration
 LOGGING = {
