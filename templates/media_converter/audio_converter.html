@@ -69,10 +69,10 @@ if (!window.audioConverterState) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('.converter-tool');
-    const fileInput = document.getElementById('audio_file');
-    const uploadArea = document.querySelector('.file-upload-area');
-    const submitBtn = form.querySelector('button[type="submit"]');
+    let form = document.querySelector('.converter-tool');
+    let fileInput = document.getElementById('audio_file');
+    let uploadArea = document.querySelector('.file-upload-area');
+    let submitBtn = form.querySelector('button[type="submit"]');
     
     // Update UI when file is selected
     fileInput.addEventListener('change', function(e) {
@@ -87,30 +87,39 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Handle form submission with fetch to keep page responsive
-    form.addEventListener('submit', function(e) {
+    let formSubmitted = false;
+    const submitHandler = function(e) {
         e.preventDefault();
+        e.stopImmediatePropagation(); // Prevent other listeners
+        e.stopPropagation();
         
         // Prevent duplicate submissions using global state
-        if (window.audioConverterState.isProcessing) {
+        if (window.audioConverterState.isProcessing || formSubmitted) {
             console.log('Already processing, ignoring duplicate submission');
-            return;
+            return false;
         }
         
         if (!fileInput.files.length) {
             alert('Please select an audio file.');
-            return;
+            return false;
         }
+        
+        // Mark as submitted immediately
+        formSubmitted = true;
         
         // Set processing flag globally
         window.audioConverterState.isProcessing = true;
         window.audioConverterState.downloadTriggered = false;
         window.audioConverterState.downloadId = Date.now().toString();
         
-        // Disable button during processing
+        // Disable button and form during processing
         submitBtn.disabled = true;
         submitBtn.textContent = 'Processing...';
+        form.style.pointerEvents = 'none'; // Prevent any clicks
         
         const formData = new FormData(form);
+        
+        console.log('Starting audio conversion request...');
         
         fetch(form.action || window.location.href, {
             method: 'POST',
@@ -211,8 +220,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reset processing flag and button after a delay
             setTimeout(() => {
                 window.audioConverterState.isProcessing = false;
+                formSubmitted = false;
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Convert & Download';
+                form.style.pointerEvents = 'auto'; // Re-enable form
                 // Reset download flag after longer delay
                 setTimeout(() => {
                     window.audioConverterState.downloadTriggered = false;
@@ -224,12 +235,20 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reset processing flag and button
             window.audioConverterState.isProcessing = false;
             window.audioConverterState.downloadTriggered = false;
+            formSubmitted = false;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Convert & Download';
+            form.style.pointerEvents = 'auto'; // Re-enable form
             // Reload to show error message
             window.location.reload();
         });
-    });
+        
+        return false; // Prevent default and stop propagation
+    };
+    
+    // Remove any existing submit listeners and add our own
+    form.onsubmit = null; // Clear any inline handlers
+    form.addEventListener('submit', submitHandler, { once: false, capture: true });
 });
 </script>
 {% endblock %}
