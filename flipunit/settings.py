@@ -157,17 +157,18 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 
 # Security settings for production
 if not DEBUG:
-    # Disable SECURE_SSL_REDIRECT if web server (nginx/proxy) handles SSL termination
-    # Set to True only if Django is directly handling SSL
-    SECURE_SSL_REDIRECT = False  # Changed to False - let web server handle SSL redirects
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    # TEMPORARILY DISABLED ALL SSL REDIRECTS TO FIX REDIRECT LOOP
+    # These will be re-enabled once the redirect issue is resolved
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False  # Temporarily False to avoid redirect issues
+    CSRF_COOKIE_SECURE = False  # Temporarily False to avoid redirect issues
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    # Temporarily disable HSTS to avoid redirect loops
+    # SECURE_HSTS_SECONDS = 31536000
+    # SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # SECURE_HSTS_PRELOAD = True
     
     # Trust proxy headers if behind a reverse proxy (nginx, etc.)
     # Only set this if your proxy actually sends X-Forwarded-Proto header
