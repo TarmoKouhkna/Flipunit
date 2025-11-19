@@ -348,6 +348,7 @@ services:
     volumes:
       - ./media:/app/media
       - ./staticfiles:/app/staticfiles
+      - ./templates:/app/templates  # Mount templates so changes are immediate without rebuild
     depends_on:
       - postgres
     networks:
