@@ -402,7 +402,7 @@ def audio_converter(request):
         }
         
         # Build FFmpeg command with proper flags to force re-encoding
-        # Use -avoid_negative_ts make_zero to prevent stream copy
+        # Use multiple flags to prevent stream copy and force actual conversion
         cmd = [
             ffmpeg_path,
             '-i', input_path,
@@ -412,6 +412,7 @@ def audio_converter(request):
             '-ar', '44100',  # Set sample rate to ensure re-encoding
             '-ac', '2',  # Set to stereo
             '-avoid_negative_ts', 'make_zero',  # Force re-encoding, prevent stream copy
+            '-fflags', '+genpts',  # Generate presentation timestamps (forces re-encoding)
         ]
         
         # Add quality settings for lossy formats
@@ -427,6 +428,9 @@ def audio_converter(request):
             '-y',  # Overwrite output file
             output_path
         ])
+        
+        # Log the complete command for debugging
+        logger.info(f'Complete FFmpeg command: {" ".join(cmd)}')
         
         # Debug: Log the command being run
         import logging
