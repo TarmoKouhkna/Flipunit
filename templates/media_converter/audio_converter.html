@@ -180,9 +180,14 @@ if (window.audioConverterInitialized) {
             state.downloadTriggered = false;
             console.log('🔒 Lock set, submit count:', state.submitCount);
             
-            const submitBtn = form.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Processing...';
+            // Find button by class or any button in the form (since we changed type to "button")
+            const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Processing...';
+            } else {
+                console.error('❌ Submit button not found!');
+            }
             form.style.pointerEvents = 'none';
 
             // Abort any previous fetch to kill duplicates
@@ -292,8 +297,13 @@ if (window.audioConverterInitialized) {
                 console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
                 state.isProcessing = false;
                 state.abortController = null; // Clear controller
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Convert & Download';
+                
+                // Find button again (in case form was re-rendered)
+                const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Convert & Download';
+                }
                 form.style.pointerEvents = 'auto';
             }
         };
