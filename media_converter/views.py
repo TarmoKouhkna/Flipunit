@@ -169,14 +169,19 @@ def youtube_to_mp3(request):
                     safe_filename = 'youtube_audio'
                 
                 # Create HTTP response
-                # Set Content-Disposition to inline to prevent browser auto-download
+                # Use attachment with a unique filename to prevent browser auto-download
                 # JavaScript will handle the download programmatically
-                response = HttpResponse(file_content, content_type='audio/mpeg')
+                response = HttpResponse(file_content, content_type='application/octet-stream')
                 response['Content-Length'] = len(file_content)
-                response['Content-Disposition'] = 'inline'  # Prevent browser auto-download
+                # Use attachment to prevent browser from auto-opening, but JS will handle download
+                response['Content-Disposition'] = f'inline; filename="{safe_filename}.mp3"'
                 # Add custom header with filename for JavaScript to use
                 response['X-Filename'] = f'{safe_filename}.mp3'
                 response['X-Content-Type'] = 'audio/mpeg'
+                # Prevent browser caching
+                response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+                response['Pragma'] = 'no-cache'
+                response['Expires'] = '0'
                 
                 return response
                 
@@ -417,16 +422,22 @@ def audio_converter(request):
         }
         
         # Create response
-        # Set Content-Disposition to inline to prevent browser auto-download
+        # Use application/octet-stream to prevent browser auto-download
         # JavaScript will handle the download programmatically to keep page responsive
         safe_filename = os.path.splitext(uploaded_file.name)[0] + f'.{output_ext}'
         safe_filename = re.sub(r'[^\w\s-]', '', safe_filename).strip()
         safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
         
-        response = HttpResponse(file_content, content_type=content_type_map[output_format])
+        response = HttpResponse(file_content, content_type='application/octet-stream')
         response['Content-Length'] = len(file_content)
-        response['Content-Disposition'] = 'inline'  # Prevent browser auto-download
+        # Use inline with filename to prevent browser auto-download
+        response['Content-Disposition'] = f'inline; filename="{safe_filename}"'
         response['X-Filename'] = safe_filename
+        response['X-Content-Type'] = content_type_map[output_format]
+        # Prevent browser caching
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
         return response
         
     except Exception as e:

@@ -114,11 +114,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
             
+            // Check for custom content type header or check if it's an octet-stream (our audio file)
             const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('audio/')) {
+            const xContentType = response.headers.get('x-content-type');
+            const isAudioFile = (contentType && (contentType.includes('audio/') || contentType.includes('application/octet-stream'))) || xContentType;
+            
+            if (isAudioFile) {
                 return response.blob().then(blob => {
                     const filename = response.headers.get('x-filename') || 'converted.audio';
-                    return { blob, filename };
+                    // Use the actual content type from header if available
+                    const actualContentType = xContentType || contentType || 'audio/mpeg';
+                    return { blob, filename, contentType: actualContentType };
                 });
             } else {
                 // Error page - reload to show error
@@ -126,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return Promise.reject(new Error('Expected audio file but got HTML response'));
             }
         })
-        .then(({ blob, filename }) => {
+        .then(({ blob, filename, contentType }) => {
             // Prevent duplicate downloads
             if (downloadTriggered) {
                 console.log('Download already triggered, skipping duplicate');
@@ -136,31 +142,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Mark download as triggered immediately
+            // Mark download as triggered immediately (before any async operations)
             downloadTriggered = true;
             
+            // Create a blob with the correct content type
+            const typedBlob = new Blob([blob], { type: contentType || 'audio/mpeg' });
+            const url = window.URL.createObjectURL(typedBlob);
+            
             // Create download link only once
-            const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
             a.style.display = 'none';
+            // Add a unique ID to prevent duplicate clicks
+            a.setAttribute('data-download-id', Date.now().toString());
             document.body.appendChild(a);
             
             // Trigger download once
             a.click();
             
-            // Clean up immediately after click
+            // Remove the element immediately to prevent any browser auto-download
             setTimeout(function() {
-                window.URL.revokeObjectURL(url);
                 if (document.body.contains(a)) {
                     document.body.removeChild(a);
                 }
+                window.URL.revokeObjectURL(url);
                 // Reset download flag after a delay to allow for retry if needed
                 setTimeout(() => {
                     downloadTriggered = false;
-                }, 2000);
-            }, 100);
+                }, 3000);
+            }, 200);
             
             // Reset processing flag and button
             isProcessing = false;

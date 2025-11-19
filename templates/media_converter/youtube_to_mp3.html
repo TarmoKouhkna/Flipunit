@@ -6,6 +6,12 @@
 <div class="card">
     <h1 class="card-title">YouTube to MP3 Converter</h1>
     
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    
     <div class="alert alert-info">
         <strong>Usage Notice:</strong>
         <pre style="white-space: pre-wrap; margin-top: 0.5rem;">{{ usage_notice }}</pre>
@@ -177,10 +183,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
             
-            // Check if response is actually an MP3 file
+            // Check for custom content type header or check if it's an octet-stream (our audio file)
             const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('audio/mpeg')) {
-                // Extract filename from custom X-Filename header (we set this instead of Content-Disposition)
+            const xContentType = response.headers.get('x-content-type');
+            const isAudioFile = (contentType && (contentType.includes('audio/mpeg') || contentType.includes('application/octet-stream'))) || xContentType;
+            
+            if (isAudioFile) {
+                // Extract filename from custom X-Filename header
                 let filename = response.headers.get('x-filename') || 'converted.mp3';
                 
                 // Decode filename if needed
@@ -190,14 +199,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Keep original if decode fails
                 }
                 
-                return response.blob().then(blob => ({ blob, filename }));
+                const actualContentType = xContentType || contentType || 'audio/mpeg';
+                return response.blob().then(blob => ({ blob, filename, contentType: actualContentType }));
             } else {
                 // Response is HTML (error page), reload to show error messages
                 window.location.reload();
                 return Promise.reject(new Error('Expected MP3 file but got HTML response'));
             }
         })
-        .then(({ blob, filename }) => {
+        .then(({ blob, filename, contentType }) => {
             // Atomic check-and-set: only proceed if download hasn't been triggered
             if (window.ytMp3DownloadTriggered) {
                 console.log('Download already triggered, skipping duplicate');
@@ -257,13 +267,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Create download link only once and store it globally
-            const url = window.URL.createObjectURL(blob);
+            // Create a blob with the correct content type
+            const typedBlob = new Blob([blob], { type: contentType || 'audio/mpeg' });
+            const url = window.URL.createObjectURL(typedBlob);
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
             a.style.display = 'none';
             a.setAttribute('data-yt-download', 'true');
+            // Add a unique ID to prevent duplicate clicks
+            a.setAttribute('data-download-id', Date.now().toString());
             
             // Store globally to prevent duplicates
             window.ytMp3DownloadLink = a;
@@ -307,9 +320,9 @@ document.addEventListener('DOMContentLoaded', function() {
             urlInput.readOnly = false;
             currentStep = 0;
             
-            // Show error - page will reload with error message
-            alert('An error occurred during conversion. Please try again.');
-            // Reload page to show server error messages
+            // Try to get error message from response if available
+            // Reload page to show server error messages (Django messages framework)
+            // The error will be displayed via Django messages after reload
             window.location.reload();
         });
     });
