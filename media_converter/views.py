@@ -387,24 +387,39 @@ def audio_converter(request):
             'aac': 'aac',
         }
         
+        # Build FFmpeg command with proper flags to force re-encoding
         cmd = [
             ffmpeg_path,
             '-i', input_path,
-            '-acodec', codec_map[output_format],
-            '-y',
-            output_path
+            '-map', '0:a',  # Map only audio stream
+            '-c:a', codec_map[output_format],  # Use modern -c:a instead of deprecated -acodec
+            '-y',  # Overwrite output file
         ]
         
         # Add quality settings for lossy formats
         if output_format in ['mp3', 'ogg', 'aac']:
-            cmd.insert(-1, '-ab')
-            cmd.insert(-1, '192k')
+            cmd.extend(['-b:a', '192k'])  # Use -b:a instead of deprecated -ab
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # For WAV, specify format explicitly
+        if output_format == 'wav':
+            cmd.extend(['-f', 'wav'])
+        
+        # Add output path
+        cmd.append(output_path)
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        # Check if FFmpeg command failed
+        if result.returncode != 0:
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            return render(request, 'media_converter/audio_converter.html', {
+                'error': f'Conversion failed: {error_msg[:500]}'
+            })
         
         if not os.path.exists(output_path):
+            error_msg = result.stderr if result.stderr else 'Output file was not created'
             return render(request, 'media_converter/audio_converter.html', {
-                'error': f'Conversion failed: {result.stderr}'
+                'error': f'Conversion failed: {error_msg[:500]}'
             })
         
         # Read output file
