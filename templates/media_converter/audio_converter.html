@@ -65,19 +65,17 @@ if (window.audioConverterScriptLoaded) {
 } else {
     window.audioConverterScriptLoaded = true;
 
-// Use global variables to prevent duplicates across page reloads
-if (!window.audioConverterState) {
-    window.audioConverterState = {
-        isProcessing: false,
-        downloadTriggered: false,
-        downloadId: null,
-        currentRequestId: null,
-        activeFetch: null, // Track active fetch to prevent duplicates
-        recentFetches: [] // Track recent fetch URLs to prevent duplicates
-    };
+// CRITICAL: Set up fetch interceptor FIRST, before anything else
+// This must run every time to ensure it's always active
+if (!window.audioConverterFetchInterceptor) {
+    window.audioConverterFetchInterceptor = true;
     
-    // Intercept fetch calls to prevent duplicates
-    const originalFetch = window.fetch;
+    // Store original fetch
+    if (!window._originalFetch) {
+        window._originalFetch = window.fetch;
+    }
+    
+    // Intercept ALL fetch calls
     window.fetch = function(...args) {
         const url = args[0];
         const options = args[1] || {};
@@ -85,9 +83,17 @@ if (!window.audioConverterState) {
         // Check if this is a POST to our audio converter endpoint
         const urlString = typeof url === 'string' ? url : (url && url.toString ? url.toString() : '');
         if (options.method === 'POST' && urlString.includes('audio-converter')) {
-            const now = Date.now();
+            // Initialize state if needed
+            if (!window.audioConverterState) {
+                window.audioConverterState = {
+                    recentFetches: []
+                };
+            }
+            if (!window.audioConverterState.recentFetches) {
+                window.audioConverterState.recentFetches = [];
+            }
             
-            // Create a simple key (FormData can't be stringified, so we use URL + timestamp window)
+            const now = Date.now();
             const fetchKey = urlString;
             
             // Check if we just made a request to this URL (within 2 seconds)
@@ -115,8 +121,27 @@ if (!window.audioConverterState) {
             console.log('✅ Fetch allowed. URL:', urlString, 'Timestamp:', now);
         }
         
-        return originalFetch.apply(this, args);
+        return window._originalFetch.apply(this, args);
     };
+    
+    console.log('🔒 Fetch interceptor installed');
+}
+
+// Use global variables to prevent duplicates across page reloads
+if (!window.audioConverterState) {
+    window.audioConverterState = {
+        isProcessing: false,
+        downloadTriggered: false,
+        downloadId: null,
+        currentRequestId: null,
+        activeFetch: null, // Track active fetch to prevent duplicates
+        recentFetches: window.audioConverterState?.recentFetches || [] // Preserve existing recentFetches
+    };
+} else {
+    // Ensure all required properties exist
+    if (!window.audioConverterState.recentFetches) {
+        window.audioConverterState.recentFetches = [];
+    }
 }
 
 // Ensure this only runs once, even if DOMContentLoaded fires multiple times
