@@ -83,21 +83,22 @@ if (!window.audioConverterState) {
         const options = args[1] || {};
         
         // Check if this is a POST to our audio converter endpoint
-        if (options.method === 'POST' && 
-            (typeof url === 'string' && url.includes('audio-converter')) ||
-            (url && url.toString && url.toString().includes('audio-converter'))) {
-            
-            const fetchKey = url + JSON.stringify(options);
+        const urlString = typeof url === 'string' ? url : (url && url.toString ? url.toString() : '');
+        if (options.method === 'POST' && urlString.includes('audio-converter')) {
             const now = Date.now();
             
-            // Check if we just made this exact request
+            // Create a simple key (FormData can't be stringified, so we use URL + timestamp window)
+            const fetchKey = urlString;
+            
+            // Check if we just made a request to this URL (within 2 seconds)
             const recent = window.audioConverterState.recentFetches.find(f => 
-                f.key === fetchKey && (now - f.timestamp) < 1000
+                f.key === fetchKey && (now - f.timestamp) < 2000
             );
             
             if (recent) {
-                console.warn('Duplicate fetch intercepted! URL:', url, 'Time since last:', now - recent.timestamp, 'ms');
-                return Promise.reject(new Error('Duplicate fetch prevented'));
+                console.warn('❌ DUPLICATE FETCH INTERCEPTED! URL:', urlString, 'Time since last:', now - recent.timestamp, 'ms');
+                console.warn('Blocking duplicate request to prevent double conversion');
+                return Promise.reject(new Error('Duplicate fetch prevented by interceptor'));
             }
             
             // Record this fetch
@@ -111,7 +112,7 @@ if (!window.audioConverterState) {
                 f => (now - f.timestamp) < 5000
             );
             
-            console.log('Fetch allowed. URL:', url);
+            console.log('✅ Fetch allowed. URL:', urlString, 'Timestamp:', now);
         }
         
         return originalFetch.apply(this, args);
