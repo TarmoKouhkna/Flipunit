@@ -402,18 +402,24 @@ def audio_converter(request):
         }
         
         # Build FFmpeg command with proper flags to force re-encoding
+        # CRITICAL: We must NEVER use stream copy (-c:a copy) - always re-encode
         # Use multiple flags to prevent stream copy and force actual conversion
         cmd = [
             ffmpeg_path,
             '-i', input_path,
             '-vn',  # No video
             '-map', '0:a',  # Map only audio stream
-            '-c:a', codec_map[output_format],  # Use modern -c:a instead of deprecated -acodec
+            '-c:a', codec_map[output_format],  # ALWAYS re-encode with specified codec
             '-ar', '44100',  # Set sample rate to ensure re-encoding
             '-ac', '2',  # Set to stereo
             '-avoid_negative_ts', 'make_zero',  # Force re-encoding, prevent stream copy
             '-fflags', '+genpts',  # Generate presentation timestamps (forces re-encoding)
+            '-strict', '-2',  # Allow experimental codecs if needed
         ]
+        
+        # For WAV specifically, ensure we're creating a proper WAV file
+        if output_format == 'wav':
+            cmd.extend(['-sample_fmt', 's16'])  # 16-bit signed PCM for WAV
         
         # Add quality settings for lossy formats
         if output_format in ['mp3', 'ogg', 'aac']:
