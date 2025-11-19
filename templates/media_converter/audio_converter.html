@@ -360,6 +360,19 @@ if (!window.audioConverterInitialized) {
         // Also prevent any default form behavior
         form.setAttribute('onsubmit', 'return false;');
         
+        // Prevent button double-clicks
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function(e) {
+                if (window.audioConverterState.isProcessing) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    e.stopPropagation();
+                    console.log('Button click blocked - already processing');
+                    return false;
+                }
+            }, { capture: true });
+        }
+        
         console.log('Audio converter form initialized. Form ID:', form.id || 'no-id');
     });
 }
