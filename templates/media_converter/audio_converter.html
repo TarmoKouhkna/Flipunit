@@ -72,7 +72,49 @@ if (!window.audioConverterState) {
         downloadTriggered: false,
         downloadId: null,
         currentRequestId: null,
-        activeFetch: null // Track active fetch to prevent duplicates
+        activeFetch: null, // Track active fetch to prevent duplicates
+        recentFetches: [] // Track recent fetch URLs to prevent duplicates
+    };
+    
+    // Intercept fetch calls to prevent duplicates
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const url = args[0];
+        const options = args[1] || {};
+        
+        // Check if this is a POST to our audio converter endpoint
+        if (options.method === 'POST' && 
+            (typeof url === 'string' && url.includes('audio-converter')) ||
+            (url && url.toString && url.toString().includes('audio-converter'))) {
+            
+            const fetchKey = url + JSON.stringify(options);
+            const now = Date.now();
+            
+            // Check if we just made this exact request
+            const recent = window.audioConverterState.recentFetches.find(f => 
+                f.key === fetchKey && (now - f.timestamp) < 1000
+            );
+            
+            if (recent) {
+                console.warn('Duplicate fetch intercepted! URL:', url, 'Time since last:', now - recent.timestamp, 'ms');
+                return Promise.reject(new Error('Duplicate fetch prevented'));
+            }
+            
+            // Record this fetch
+            window.audioConverterState.recentFetches.push({
+                key: fetchKey,
+                timestamp: now
+            });
+            
+            // Clean up old entries (older than 5 seconds)
+            window.audioConverterState.recentFetches = window.audioConverterState.recentFetches.filter(
+                f => (now - f.timestamp) < 5000
+            );
+            
+            console.log('Fetch allowed. URL:', url);
+        }
+        
+        return originalFetch.apply(this, args);
     };
 }
 
@@ -143,26 +185,44 @@ if (!window.audioConverterInitialized) {
             form.style.pointerEvents = 'none'; // Prevent any clicks
             
             const formData = new FormData(form);
+            const fetchUrl = form.action || window.location.href;
             
-            console.log('Starting audio conversion request... Request ID:', requestId);
+            console.log('Starting audio conversion request... Request ID:', requestId, 'URL:', fetchUrl);
             
             // CRITICAL: Store fetch promise globally to prevent duplicate calls
             if (window.audioConverterState.activeFetch) {
                 console.log('Fetch already in progress, aborting duplicate. Request ID:', requestId);
+                console.log('Active fetch details:', window.audioConverterState.activeFetch);
                 return false;
             }
             
             // Create AbortController to cancel if needed
             const controller = new AbortController();
-            window.audioConverterState.activeFetch = { controller, requestId };
-            
-            fetch(form.action || window.location.href, {
+            const fetchPromise = fetch(fetchUrl, {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin',
                 signal: controller.signal
-            })
+            });
+            
+            // Store the fetch promise immediately
+            window.audioConverterState.activeFetch = { 
+                controller, 
+                requestId,
+                promise: fetchPromise,
+                url: fetchUrl,
+                timestamp: Date.now()
+            };
+            
+            console.log('Fetch initiated. Active fetch stored:', window.audioConverterState.activeFetch);
+            
+            fetchPromise
             .then(response => {
+                // Double-check this is still the active fetch
+                if (window.audioConverterState.activeFetch?.requestId !== requestId) {
+                    console.warn('Response received for non-active request. Active:', window.audioConverterState.activeFetch?.requestId, 'This:', requestId);
+                    return Promise.reject(new Error('Stale request response'));
+                }
                 // Verify this is still the current request
                 if (window.audioConverterState.currentRequestId !== requestId) {
                     console.log('Ignoring response from old request. Current:', window.audioConverterState.currentRequestId, 'Response:', requestId);
