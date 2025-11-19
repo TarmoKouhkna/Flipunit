@@ -104,6 +104,7 @@ def youtube_to_mp3(request):
                 os.environ['PATH'] = f"{ffmpeg_dir}:{original_path}"
             
             # Configure yt-dlp options for faster processing
+            # Add headers to bypass YouTube bot detection
             ydl_opts = {
                 'format': 'bestaudio[ext=m4a]/bestaudio/best',  # Prefer m4a for faster processing
                 'postprocessors': [{
@@ -119,6 +120,14 @@ def youtube_to_mp3(request):
                 'extract_flat': False,
                 # Optimize for speed
                 'concurrent_fragments': 4,  # Download multiple fragments in parallel
+                # Add browser-like headers to bypass bot detection
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'referer': 'https://www.youtube.com/',
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],  # Try android client first, fallback to web
+                    }
+                },
             }
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -183,8 +192,8 @@ def youtube_to_mp3(request):
                 messages.error(request, 'FFmpeg is required for audio conversion. Please install FFmpeg on your system.')
             elif 'unable to download' in error_msg.lower() or 'private video' in error_msg.lower():
                 messages.error(request, 'Unable to download video. The video may be private, age-restricted, or unavailable.')
-            elif 'sign in' in error_msg.lower() or 'authentication' in error_msg.lower():
-                messages.error(request, 'This video requires authentication. Please try a different video.')
+            elif 'sign in' in error_msg.lower() or 'bot' in error_msg.lower() or 'authentication' in error_msg.lower():
+                messages.error(request, 'YouTube is blocking this request. This is a temporary YouTube restriction. Please try again in a few minutes, or try a different video.')
             else:
                 messages.error(request, f'Error downloading video: {error_msg[:200]}. Please check the URL and try again.')
         except ImportError as e:
