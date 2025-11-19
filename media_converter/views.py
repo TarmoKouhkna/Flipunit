@@ -456,9 +456,57 @@ def audio_converter(request):
                 'error': f'Conversion failed: {error_msg[:500]}'
             })
         
+        # Verify output file exists and get its size
+        output_size = os.path.getsize(output_path)
+        input_size = os.path.getsize(input_path)
+        logger.info(f'File sizes - Input: {input_size} bytes, Output: {output_size} bytes')
+        
         # Read output file
         with open(output_path, 'rb') as f:
             file_content = f.read()
+        
+        # Verify the file is actually in the correct format by checking magic bytes
+        if len(file_content) < 12:
+            error_msg = 'Output file is too small or corrupted'
+            logger.error(error_msg)
+            return render(request, 'media_converter/audio_converter.html', {
+                'error': error_msg
+            })
+        
+        # Check magic bytes to verify format
+        magic_bytes = file_content[:12]
+        format_verified = False
+        
+        if output_format == 'wav':
+            # WAV files start with "RIFF" and contain "WAVE"
+            if magic_bytes[:4] == b'RIFF' and b'WAVE' in magic_bytes:
+                format_verified = True
+        elif output_format == 'mp3':
+            # MP3 files start with ID3 tag or FF FB/FA (MPEG sync)
+            if magic_bytes[:3] == b'ID3' or (magic_bytes[0] == 0xFF and (magic_bytes[1] & 0xE0) == 0xE0):
+                format_verified = True
+        elif output_format == 'ogg':
+            # OGG files start with "OggS"
+            if magic_bytes[:4] == b'OggS':
+                format_verified = True
+        elif output_format == 'flac':
+            # FLAC files start with "fLaC"
+            if magic_bytes[:4] == b'fLaC':
+                format_verified = True
+        elif output_format == 'aac':
+            # AAC/M4A files can have various headers, check for common ones
+            if magic_bytes[4:8] == b'ftyp' or magic_bytes[:2] == b'\xff\xf1':
+                format_verified = True
+        
+        if not format_verified:
+            error_msg = f'Output file format verification failed. Expected {output_format}, but file magic bytes: {magic_bytes.hex()[:24]}'
+            logger.error(error_msg)
+            logger.error(f'FFmpeg stderr: {result.stderr[:1000] if result.stderr else "No stderr"}')
+            return render(request, 'media_converter/audio_converter.html', {
+                'error': f'Conversion failed: Output file is not in {output_format.upper()} format. FFmpeg may have failed silently. Please check server logs.'
+            })
+        
+        logger.info(f'Format verified: Output file is correctly formatted as {output_format}')
         
         # Clean up
         try:
