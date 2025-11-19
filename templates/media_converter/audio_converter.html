@@ -63,12 +63,13 @@
 (function() {
     'use strict';
     if (window._audioConverterFetchProtected) {
+        console.warn('⚠️ Fetch protection already installed - this script may be loaded twice!');
         return; // Already protected
     }
     window._audioConverterFetchProtected = true;
     
     const originalFetch = window.fetch;
-    const activeRequests = new Map(); // Track active requests by URL
+    let isProcessing = false; // Synchronous lock - no Map needed
     
     window.fetch = function(url, options = {}) {
         const urlString = typeof url === 'string' ? url : (url?.toString() || '');
@@ -76,32 +77,25 @@
         const isAudioConverter = urlString.includes('audio-converter');
         
         if (isPost && isAudioConverter) {
-            const requestKey = urlString;
-            
-            // Check if this exact request is already in progress
-            if (activeRequests.has(requestKey)) {
-                const existing = activeRequests.get(requestKey);
-                const age = Date.now() - existing.timestamp;
-                
-                if (age < 5000) { // Within 5 seconds
-                    console.warn('🚫 BLOCKED DUPLICATE FETCH:', urlString, 'Age:', age, 'ms');
-                    return Promise.reject(new Error('Duplicate request blocked'));
-                } else {
-                    // Old request, remove it
-                    activeRequests.delete(requestKey);
-                }
+            // SYNCHRONOUS CHECK - happens before any async code
+            if (isProcessing) {
+                console.error('🚫🚫🚫 BLOCKED DUPLICATE FETCH (synchronous lock):', urlString);
+                console.trace('Stack trace for blocked request:');
+                return Promise.reject(new Error('Duplicate request blocked by synchronous lock'));
             }
             
-            // Register this request
-            activeRequests.set(requestKey, { timestamp: Date.now() });
-            console.log('✅ ALLOWED FETCH:', urlString);
+            // Set lock IMMEDIATELY (synchronously)
+            isProcessing = true;
+            console.log('✅ ALLOWED FETCH (lock set):', urlString);
             
-            // Clean up after request completes
+            // Clean up after request completes (with delay to catch rapid duplicates)
             const fetchPromise = originalFetch.apply(this, arguments);
             fetchPromise.finally(() => {
+                // Wait 2 seconds before releasing lock to catch any rapid duplicates
                 setTimeout(() => {
-                    activeRequests.delete(requestKey);
-                }, 1000);
+                    isProcessing = false;
+                    console.log('🔓 Lock released');
+                }, 2000);
             });
             
             return fetchPromise;
@@ -110,7 +104,8 @@
         return originalFetch.apply(this, arguments);
     };
     
-    console.log('🛡️ Global fetch protection installed');
+    console.log('🛡️ Global fetch protection installed (synchronous lock mode)');
+    console.log('Current fetch function:', window.fetch);
 })();
 
 // === SINGLE EXECUTION GUARD ===
@@ -171,12 +166,20 @@ if (window.audioConverterInitialized) {
             const formData = new FormData(form);
 
             try {
-                const response = await fetch(form.action || window.location.href, {
+                console.log('📤 About to call fetch...');
+                const fetchUrl = form.action || window.location.href;
+                console.log('📤 Fetch URL:', fetchUrl);
+                console.log('📤 Current fetch function:', window.fetch);
+                console.log('📤 Is protected?', window._audioConverterFetchProtected);
+                
+                const response = await fetch(fetchUrl, {
                     method: 'POST',
                     body: formData,
                     credentials: 'same-origin',
                     signal: abortController.signal // Allows abort
                 });
+                
+                console.log('📥 Fetch response received:', response.status);
 
                 if (!response.ok) {
                     throw new Error('Conversion failed');
