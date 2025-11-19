@@ -160,10 +160,11 @@ def youtube_to_mp3(request):
                     safe_filename = 'youtube_audio'
                 
                 # Create HTTP response
-                # Note: We don't set Content-Disposition here to prevent browser auto-download
+                # Set Content-Disposition to inline to prevent browser auto-download
                 # JavaScript will handle the download programmatically
                 response = HttpResponse(file_content, content_type='audio/mpeg')
                 response['Content-Length'] = len(file_content)
+                response['Content-Disposition'] = 'inline'  # Prevent browser auto-download
                 # Add custom header with filename for JavaScript to use
                 response['X-Filename'] = f'{safe_filename}.mp3'
                 response['X-Content-Type'] = 'audio/mpeg'
@@ -172,19 +173,40 @@ def youtube_to_mp3(request):
                 
         except yt_dlp.utils.DownloadError as e:
             error_msg = str(e)
-            if 'ffmpeg' in error_msg.lower() or 'ffprobe' in error_msg.lower():
-                messages.error(request, 'FFmpeg is required for audio conversion. Please install FFmpeg on your system.')
-            else:
-                messages.error(request, f'Error downloading video: {error_msg}. Please check the URL and try again.')
-        except Exception as e:
-            error_msg = str(e)
             # Clean up temp directory on error
             try:
                 if 'temp_dir' in locals():
                     shutil.rmtree(temp_dir)
             except:
                 pass
-            messages.error(request, f'An error occurred: {error_msg}. Please try again.')
+            if 'ffmpeg' in error_msg.lower() or 'ffprobe' in error_msg.lower():
+                messages.error(request, 'FFmpeg is required for audio conversion. Please install FFmpeg on your system.')
+            elif 'unable to download' in error_msg.lower() or 'private video' in error_msg.lower():
+                messages.error(request, 'Unable to download video. The video may be private, age-restricted, or unavailable.')
+            elif 'sign in' in error_msg.lower() or 'authentication' in error_msg.lower():
+                messages.error(request, 'This video requires authentication. Please try a different video.')
+            else:
+                messages.error(request, f'Error downloading video: {error_msg[:200]}. Please check the URL and try again.')
+        except ImportError as e:
+            error_msg = str(e)
+            messages.error(request, 'yt-dlp is not installed. Please install it: pip install yt-dlp')
+        except Exception as e:
+            error_msg = str(e)
+            import traceback
+            # Log full error for debugging
+            print(f"YouTube to MP3 error: {error_msg}")
+            print(traceback.format_exc())
+            # Clean up temp directory on error
+            try:
+                if 'temp_dir' in locals():
+                    shutil.rmtree(temp_dir)
+            except:
+                pass
+            # Show user-friendly error message
+            if 'yt_dlp' in str(type(e)).lower() or 'yt-dlp' in error_msg.lower():
+                messages.error(request, 'YouTube downloader is not available. Please contact support.')
+            else:
+                messages.error(request, f'An error occurred: {error_msg[:200]}. Please try again.')
     
     return render(request, 'media_converter/youtube_to_mp3.html', context)
 

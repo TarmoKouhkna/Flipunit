@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadArea = document.querySelector('.file-upload-area');
     const submitBtn = form.querySelector('button[type="submit"]');
     let isProcessing = false; // Flag to prevent duplicate submissions
+    let downloadTriggered = false; // Flag to prevent duplicate downloads
     
     // Update UI when file is selected
     fileInput.addEventListener('change', function(e) {
@@ -126,6 +127,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .then(({ blob, filename }) => {
+            // Prevent duplicate downloads
+            if (downloadTriggered) {
+                console.log('Download already triggered, skipping duplicate');
+                isProcessing = false;
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Convert & Download';
+                return;
+            }
+            
+            // Mark download as triggered immediately
+            downloadTriggered = true;
+            
             // Create download link only once
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -143,6 +156,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (document.body.contains(a)) {
                     document.body.removeChild(a);
                 }
+                // Reset download flag after a delay to allow for retry if needed
+                setTimeout(() => {
+                    downloadTriggered = false;
+                }, 2000);
             }, 100);
             
             // Reset processing flag and button
@@ -154,6 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             // Reset processing flag and button
             isProcessing = false;
+            downloadTriggered = false;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Convert & Download';
             // Reload to show error message
