@@ -77,7 +77,19 @@
             
             // Check if this is a POST to our audio converter endpoint
             const urlString = typeof url === 'string' ? url : (url && url.toString ? url.toString() : '');
-            if (options.method === 'POST' && urlString.includes('audio-converter')) {
+            const isAudioConverterPost = options.method === 'POST' && urlString.includes('audio-converter');
+            
+            // Log ALL POST requests to help debug
+            if (options.method === 'POST') {
+                console.log('🔍 FETCH INTERCEPTOR: POST request detected', {
+                    url: urlString,
+                    isAudioConverter: isAudioConverterPost,
+                    hasBody: !!options.body,
+                    timestamp: Date.now()
+                });
+            }
+            
+            if (isAudioConverterPost) {
                 // Initialize state if needed
                 if (!window.audioConverterState) {
                     window.audioConverterState = {
