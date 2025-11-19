@@ -346,6 +346,11 @@ def audio_converter(request):
     uploaded_file = request.FILES['audio_file']
     output_format = request.POST.get('output_format', 'mp3').lower()
     
+    # Debug: Log the received output format
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f'Audio converter called - uploaded_file: {uploaded_file.name}, output_format from POST: {request.POST.get("output_format")}, normalized: {output_format}')
+    
     # Validate file type
     allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a']
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
