@@ -291,12 +291,9 @@ if (window.audioConverterInitialized) {
             }
         };
 
-        // Remove ALL existing listeners by cloning (once!)
-        const newForm = form.cloneNode(true);
-        form.parentNode.replaceChild(newForm, form);
-
-        // Get button and completely disable native form submission
-        const submitBtn = newForm.querySelector('button[type="submit"]');
+        // DON'T clone the form - it breaks file input handlers
+        // Instead, just remove existing submit listeners by replacing the form's submit handler
+        const submitBtn = form.querySelector('button[type="submit"]');
         
         // Change button type to prevent any native form submission
         if (submitBtn) {
@@ -316,12 +313,12 @@ if (window.audioConverterInitialized) {
                 console.log('🖱️ Button clicked, dispatching submit event');
                 // Manually trigger submit event
                 const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-                newForm.dispatchEvent(submitEvent);
+                form.dispatchEvent(submitEvent);
             }, { capture: true, once: false });
         }
 
         // Completely prevent any native form submission
-        newForm.addEventListener('submit', function(e) {
+        form.addEventListener('submit', function(e) {
             e.preventDefault();
             e.stopImmediatePropagation();
             e.stopPropagation();
@@ -329,7 +326,7 @@ if (window.audioConverterInitialized) {
         }, { capture: true });
         
         // Also set onsubmit to prevent any fallback
-        newForm.onsubmit = function(e) {
+        form.onsubmit = function(e) {
             e.preventDefault();
             e.stopImmediatePropagation();
             e.stopPropagation();
@@ -337,48 +334,14 @@ if (window.audioConverterInitialized) {
         };
         
         // Attach our handler LAST, with highest priority
-        newForm.addEventListener('submit', submitHandler, { capture: false, once: false });
+        form.addEventListener('submit', submitHandler, { capture: false, once: false });
         
-        // Update file name display and restore file input functionality
-        const newFileInput = newForm.querySelector('#audio_file');
-        const uploadArea = newForm.querySelector('.file-upload-area');
-        if (newFileInput && uploadArea) {
-            // Restore click handler for file upload area (main.js handles this, but we need to ensure it works)
-            uploadArea.addEventListener('click', function(e) {
-                // Only trigger file input if click is not directly on the input itself
-                if (e.target !== newFileInput && !newFileInput.contains(e.target)) {
-                    newFileInput.click();
-                }
-            });
-            
-            // Restore drag and drop functionality
-            uploadArea.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                uploadArea.classList.add('dragover');
-            });
-            
-            uploadArea.addEventListener('dragleave', function() {
-                uploadArea.classList.remove('dragover');
-            });
-            
-            uploadArea.addEventListener('drop', function(e) {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                if (e.dataTransfer.files.length > 0) {
-                    newFileInput.files = e.dataTransfer.files;
-                    // Trigger change event
-                    const event = new Event('change', { bubbles: true });
-                    newFileInput.dispatchEvent(event);
-                }
-            });
-            
-            // Prevent file input click from bubbling to upload area
-            newFileInput.addEventListener('click', function(e) {
-                e.stopPropagation();
-            });
-            
+        // Update file name display (main.js handles the click/drag handlers, so we don't need to restore them)
+        const fileInput = form.querySelector('#audio_file');
+        const uploadArea = form.querySelector('.file-upload-area');
+        if (fileInput && uploadArea) {
             // Update display when file is selected
-            newFileInput.addEventListener('change', (e) => {
+            fileInput.addEventListener('change', (e) => {
                 const fileName = e.target.files[0]?.name;
                 const p = uploadArea.querySelector('p');
                 if (p && fileName) {
