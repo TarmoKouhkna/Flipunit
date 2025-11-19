@@ -154,6 +154,8 @@ if (window.audioConverterInitialized) {
         const submitHandler = async (e) => {
             state.submitCount++;
             console.log('📝 Submit handler called, count:', state.submitCount);
+            console.log('📝 Event type:', e.type);
+            console.log('📝 Event target:', e.target);
             
             e.preventDefault();
             e.stopPropagation();
@@ -202,17 +204,20 @@ if (window.audioConverterInitialized) {
                 console.log('📤 About to call fetch...');
                 const fetchUrl = form.action || window.location.href;
                 console.log('📤 Fetch URL:', fetchUrl);
+                console.log('📤 FormData keys:', Array.from(formData.keys()));
+                console.log('📤 File in FormData:', formData.get('audio_file')?.name);
                 console.log('📤 Current fetch function:', window.fetch);
                 console.log('📤 Is protected?', window._audioConverterFetchProtected);
                 
                 const response = await fetch(fetchUrl, {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin',
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin',
                     signal: state.abortController.signal // Allows abort
                 });
                 
                 console.log('📥 Fetch response received:', response.status);
+                console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
 
                 if (!response.ok) {
                     throw new Error('Conversion failed');
