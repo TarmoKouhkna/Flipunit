@@ -71,6 +71,16 @@ if (window.audioConverterInitialized) {
 
         let isProcessing = false;
         let downloadTriggered = false;
+        let abortController = null; // Track AbortController for canceling duplicates
+
+        // Debounce function to prevent ultra-fast double-clicks (300ms window)
+        function debounce(fn, delay) {
+            let timeoutId;
+            return function (...args) {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn.apply(this, args), delay);
+            };
+        }
 
         const submitHandler = async (e) => {
             e.preventDefault();
@@ -97,6 +107,13 @@ if (window.audioConverterInitialized) {
             submitBtn.textContent = 'Processing...';
             form.style.pointerEvents = 'none';
 
+            // Abort any previous fetch to kill duplicates
+            if (abortController) {
+                abortController.abort();
+                console.log('Previous fetch aborted');
+            }
+            abortController = new AbortController(); // Fresh controller
+
             // Cleanup any old blob URLs
             document.querySelectorAll('a[data-temp-download]').forEach(a => {
                 if (a.href.startsWith('blob:')) {
@@ -111,7 +128,8 @@ if (window.audioConverterInitialized) {
                 const response = await fetch(form.action || window.location.href, {
                     method: 'POST',
                     body: formData,
-                    credentials: 'same-origin'
+                    credentials: 'same-origin',
+                    signal: abortController.signal // Allows abort
                 });
 
                 if (!response.ok) {
@@ -147,10 +165,16 @@ if (window.audioConverterInitialized) {
                 }
                 downloadTriggered = true;
 
+                // Add timestamp to filename to prevent browser de-duping
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+                const fileExt = filename.match(/\.[^/.]+$/) || '.mp3';
+                const baseName = filename.replace(/\.[^/.]+$/, '');
+                const uniqueFilename = `${baseName}-${timestamp}${fileExt}`;
+
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = filename;
+                a.download = uniqueFilename; // Use unique name
                 a.dataset.tempDownload = 'true';
                 a.style.display = 'none';
                 document.body.appendChild(a);
@@ -165,12 +189,18 @@ if (window.audioConverterInitialized) {
                 }, 100);
 
             } catch (err) {
+                // Ignore abort errors (expected for duplicates)
+                if (err.name === 'AbortError') {
+                    console.log('Fetch aborted (duplicate prevented)');
+                    return;
+                }
                 console.error('Conversion error:', err);
                 alert('Conversion failed. Please try again.');
                 window.location.reload();
             } finally {
                 // === ALWAYS RESET ===
                 isProcessing = false;
+                abortController = null; // Clear controller
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Convert & Download';
                 form.style.pointerEvents = 'auto';
@@ -181,7 +211,16 @@ if (window.audioConverterInitialized) {
         const newForm = form.cloneNode(true);
         form.parentNode.replaceChild(newForm, form);
 
-        // Attach single listener
+        // Attach debounced handler to button for extra double-click protection
+        const submitBtn = newForm.querySelector('button[type="submit"]');
+        const debouncedSubmit = debounce((e) => {
+            e.preventDefault();
+            newForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }, 300);
+        
+        submitBtn.addEventListener('click', debouncedSubmit);
+
+        // Attach single listener to form
         newForm.addEventListener('submit', submitHandler);
         
         // Update file name display
