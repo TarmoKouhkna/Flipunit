@@ -59,9 +59,12 @@
 
 {% block extra_js %}
 <script>
-// === FORCE CONSOLE LOGS TO APPEAR ===
-console.log('🔵 Audio converter script block loaded at:', new Date().toISOString());
-console.log('🔵 Script location:', window.location.href);
+// === VERSION CHECK - FORCE CACHE BUST ===
+const AUDIO_CONVERTER_VERSION = 'v2.0.2025-01-19';
+console.log('🔵🔵🔵 AUDIO CONVERTER SCRIPT LOADED - VERSION:', AUDIO_CONVERTER_VERSION);
+console.log('🔵 Timestamp:', new Date().toISOString());
+console.log('🔵 URL:', window.location.href);
+alert('Audio converter script version: ' + AUDIO_CONVERTER_VERSION); // TEMPORARY - FORCE VISIBILITY
 
 // === GLOBAL FETCH PROTECTION (runs immediately, before anything else) ===
 (function() {
