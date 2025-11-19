@@ -59,464 +59,144 @@
 
 {% block extra_js %}
 <script>
-console.log('🚀 Audio converter script STARTING to load...', new Date().toISOString());
-
-// CRITICAL: Set up fetch interceptor IMMEDIATELY, before anything else
-// This must happen at the very top, before any other code runs
-(function() {
-    console.log('🔧 Checking fetch interceptor installation...', window._audioConverterFetchInterceptorInstalled);
-    if (!window._audioConverterFetchInterceptorInstalled) {
-        console.log('✅ Installing fetch interceptor...');
-        window._audioConverterFetchInterceptorInstalled = true;
-        
-        // Store original fetch
-        if (!window._originalFetch) {
-            window._originalFetch = window.fetch;
-        }
-        
-        // Intercept ALL fetch calls
-        window.fetch = function(...args) {
-            const url = args[0];
-            const options = args[1] || {};
-            
-            // Check if this is a POST to our audio converter endpoint
-            const urlString = typeof url === 'string' ? url : (url && url.toString ? url.toString() : '');
-            const isAudioConverterPost = options.method === 'POST' && urlString.includes('audio-converter');
-            
-            // Log ALL POST requests to help debug
-            if (options.method === 'POST') {
-                console.log('🔍 FETCH INTERCEPTOR: POST request detected', {
-                    url: urlString,
-                    isAudioConverter: isAudioConverterPost,
-                    hasBody: !!options.body,
-                    timestamp: Date.now()
-                });
-            }
-            
-            if (isAudioConverterPost) {
-                // Initialize state if needed
-                if (!window.audioConverterState) {
-                    window.audioConverterState = {
-                        recentFetches: [],
-                        activeFetchLock: false
-                    };
-                }
-                if (!window.audioConverterState.recentFetches) {
-                    window.audioConverterState.recentFetches = [];
-                }
-                if (window.audioConverterState.activeFetchLock === undefined) {
-                    window.audioConverterState.activeFetchLock = false;
-                }
-                
-                // CRITICAL: Use a synchronous lock to prevent race conditions
-                if (window.audioConverterState.activeFetchLock) {
-                    console.warn('❌ DUPLICATE FETCH BLOCKED BY LOCK! URL:', urlString);
-                    console.trace('Stack trace of blocked fetch:');
-                    return Promise.reject(new Error('Duplicate fetch prevented by lock'));
-                }
-                
-                // Set lock IMMEDIATELY (synchronously, before any async operations)
-                window.audioConverterState.activeFetchLock = true;
-                
-                const now = Date.now();
-                const fetchKey = urlString;
-                
-                // Check if we just made a request to this URL (within 2 seconds)
-                const recent = window.audioConverterState.recentFetches.find(f => 
-                    f.key === fetchKey && (now - f.timestamp) < 2000
-                );
-                
-                if (recent) {
-                    // Release lock since we're blocking
-                    window.audioConverterState.activeFetchLock = false;
-                    console.warn('❌ DUPLICATE FETCH INTERCEPTED! URL:', urlString, 'Time since last:', now - recent.timestamp, 'ms');
-                    console.warn('Blocking duplicate request to prevent double conversion');
-                    return Promise.reject(new Error('Duplicate fetch prevented by interceptor'));
-                }
-                
-                // Record this fetch
-                window.audioConverterState.recentFetches.push({
-                    key: fetchKey,
-                    timestamp: now
-                });
-                
-                // Clean up old entries (older than 5 seconds)
-                window.audioConverterState.recentFetches = window.audioConverterState.recentFetches.filter(
-                    f => (now - f.timestamp) < 5000
-                );
-                
-                console.log('✅ Fetch allowed. URL:', urlString, 'Timestamp:', now);
-                
-                // Call original fetch and release lock when done (success or error)
-                const fetchPromise = window._originalFetch.apply(this, args);
-                fetchPromise.finally(() => {
-                    // Release lock after fetch completes (success or error)
-                    setTimeout(() => {
-                        window.audioConverterState.activeFetchLock = false;
-                    }, 100); // Small delay to ensure any pending duplicates are caught
-                });
-                
-                return fetchPromise;
-            }
-            
-            return window._originalFetch.apply(this, args);
-        };
-        
-        console.log('🔒 Fetch interceptor installed at script load time');
-    } else {
-        console.warn('⚠️ Fetch interceptor already installed, skipping');
-    }
-})();
-
-console.log('📝 Script continues after interceptor setup...');
-
-// CRITICAL: Prevent script from running multiple times
-console.log('🔍 Checking if script already loaded...', window.audioConverterScriptLoaded);
-if (window.audioConverterScriptLoaded) {
-    console.warn('⚠️ Audio converter script already loaded, skipping duplicate');
-    console.trace('Stack trace of duplicate script load:');
+// === SINGLE EXECUTION GUARD ===
+if (window.audioConverterInitialized) {
+    console.log('Audio converter script already initialized');
 } else {
-    console.log('✅ First time loading script, proceeding...');
-    window.audioConverterScriptLoaded = true;
-
-// Fetch interceptor is now set up at the very top of the script (IIFE above)
-
-// Use global variables to prevent duplicates across page reloads
-if (!window.audioConverterState) {
-    window.audioConverterState = {
-        isProcessing: false,
-        downloadTriggered: false,
-        downloadId: null,
-        currentRequestId: null,
-        activeFetch: null, // Track active fetch to prevent duplicates
-        recentFetches: window.audioConverterState?.recentFetches || [] // Preserve existing recentFetches
-    };
-} else {
-    // Ensure all required properties exist
-    if (!window.audioConverterState.recentFetches) {
-        window.audioConverterState.recentFetches = [];
-    }
-}
-
-// Ensure this only runs once, even if DOMContentLoaded fires multiple times
-if (!window.audioConverterInitialized) {
     window.audioConverterInitialized = true;
-    
-    document.addEventListener('DOMContentLoaded', function() {
-        let form = document.querySelector('.converter-tool');
-        if (!form) return; // Form not found
-        
-        let fileInput = document.getElementById('audio_file');
-        let uploadArea = document.querySelector('.file-upload-area');
-        let submitBtn = form.querySelector('button[type="submit"]');
-    
-    // Update UI when file is selected
-        if (fileInput) {
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            const fileName = e.target.files[0].name;
-                    if (uploadArea) {
-            uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
-                    }
-        }
-    });
-    
-    fileInput.addEventListener('click', function(e) {
-        e.stopPropagation();
-    });
-        }
-    
-    // Handle form submission with fetch to keep page responsive
-        let formSubmitted = false;
-        let currentRequestId = null;
-        
-        const submitHandler = function(e) {
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.querySelector('.converter-tool');
+        if (!form) return;
+
+        let isProcessing = false;
+        let downloadTriggered = false;
+
+        const submitHandler = async (e) => {
             e.preventDefault();
-            e.stopImmediatePropagation(); // Prevent other listeners
             e.stopPropagation();
-            
-            // Generate unique request ID
-            const requestId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-            
-            // Prevent duplicate submissions using global state
-            if (window.audioConverterState.isProcessing || formSubmitted) {
-                console.log('Already processing, ignoring duplicate submission. Request ID:', requestId);
+            e.stopImmediatePropagation();
+
+            // === INSTANT DOUBLE-CLICK PROTECTION ===
+            if (isProcessing) {
+                console.log('Submit blocked: already processing');
                 return false;
             }
-            
-            if (!fileInput || !fileInput.files.length) {
-            alert('Please select an audio file.');
+
+            const fileInput = form.querySelector('#audio_file');
+            if (!fileInput?.files?.length) {
+                alert('Please select an audio file');
                 return false;
             }
-            
-            // Mark as submitted immediately with request ID
-            formSubmitted = true;
-            currentRequestId = requestId;
-            
-            // Set processing flag globally
-            window.audioConverterState.isProcessing = true;
-            window.audioConverterState.downloadTriggered = false;
-            window.audioConverterState.downloadId = requestId;
-            window.audioConverterState.currentRequestId = requestId;
-            
-            // Disable button and form during processing
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Processing...';
-            form.style.pointerEvents = 'none'; // Prevent any clicks
-        
-        const formData = new FormData(form);
-            const fetchUrl = form.action || window.location.href;
-            
-            console.log('Starting audio conversion request... Request ID:', requestId, 'URL:', fetchUrl);
-            
-            // CRITICAL: Store fetch promise globally to prevent duplicate calls
-            if (window.audioConverterState.activeFetch) {
-                console.log('Fetch already in progress, aborting duplicate. Request ID:', requestId);
-                console.log('Active fetch details:', window.audioConverterState.activeFetch);
-                return false;
-            }
-            
-            // Create AbortController to cancel if needed
-            const controller = new AbortController();
-            const fetchPromise = fetch(fetchUrl, {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin',
-                signal: controller.signal
+
+            // === LOCK IMMEDIATELY ===
+            isProcessing = true;
+            downloadTriggered = false;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+            form.style.pointerEvents = 'none';
+
+            // Cleanup any old blob URLs
+            document.querySelectorAll('a[data-temp-download]').forEach(a => {
+                if (a.href.startsWith('blob:')) {
+                    URL.revokeObjectURL(a.href);
+                }
+                a.remove();
             });
-            
-            // Store the fetch promise immediately
-            window.audioConverterState.activeFetch = { 
-                controller, 
-                requestId,
-                promise: fetchPromise,
-                url: fetchUrl,
-                timestamp: Date.now()
-            };
-            
-            console.log('Fetch initiated. Active fetch stored:', window.audioConverterState.activeFetch);
-            
-            fetchPromise
-        .then(response => {
-                // Double-check this is still the active fetch
-                if (window.audioConverterState.activeFetch?.requestId !== requestId) {
-                    console.warn('Response received for non-active request. Active:', window.audioConverterState.activeFetch?.requestId, 'This:', requestId);
-                    return Promise.reject(new Error('Stale request response'));
-                }
-                // Verify this is still the current request
-                if (window.audioConverterState.currentRequestId !== requestId) {
-                    console.log('Ignoring response from old request. Current:', window.audioConverterState.currentRequestId, 'Response:', requestId);
-                    return Promise.reject(new Error('Stale request'));
-                }
-                
-                console.log('Received response for request ID:', requestId);
-                
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error('Server returned an error');
+
+            const formData = new FormData(form);
+
+            try {
+                const response = await fetch(form.action || window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
                 });
-            }
-            
-                // Check if response is JSON (our new format) or audio file
-            const contentType = response.headers.get('content-type');
-                
-                if (contentType && contentType.includes('application/json')) {
-                    // New JSON format - extract file data
-                    return response.json().then(data => {
-                        // Decode base64 file
-                        const binaryString = atob(data.file);
-                        const bytes = new Uint8Array(binaryString.length);
-                        for (let i = 0; i < binaryString.length; i++) {
-                            bytes[i] = binaryString.charCodeAt(i);
-                        }
-                        const blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
-                        return { blob, filename: data.filename, contentType: data.content_type };
-                    });
-                } else if (contentType && (contentType.includes('audio/') || contentType.includes('application/octet-stream'))) {
-                    // Legacy format - direct audio file
-                    const xContentType = response.headers.get('x-content-type');
-                return response.blob().then(blob => {
-                    const filename = response.headers.get('x-filename') || 'converted.audio';
-                        const actualContentType = xContentType || contentType || 'audio/mpeg';
-                        return { blob, filename, contentType: actualContentType };
-                });
-            } else {
-                // Error page - reload to show error
-                window.location.reload();
-                return Promise.reject(new Error('Expected audio file but got HTML response'));
-            }
-        })
-            .then(({ blob, filename, contentType }) => {
-                // Verify this is still the current request
-                if (window.audioConverterState.currentRequestId !== requestId) {
-                    console.log('Ignoring download from old request');
-                    return;
+
+                if (!response.ok) {
+                    throw new Error('Conversion failed');
                 }
-                
-                // Prevent duplicate downloads using global state
-                if (window.audioConverterState.downloadTriggered) {
-                    console.log('Download already triggered, skipping duplicate. Request ID:', requestId);
-                    window.audioConverterState.isProcessing = false;
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Convert & Download';
-                    return;
-                }
-                
-                console.log('Triggering download for request ID:', requestId);
-                
-                // Mark download as triggered immediately (before any async operations)
-                window.audioConverterState.downloadTriggered = true;
-                const downloadId = window.audioConverterState.downloadId;
-                
-                // Remove any existing download links first
-                const existingLinks = document.querySelectorAll('a[data-audio-download]');
-                existingLinks.forEach(link => {
-                    try {
-                        if (link.href && link.href.startsWith('blob:')) {
-                            window.URL.revokeObjectURL(link.href);
-                        }
-                        if (document.body.contains(link)) {
-                            document.body.removeChild(link);
-                        }
-                    } catch(e) {
-                        // Ignore cleanup errors
+
+                let blob, filename, contentType = 'audio/mpeg';
+
+                const contentTypeHeader = response.headers.get('content-type');
+                if (contentTypeHeader?.includes('application/json')) {
+                    // JSON format - extract file data
+                    const data = await response.json();
+                    const binary = atob(data.file);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
                     }
-                });
-                
-                // Create a blob with the correct content type
-                const typedBlob = new Blob([blob], { type: contentType || 'audio/mpeg' });
-                const url = window.URL.createObjectURL(typedBlob);
-                
-                // Create download link only once
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.style.display = 'none';
-                a.setAttribute('data-audio-download', downloadId);
-            document.body.appendChild(a);
-                
-                // Trigger download once
-            a.click();
-            
-                // Remove the element IMMEDIATELY (synchronously if possible)
-                requestAnimationFrame(function() {
+                    blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
+                    filename = data.filename;
+                    contentType = data.content_type || 'audio/mpeg';
+                } else {
+                    // Legacy format - direct audio file
+                    blob = await response.blob();
+                    filename = response.headers.get('x-filename') || 'converted.audio';
+                    contentType = response.headers.get('x-content-type') || contentTypeHeader || 'audio/mpeg';
+                    blob = new Blob([blob], { type: contentType });
+                }
+
+                // === FINAL DUPLICATE DOWNLOAD GUARD ===
+                if (downloadTriggered) {
+                    console.log('Download already triggered, skipping');
+                    return;
+                }
+                downloadTriggered = true;
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.dataset.tempDownload = 'true';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+
+                // Cleanup
+                setTimeout(() => {
                     if (document.body.contains(a)) {
                         document.body.removeChild(a);
                     }
-                    // Revoke URL after a short delay
-                    setTimeout(() => {
-                window.URL.revokeObjectURL(url);
-            }, 100);
-                });
-                
-                // Reset processing flag and button after a delay
-                setTimeout(() => {
-                    window.audioConverterState.isProcessing = false;
-                    formSubmitted = false;
-                    window.audioConverterState.activeFetch = null; // Clear active fetch
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Convert & Download';
-                    form.style.pointerEvents = 'auto'; // Re-enable form
-                    // Reset download flag after longer delay
-                    setTimeout(() => {
-                        window.audioConverterState.downloadTriggered = false;
-                    }, 2000);
-                }, 500);
-        })
-        .catch(error => {
-                // Clear active fetch on error
-                window.audioConverterState.activeFetch = null;
-                // Only handle errors for the current request
-                if (window.audioConverterState.currentRequestId !== requestId && error.message !== 'Stale request') {
-                    return; // Ignore errors from old requests
-                }
-                
-                console.error('Error for request ID:', requestId, error);
-                // Reset processing flag and button
-                window.audioConverterState.isProcessing = false;
-                window.audioConverterState.downloadTriggered = false;
-                window.audioConverterState.activeFetch = null;
-                formSubmitted = false;
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Convert & Download';
-                form.style.pointerEvents = 'auto'; // Re-enable form
-            // Reload to show error message
-            window.location.reload();
-            });
-            
-            return false; // Prevent default and stop propagation
+                    URL.revokeObjectURL(url);
+                }, 100);
+
+            } catch (err) {
+                console.error('Conversion error:', err);
+                alert('Conversion failed. Please try again.');
+                window.location.reload();
+            } finally {
+                // === ALWAYS RESET ===
+                isProcessing = false;
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Convert & Download';
+                form.style.pointerEvents = 'auto';
+            }
         };
-        
-        // CRITICAL: Remove ALL existing event listeners by cloning the form
-        // This is the most reliable way to ensure no duplicate listeners
-        const formParent = form.parentNode;
-        const formNextSibling = form.nextSibling;
+
+        // Remove ALL existing listeners by cloning (once!)
         const newForm = form.cloneNode(true);
+        form.parentNode.replaceChild(newForm, form);
+
+        // Attach single listener
+        newForm.addEventListener('submit', submitHandler);
         
-        // Remove old form
-        form.remove();
-        
-        // Insert new form in same position
-        if (formNextSibling) {
-            formParent.insertBefore(newForm, formNextSibling);
-        } else {
-            formParent.appendChild(newForm);
-        }
-        
-        // Update form reference
-        form = newForm;
-        
-        // Re-get all elements after cloning
-        fileInput = document.getElementById('audio_file');
-        uploadArea = document.querySelector('.file-upload-area');
-        submitBtn = form.querySelector('button[type="submit"]');
-        
-        // Re-attach file input listeners
-        if (fileInput) {
-            fileInput.addEventListener('change', function(e) {
-                if (e.target.files.length > 0) {
-                    const fileName = e.target.files[0].name;
-                    if (uploadArea) {
-                        uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
-                    }
+        // Update file name display
+        const newFileInput = newForm.querySelector('#audio_file');
+        const uploadArea = newForm.querySelector('.file-upload-area');
+        if (newFileInput && uploadArea) {
+            newFileInput.addEventListener('change', (e) => {
+                const fileName = e.target.files[0]?.name;
+                const p = uploadArea.querySelector('p');
+                if (p && fileName) {
+                    p.textContent = 'Selected: ' + fileName;
                 }
             });
-            
-            fileInput.addEventListener('click', function(e) {
-                e.stopPropagation();
-            });
         }
-        
-        // Clear any inline handlers
-        form.onsubmit = null;
-        
-        // Add our listener with capture phase and make it the ONLY listener
-        form.addEventListener('submit', submitHandler, { 
-            once: false, 
-            capture: true,
-            passive: false 
-        });
-        
-        // Also prevent any default form behavior
-        form.setAttribute('onsubmit', 'return false;');
-        
-        // Prevent button double-clicks
-        if (submitBtn) {
-            submitBtn.addEventListener('click', function(e) {
-                if (window.audioConverterState.isProcessing) {
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    e.stopPropagation();
-                    console.log('Button click blocked - already processing');
-                    return false;
-                }
-            }, { capture: true });
-        }
-        
-        console.log('Audio converter form initialized. Form ID:', form.id || 'no-id');
     });
 }
-} // End of audioConverterScriptLoaded check
 </script>
 {% endblock extra_js %}
-
