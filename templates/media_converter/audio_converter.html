@@ -59,6 +59,12 @@
 
 {% block extra_js %}
 <script>
+// CRITICAL: Prevent script from running multiple times
+if (window.audioConverterScriptLoaded) {
+    console.warn('Audio converter script already loaded, skipping duplicate');
+} else {
+    window.audioConverterScriptLoaded = true;
+
 // Use global variables to prevent duplicates across page reloads
 if (!window.audioConverterState) {
     window.audioConverterState = {
@@ -301,22 +307,63 @@ if (!window.audioConverterInitialized) {
             return false; // Prevent default and stop propagation
         };
         
-        // Remove any existing submit listeners and add our own
-        form.onsubmit = null; // Clear any inline handlers
-        
-        // Remove all existing submit listeners
+        // CRITICAL: Remove ALL existing event listeners by cloning the form
+        // This is the most reliable way to ensure no duplicate listeners
+        const formParent = form.parentNode;
+        const formNextSibling = form.nextSibling;
         const newForm = form.cloneNode(true);
-        form.parentNode.replaceChild(newForm, form);
+        
+        // Remove old form
+        form.remove();
+        
+        // Insert new form in same position
+        if (formNextSibling) {
+            formParent.insertBefore(newForm, formNextSibling);
+        } else {
+            formParent.appendChild(newForm);
+        }
+        
+        // Update form reference
         form = newForm;
         
-        // Re-get elements after cloning
+        // Re-get all elements after cloning
         fileInput = document.getElementById('audio_file');
+        uploadArea = document.querySelector('.file-upload-area');
         submitBtn = form.querySelector('button[type="submit"]');
         
-        // Add our listener
-        form.addEventListener('submit', submitHandler, { once: false, capture: true });
+        // Re-attach file input listeners
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    const fileName = e.target.files[0].name;
+                    if (uploadArea) {
+                        uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
+                    }
+                }
+            });
+            
+            fileInput.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        }
+        
+        // Clear any inline handlers
+        form.onsubmit = null;
+        
+        // Add our listener with capture phase and make it the ONLY listener
+        form.addEventListener('submit', submitHandler, { 
+            once: false, 
+            capture: true,
+            passive: false 
+        });
+        
+        // Also prevent any default form behavior
+        form.setAttribute('onsubmit', 'return false;');
+        
+        console.log('Audio converter form initialized. Form ID:', form.id || 'no-id');
     });
 }
+} // End of audioConverterScriptLoaded check
 </script>
 {% endblock extra_js %}
 
