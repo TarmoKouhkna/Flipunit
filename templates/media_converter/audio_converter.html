@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('audio_file');
     const uploadArea = document.querySelector('.file-upload-area');
     const submitBtn = form.querySelector('button[type="submit"]');
+    let isProcessing = false; // Flag to prevent duplicate submissions
     
     // Update UI when file is selected
     fileInput.addEventListener('change', function(e) {
@@ -81,10 +82,18 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
+        // Prevent duplicate submissions
+        if (isProcessing) {
+            return;
+        }
+        
         if (!fileInput.files.length) {
             alert('Please select an audio file.');
             return;
         }
+        
+        // Set processing flag
+        isProcessing = true;
         
         // Disable button during processing
         submitBtn.disabled = true;
@@ -117,28 +126,34 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .then(({ blob, filename }) => {
-            // Create download link
+            // Create download link only once
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
             a.style.display = 'none';
             document.body.appendChild(a);
+            
+            // Trigger download once
             a.click();
             
-            // Clean up
+            // Clean up immediately after click
             setTimeout(function() {
                 window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
+                if (document.body.contains(a)) {
+                    document.body.removeChild(a);
+                }
             }, 100);
             
-            // Re-enable button
+            // Reset processing flag and button
+            isProcessing = false;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Convert & Download';
         })
         .catch(error => {
             console.error('Error:', error);
-            // Re-enable button
+            // Reset processing flag and button
+            isProcessing = false;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Convert & Download';
             // Reload to show error message

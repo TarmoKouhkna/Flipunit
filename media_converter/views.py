@@ -386,7 +386,7 @@ def audio_converter(request):
         }
         
         # Create response
-        # Note: We don't set Content-Disposition here to prevent browser auto-download
+        # Set Content-Disposition to inline to prevent browser auto-download
         # JavaScript will handle the download programmatically to keep page responsive
         safe_filename = os.path.splitext(uploaded_file.name)[0] + f'.{output_ext}'
         safe_filename = re.sub(r'[^\w\s-]', '', safe_filename).strip()
@@ -394,6 +394,7 @@ def audio_converter(request):
         
         response = HttpResponse(file_content, content_type=content_type_map[output_format])
         response['Content-Length'] = len(file_content)
+        response['Content-Disposition'] = 'inline'  # Prevent browser auto-download
         response['X-Filename'] = safe_filename
         return response
         
