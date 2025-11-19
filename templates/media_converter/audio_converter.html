@@ -310,7 +310,7 @@ if (window.audioConverterInitialized) {
 
         // DON'T clone the form - it breaks file input handlers
         // Instead, just remove existing submit listeners by replacing the form's submit handler
-        const submitBtn = form.querySelector('button[type="submit"]');
+        const submitBtn = form.querySelector('button.btn-primary');
         
         // Change button type to prevent any native form submission
         if (submitBtn) {
