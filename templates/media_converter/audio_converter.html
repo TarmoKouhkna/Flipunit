@@ -315,10 +315,16 @@ if (window.audioConverterInitialized) {
                     return false;
                 }
                 
-                console.log('🖱️ Button clicked, dispatching submit event');
-                // Manually trigger submit event
-                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-                form.dispatchEvent(submitEvent);
+                console.log('🖱️ Button clicked, calling submit handler directly');
+                // Call submit handler directly instead of dispatching event
+                const submitEvent = { 
+                    type: 'submit',
+                    target: form,
+                    preventDefault: () => {},
+                    stopPropagation: () => {},
+                    stopImmediatePropagation: () => {}
+                };
+                submitHandler(submitEvent);
             }, { capture: true, once: false });
         }
 
