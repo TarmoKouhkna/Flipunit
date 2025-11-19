@@ -33,6 +33,13 @@
         <pre style="white-space: pre-wrap; margin-top: 0.5rem;">{{ usage_notice }}</pre>
     </div>
     
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.2rem;">🔒</span>
+            <span><strong>Privacy Notice:</strong> Your converted files are <strong>not stored</strong> on our servers. Files are temporarily saved during conversion and deleted immediately after processing.</span>
+        </p>
+    </div>
+    
     {% if debug_post %}
     <div class="alert alert-info">
         <strong>Debug Info:</strong> POST keys received: {{ debug_post|join:", " }}
