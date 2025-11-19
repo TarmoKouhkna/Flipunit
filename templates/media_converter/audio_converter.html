@@ -260,29 +260,48 @@ if (window.audioConverterInitialized) {
         const newForm = form.cloneNode(true);
         form.parentNode.replaceChild(newForm, form);
 
-        // Get button and add click protection
+        // Get button and completely disable native form submission
         const submitBtn = newForm.querySelector('button[type="submit"]');
         
-        // Prevent button double-clicks by disabling immediately on click
+        // Change button type to prevent any native form submission
         if (submitBtn) {
+            submitBtn.type = 'button'; // Change from 'submit' to 'button'
+            
+            // Add click handler that manually triggers our submit handler
             submitBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                e.stopPropagation();
+                
                 if (isProcessing) {
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    e.stopPropagation();
+                    console.log('Button click blocked: already processing');
                     return false;
                 }
-            }, { capture: true });
+                
+                // Manually trigger submit event
+                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+                newForm.dispatchEvent(submitEvent);
+            }, { capture: true, once: false });
         }
 
-        // Attach single listener to form - use capture phase to catch early
-        newForm.addEventListener('submit', submitHandler, { capture: true });
+        // Completely prevent any native form submission
+        newForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            e.stopPropagation();
+            return false;
+        }, { capture: true });
         
-        // Also prevent default form submission
+        // Also set onsubmit to prevent any fallback
         newForm.onsubmit = function(e) {
             e.preventDefault();
+            e.stopImmediatePropagation();
+            e.stopPropagation();
             return false;
         };
+        
+        // Attach our handler LAST, with highest priority
+        newForm.addEventListener('submit', submitHandler, { capture: false, once: false });
         
         // Update file name display
         const newFileInput = newForm.querySelector('#audio_file');
