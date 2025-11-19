@@ -170,8 +170,8 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     
     # Trust proxy headers if behind a reverse proxy (nginx, etc.)
-    USE_TZ = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Only set this if your proxy actually sends X-Forwarded-Proto header
+    # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Commented out - may cause issues if proxy doesn't send this
 
 # Logging configuration
 LOGGING = {
