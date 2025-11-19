@@ -429,13 +429,8 @@ def audio_converter(request):
             output_path
         ])
         
-        # Log the complete command for debugging
-        logger.info(f'Complete FFmpeg command: {" ".join(cmd)}')
-        
         # Debug: Log the command being run
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f'Audio conversion command: {" ".join(cmd)}')
+        logger.info(f'Complete FFmpeg command: {" ".join(cmd)}')
         logger.info(f'Input: {input_path}, Output: {output_path}, Format: {output_format}')
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
