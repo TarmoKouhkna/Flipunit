@@ -64,7 +64,9 @@ if (!window.audioConverterState) {
     window.audioConverterState = {
         isProcessing: false,
         downloadTriggered: false,
-        downloadId: null
+        downloadId: null,
+        currentRequestId: null,
+        activeFetch: null // Track active fetch to prevent duplicates
     };
 }
 
@@ -138,10 +140,21 @@ if (!window.audioConverterInitialized) {
             
             console.log('Starting audio conversion request... Request ID:', requestId);
             
+            // CRITICAL: Store fetch promise globally to prevent duplicate calls
+            if (window.audioConverterState.activeFetch) {
+                console.log('Fetch already in progress, aborting duplicate. Request ID:', requestId);
+                return false;
+            }
+            
+            // Create AbortController to cancel if needed
+            const controller = new AbortController();
+            window.audioConverterState.activeFetch = { controller, requestId };
+            
             fetch(form.action || window.location.href, {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin',
+                signal: controller.signal
             })
             .then(response => {
                 // Verify this is still the current request
@@ -254,6 +267,7 @@ if (!window.audioConverterInitialized) {
                 setTimeout(() => {
                     window.audioConverterState.isProcessing = false;
                     formSubmitted = false;
+                    window.audioConverterState.activeFetch = null; // Clear active fetch
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Convert & Download';
                     form.style.pointerEvents = 'auto'; // Re-enable form
@@ -264,6 +278,8 @@ if (!window.audioConverterInitialized) {
                 }, 500);
             })
             .catch(error => {
+                // Clear active fetch on error
+                window.audioConverterState.activeFetch = null;
                 // Only handle errors for the current request
                 if (window.audioConverterState.currentRequestId !== requestId && error.message !== 'Stale request') {
                     return; // Ignore errors from old requests
@@ -273,6 +289,7 @@ if (!window.audioConverterInitialized) {
                 // Reset processing flag and button
                 window.audioConverterState.isProcessing = false;
                 window.audioConverterState.downloadTriggered = false;
+                window.audioConverterState.activeFetch = null;
                 formSubmitted = false;
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Convert & Download';
@@ -301,6 +318,5 @@ if (!window.audioConverterInitialized) {
     });
 }
 </script>
-{% endblock %}
-{% endblock %}
+{% endblock extra_js %}
 
