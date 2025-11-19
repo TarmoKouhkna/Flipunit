@@ -387,31 +387,55 @@ def audio_converter(request):
             'aac': 'aac',
         }
         
+        # Format map for explicit format specification
+        format_map = {
+            'mp3': 'mp3',
+            'wav': 'wav',
+            'ogg': 'ogg',
+            'flac': 'flac',
+            'aac': 'm4a',  # AAC typically uses m4a container
+        }
+        
         # Build FFmpeg command with proper flags to force re-encoding
         cmd = [
             ffmpeg_path,
             '-i', input_path,
+            '-vn',  # No video
             '-map', '0:a',  # Map only audio stream
             '-c:a', codec_map[output_format],  # Use modern -c:a instead of deprecated -acodec
-            '-y',  # Overwrite output file
+            '-ar', '44100',  # Set sample rate to ensure re-encoding
+            '-ac', '2',  # Set to stereo
         ]
         
         # Add quality settings for lossy formats
         if output_format in ['mp3', 'ogg', 'aac']:
-            cmd.extend(['-b:a', '192k'])  # Use -b:a instead of deprecated -ab
+            cmd.extend(['-b:a', '192k'])  # Bitrate for lossy formats
         
-        # For WAV, specify format explicitly
-        if output_format == 'wav':
-            cmd.extend(['-f', 'wav'])
+        # Add format and output
+        cmd.extend([
+            '-f', format_map[output_format],  # Explicitly set output format
+            '-y',  # Overwrite output file
+            output_path
+        ])
         
-        # Add output path
-        cmd.append(output_path)
+        # Debug: Log the command being run
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'Audio conversion command: {" ".join(cmd)}')
+        logger.info(f'Input: {input_path}, Output: {output_path}, Format: {output_format}')
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        # Log FFmpeg output for debugging
+        if result.stderr:
+            logger.info(f'FFmpeg stderr: {result.stderr[:500]}')
+        if result.stdout:
+            logger.info(f'FFmpeg stdout: {result.stdout[:500]}')
         
         # Check if FFmpeg command failed
         if result.returncode != 0:
             error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            logger.error(f'Audio conversion failed: {error_msg}')
             return render(request, 'media_converter/audio_converter.html', {
                 'error': f'Conversion failed: {error_msg[:500]}'
             })
