@@ -7,6 +7,8 @@ import tempfile
 import re
 import shutil
 import subprocess
+import json
+import base64
 
 def index(request):
     """Media converters index page"""
@@ -169,16 +171,19 @@ def youtube_to_mp3(request):
                     safe_filename = 'youtube_audio'
                 
                 # Create HTTP response
-                # Use attachment with a unique filename to prevent browser auto-download
-                # JavaScript will handle the download programmatically
-                response = HttpResponse(file_content, content_type='application/octet-stream')
-                response['Content-Length'] = len(file_content)
-                # Use attachment to prevent browser from auto-opening, but JS will handle download
-                response['Content-Disposition'] = f'inline; filename="{safe_filename}.mp3"'
-                # Add custom header with filename for JavaScript to use
-                response['X-Filename'] = f'{safe_filename}.mp3'
-                response['X-Content-Type'] = 'audio/mpeg'
-                # Prevent browser caching
+                # Use JSON to prevent browser auto-download - JavaScript will extract and download
+                file_base64 = base64.b64encode(file_content).decode('utf-8')
+                
+                response_data = {
+                    'file': file_base64,
+                    'filename': f'{safe_filename}.mp3',
+                    'content_type': 'audio/mpeg'
+                }
+                
+                response = HttpResponse(
+                    json.dumps(response_data),
+                    content_type='application/json'
+                )
                 response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
                 response['Pragma'] = 'no-cache'
                 response['Expires'] = '0'
@@ -422,19 +427,24 @@ def audio_converter(request):
         }
         
         # Create response
-        # Use application/octet-stream to prevent browser auto-download
-        # JavaScript will handle the download programmatically to keep page responsive
+        # Use JSON to prevent browser auto-download - JavaScript will extract and download
         safe_filename = os.path.splitext(uploaded_file.name)[0] + f'.{output_ext}'
         safe_filename = re.sub(r'[^\w\s-]', '', safe_filename).strip()
         safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
         
-        response = HttpResponse(file_content, content_type='application/octet-stream')
-        response['Content-Length'] = len(file_content)
-        # Use inline with filename to prevent browser auto-download
-        response['Content-Disposition'] = f'inline; filename="{safe_filename}"'
-        response['X-Filename'] = safe_filename
-        response['X-Content-Type'] = content_type_map[output_format]
-        # Prevent browser caching
+        # Encode file as base64 to send as JSON
+        file_base64 = base64.b64encode(file_content).decode('utf-8')
+        
+        response_data = {
+            'file': file_base64,
+            'filename': safe_filename,
+            'content_type': content_type_map[output_format]
+        }
+        
+        response = HttpResponse(
+            json.dumps(response_data),
+            content_type='application/json'
+        )
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response['Pragma'] = 'no-cache'
         response['Expires'] = '0'

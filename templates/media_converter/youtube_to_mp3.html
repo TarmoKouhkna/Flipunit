@@ -192,22 +192,38 @@ document.addEventListener('DOMContentLoaded', function() {
             cache: 'no-cache'
         })
         .then(response => {
-            // Check for custom content type header or check if it's an octet-stream (our audio file)
+            // Check if response is JSON (our new format) or audio file
             const contentType = response.headers.get('content-type');
-            const xContentType = response.headers.get('x-content-type');
-            const isAudioFile = (contentType && (contentType.includes('audio/mpeg') || contentType.includes('application/octet-stream'))) || xContentType;
             
-            if (isAudioFile && response.ok) {
-                // Extract filename from custom X-Filename header
+            if (contentType && contentType.includes('application/json') && response.ok) {
+                // New JSON format - extract file data
+                return response.json().then(data => {
+                    // Decode base64 file
+                    const binaryString = atob(data.file);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
+                    let filename = data.filename || 'converted.mp3';
+                    // Decode filename if needed
+                    try {
+                        filename = decodeURIComponent(filename);
+                    } catch(e) {
+                        // Keep original if decode fails
+                    }
+                    return { blob, filename, contentType: data.content_type || 'audio/mpeg' };
+                });
+            } else if (contentType && (contentType.includes('audio/mpeg') || contentType.includes('application/octet-stream')) && response.ok) {
+                // Legacy format - direct audio file
+                const xContentType = response.headers.get('x-content-type');
                 let filename = response.headers.get('x-filename') || 'converted.mp3';
-                
                 // Decode filename if needed
                 try {
                     filename = decodeURIComponent(filename);
                 } catch(e) {
                     // Keep original if decode fails
                 }
-                
                 const actualContentType = xContentType || contentType || 'audio/mpeg';
                 return response.blob().then(blob => ({ blob, filename, contentType: actualContentType }));
             } else {
