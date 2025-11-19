@@ -148,8 +148,8 @@ SITE_NAME = 'FlipUnit.eu'
 SITE_DESCRIPTION = 'Simple, fast, no-login online converter hub - unit converters, image converters, media converters, and everyday utilities.'
 
 # File upload settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB
 
 # Request timeout settings (for long-running operations like YouTube conversion)
 # Note: For production, consider using async tasks (Celery) for long operations
