@@ -339,10 +339,45 @@ if (window.audioConverterInitialized) {
         // Attach our handler LAST, with highest priority
         newForm.addEventListener('submit', submitHandler, { capture: false, once: false });
         
-        // Update file name display
+        // Update file name display and restore file input functionality
         const newFileInput = newForm.querySelector('#audio_file');
         const uploadArea = newForm.querySelector('.file-upload-area');
         if (newFileInput && uploadArea) {
+            // Restore click handler for file upload area (main.js handles this, but we need to ensure it works)
+            uploadArea.addEventListener('click', function(e) {
+                // Only trigger file input if click is not directly on the input itself
+                if (e.target !== newFileInput && !newFileInput.contains(e.target)) {
+                    newFileInput.click();
+                }
+            });
+            
+            // Restore drag and drop functionality
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', function() {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    newFileInput.files = e.dataTransfer.files;
+                    // Trigger change event
+                    const event = new Event('change', { bubbles: true });
+                    newFileInput.dispatchEvent(event);
+                }
+            });
+            
+            // Prevent file input click from bubbling to upload area
+            newFileInput.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // Update display when file is selected
             newFileInput.addEventListener('change', (e) => {
                 const fileName = e.target.files[0]?.name;
                 const p = uploadArea.querySelector('p');
