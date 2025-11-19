@@ -86,12 +86,26 @@ if (!window.audioConverterFetchInterceptor) {
             // Initialize state if needed
             if (!window.audioConverterState) {
                 window.audioConverterState = {
-                    recentFetches: []
+                    recentFetches: [],
+                    activeFetchLock: false
                 };
             }
             if (!window.audioConverterState.recentFetches) {
                 window.audioConverterState.recentFetches = [];
             }
+            if (window.audioConverterState.activeFetchLock === undefined) {
+                window.audioConverterState.activeFetchLock = false;
+            }
+            
+            // CRITICAL: Use a synchronous lock to prevent race conditions
+            if (window.audioConverterState.activeFetchLock) {
+                console.warn('❌ DUPLICATE FETCH BLOCKED BY LOCK! URL:', urlString);
+                console.trace('Stack trace of blocked fetch:');
+                return Promise.reject(new Error('Duplicate fetch prevented by lock'));
+            }
+            
+            // Set lock IMMEDIATELY (synchronously, before any async operations)
+            window.audioConverterState.activeFetchLock = true;
             
             const now = Date.now();
             const fetchKey = urlString;
@@ -102,6 +116,8 @@ if (!window.audioConverterFetchInterceptor) {
             );
             
             if (recent) {
+                // Release lock since we're blocking
+                window.audioConverterState.activeFetchLock = false;
                 console.warn('❌ DUPLICATE FETCH INTERCEPTED! URL:', urlString, 'Time since last:', now - recent.timestamp, 'ms');
                 console.warn('Blocking duplicate request to prevent double conversion');
                 return Promise.reject(new Error('Duplicate fetch prevented by interceptor'));
@@ -119,6 +135,17 @@ if (!window.audioConverterFetchInterceptor) {
             );
             
             console.log('✅ Fetch allowed. URL:', urlString, 'Timestamp:', now);
+            
+            // Call original fetch and release lock when done (success or error)
+            const fetchPromise = window._originalFetch.apply(this, args);
+            fetchPromise.finally(() => {
+                // Release lock after fetch completes (success or error)
+                setTimeout(() => {
+                    window.audioConverterState.activeFetchLock = false;
+                }, 100); // Small delay to ensure any pending duplicates are caught
+            });
+            
+            return fetchPromise;
         }
         
         return window._originalFetch.apply(this, args);
