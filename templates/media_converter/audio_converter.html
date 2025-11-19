@@ -62,14 +62,16 @@
 <!-- AUDIO CONVERTER SCRIPT v2.0.2025-01-19 - If you see this comment, the template is loading -->
 <script>
 // === VERSION CHECK - FORCE CACHE BUST ===
-const AUDIO_CONVERTER_VERSION = 'v2.0.2025-01-19';
+const AUDIO_CONVERTER_VERSION = 'v2.1.2025-01-19-FIXED';
 console.log('🔵🔵🔵 AUDIO CONVERTER SCRIPT LOADED - VERSION:', AUDIO_CONVERTER_VERSION);
 console.log('🔵 Timestamp:', new Date().toISOString());
 console.log('🔵 URL:', window.location.href);
+console.log('🔵🔵🔵 CODE FIX: Direct submit handler call (not event dispatch)');
+console.log('🔵🔵🔵 CODE FIX: File input handlers restored');
 
 // Force immediate execution - no waiting
 (function() {
-    alert('✅ NEW CODE LOADED! Version: ' + AUDIO_CONVERTER_VERSION);
+    alert('✅ NEW CODE v2.1 LOADED! Direct submit handler fix included!');
     console.error('🔴🔴🔴 ALERT SHOULD HAVE APPEARED - IF NOT, SCRIPT NOT LOADING');
 })();
 
@@ -315,7 +317,7 @@ if (window.audioConverterInitialized) {
                     return false;
                 }
                 
-                console.log('🖱️ Button clicked, calling submit handler directly');
+                console.log('🖱️🖱️🖱️ BUTTON CLICKED - CALLING SUBMIT HANDLER DIRECTLY (v2.1 FIX)');
                 // Call submit handler directly instead of dispatching event
                 const submitEvent = { 
                     type: 'submit',
@@ -324,7 +326,9 @@ if (window.audioConverterInitialized) {
                     stopPropagation: () => {},
                     stopImmediatePropagation: () => {}
                 };
+                console.log('🖱️ About to call submitHandler function...');
                 submitHandler(submitEvent);
+                console.log('🖱️ submitHandler call completed');
             }, { capture: true, once: false });
         }
 
