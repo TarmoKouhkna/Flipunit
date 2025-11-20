@@ -41,7 +41,7 @@
                 <option value="wav">WAV</option>
                 <option value="ogg">OGG</option>
                 <option value="flac">FLAC</option>
-                <option value="aac">AAC</option>
+                <option value="aac">AAC (M4A)</option>
             </select>
         </div>
         
@@ -58,6 +58,9 @@
         </ol>
         <p style="margin-top: 1rem; color: var(--text-secondary);">
             <strong>Note:</strong> Lossy formats (MP3, OGG, AAC) are converted at 192 kbps quality. Lossless formats (WAV, FLAC) preserve original quality.
+        </p>
+        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+            <strong>Format Note:</strong> AAC format downloads as M4A file (standard container for AAC audio).
         </p>
     </div>
 </div>
@@ -275,12 +278,37 @@ if (window.audioConverterInitialized) {
                 }
                 state.downloadTriggered = true;
                 console.log('✅ Download triggered (submit count:', state.submitCount, ')');
+                console.log('📁 Original filename from server:', filename);
 
                 // Add timestamp to filename to prevent browser de-duping
+                // Preserve the original extension from server
                 const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-                const fileExt = filename.match(/\.[^/.]+$/) || '.mp3';
-                const baseName = filename.replace(/\.[^/.]+$/, '');
+                // Extract extension more reliably - look for last dot before any dash/timestamp
+                let fileExt = '';
+                let baseName = filename;
+                
+                // Try to find extension (last dot that's not part of a timestamp pattern)
+                const extMatch = filename.match(/\.([a-z0-9]+)$/i);
+                if (extMatch) {
+                    fileExt = '.' + extMatch[1];
+                    baseName = filename.slice(0, -(fileExt.length));
+                } else {
+                    // Fallback: use content type to determine extension
+                    console.warn('⚠️ Could not extract extension from filename, using content type');
+                    const extMap = {
+                        'audio/mpeg': '.mp3',
+                        'audio/wav': '.wav',
+                        'audio/ogg': '.ogg',
+                        'audio/flac': '.flac',
+                        'audio/aac': '.aac'
+                    };
+                    fileExt = extMap[contentType] || '.mp3';
+                    baseName = filename.replace(/\.[^/.]+$/, '') || filename;
+                }
+                
+                console.log('📁 Extracted extension:', fileExt, 'Base name:', baseName);
                 const uniqueFilename = `${baseName}-${timestamp}${fileExt}`;
+                console.log('📁 Final filename:', uniqueFilename);
 
                 const url = URL.createObjectURL(blob);
             const a = document.createElement('a');

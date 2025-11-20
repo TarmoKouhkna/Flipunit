@@ -398,6 +398,7 @@ def audio_converter(request):
         # Create temporary directory
         temp_dir = tempfile.mkdtemp()
         input_path = os.path.join(temp_dir, f'input{file_ext}')
+        # For AAC, use .m4a extension but mp4 container format
         output_ext = output_format if output_format != 'aac' else 'm4a'
         output_path = os.path.join(temp_dir, f'output.{output_ext}')
         
@@ -435,22 +436,36 @@ def audio_converter(request):
             '-c:a', codec_map[output_format],  # ALWAYS re-encode with specified codec
             '-ar', '44100',  # Set sample rate to ensure re-encoding
             '-ac', '2',  # Set to stereo
-            '-avoid_negative_ts', 'make_zero',  # Force re-encoding, prevent stream copy
-            '-fflags', '+genpts',  # Generate presentation timestamps (forces re-encoding)
-            '-strict', '-2',  # Allow experimental codecs if needed
         ]
         
-        # For WAV specifically, ensure we're creating a proper WAV file
+        # Format-specific settings
         if output_format == 'wav':
+            # For WAV specifically, ensure we're creating a proper WAV file
             cmd.extend(['-sample_fmt', 's16'])  # 16-bit signed PCM for WAV
+            cmd.extend(['-f', 'wav'])
+        elif output_format == 'flac':
+            # For FLAC, add compression level (0-8, higher = better compression but slower)
+            # FLAC needs explicit format and compression settings
+            cmd.extend(['-compression_level', '5'])  # Balanced compression
+            cmd.extend(['-f', 'flac'])
+        elif output_format == 'aac':
+            # For AAC, use MP4 container format (M4A is just MP4 with audio)
+            # The muxer error suggests we need to use mp4 format, not m4a
+            cmd.extend(['-b:a', '192k'])  # Bitrate
+            cmd.extend(['-f', 'mp4'])  # Use mp4 container for AAC (works with .m4a extension)
+            cmd.extend(['-movflags', '+faststart'])  # Optimize for streaming
+        elif output_format == 'mp3':
+            cmd.extend(['-b:a', '192k'])  # Bitrate
+            cmd.extend(['-f', 'mp3'])
+        elif output_format == 'ogg':
+            cmd.extend(['-b:a', '192k'])  # Bitrate
+            cmd.extend(['-f', 'ogg'])
         
-        # Add quality settings for lossy formats
-        if output_format in ['mp3', 'ogg', 'aac']:
-            cmd.extend(['-b:a', '192k'])  # Bitrate for lossy formats
-        
-        # Explicitly set output format to ensure proper conversion
-        # This prevents FFmpeg from using stream copy
-        cmd.extend(['-f', format_map[output_format]])
+        # Add flags to prevent stream copy (but after format-specific settings)
+        cmd.extend([
+            '-avoid_negative_ts', 'make_zero',  # Force re-encoding, prevent stream copy
+            '-fflags', '+genpts',  # Generate presentation timestamps (forces re-encoding)
+        ])
         
         # Add output
         cmd.extend([
@@ -555,9 +570,11 @@ def audio_converter(request):
         # Use JSON to prevent browser auto-download - JavaScript will extract and download
         # Ensure we use the correct output extension
         base_name = os.path.splitext(uploaded_file.name)[0]
-        safe_filename = base_name + f'.{output_ext}'
-        safe_filename = re.sub(r'[^\w\s-]', '', safe_filename).strip()
-        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
+        # Sanitize base name first (remove special chars but keep dots for extension)
+        base_name = re.sub(r'[^\w\s.-]', '', base_name).strip()
+        base_name = re.sub(r'[-\s]+', '-', base_name)
+        # Add extension after sanitization to preserve the dot
+        safe_filename = f'{base_name}.{output_ext}'
         
         # Debug: Log the filename being sent
         logger.info(f'Generated filename: {safe_filename}, output_format: {output_format}, output_ext: {output_ext}')
