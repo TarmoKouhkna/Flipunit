@@ -41,7 +41,7 @@
                 <option value="wav">WAV</option>
                 <option value="ogg">OGG</option>
                 <option value="flac">FLAC</option>
-                <option value="aac">AAC (M4A)</option>
+                <option value="aac">AAC</option>
             </select>
         </div>
         
@@ -58,9 +58,6 @@
         </ol>
         <p style="margin-top: 1rem; color: var(--text-secondary);">
             <strong>Note:</strong> Lossy formats (MP3, OGG, AAC) are converted at 192 kbps quality. Lossless formats (WAV, FLAC) preserve original quality.
-        </p>
-        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">
-            <strong>Format Note:</strong> AAC format downloads as M4A file (standard container for AAC audio).
         </p>
     </div>
 </div>
@@ -112,14 +109,14 @@ console.log('🔵🔵🔵 CODE FIX: File input handlers restored');
             isProcessing = true;
             console.log('✅ ALLOWED FETCH (lock set):', urlString);
             
-            // Clean up after request completes (reduced delay to 500ms)
+            // Clean up after request completes (with delay to catch rapid duplicates)
             const fetchPromise = originalFetch.apply(this, arguments);
             fetchPromise.finally(() => {
-                // Reduced delay to 500ms - enough to catch rapid duplicates but not block legitimate retries
+                // Wait 2 seconds before releasing lock to catch any rapid duplicates
                 setTimeout(() => {
                     isProcessing = false;
                     console.log('🔓 Lock released');
-                }, 500);
+                }, 2000);
             });
             
             return fetchPromise;
@@ -241,31 +238,18 @@ if (window.audioConverterInitialized) {
                 const contentTypeHeader = response.headers.get('content-type');
                 if (contentTypeHeader?.includes('application/json')) {
                     // JSON format - extract file data
-                    try {
-                        const data = await response.json();
-                        if (!data.file || !data.filename) {
-                            throw new Error('Invalid response format: missing file data');
-                        }
-                        const binary = atob(data.file);
-                        const bytes = new Uint8Array(binary.length);
-                        for (let i = 0; i < binary.length; i++) {
-                            bytes[i] = binary.charCodeAt(i);
-                        }
-                        blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
-                        filename = data.filename;
-                        contentType = data.content_type || 'audio/mpeg';
-                    } catch (jsonError) {
-                        console.error('JSON parsing error:', jsonError);
-                        // Try to get error message from response
-                        const errorText = await response.text();
-                        throw new Error(`Failed to parse response: ${jsonError.message}. Response: ${errorText.substring(0, 200)}`);
+                    const data = await response.json();
+                    const binary = atob(data.file);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
                     }
-                } else {
+                    blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
+                    filename = data.filename;
+                    contentType = data.content_type || 'audio/mpeg';
+            } else {
                     // Legacy format - direct audio file
                     blob = await response.blob();
-                    if (blob.size === 0) {
-                        throw new Error('Received empty file from server');
-                    }
                     filename = response.headers.get('x-filename') || 'converted.audio';
                     contentType = response.headers.get('x-content-type') || contentTypeHeader || 'audio/mpeg';
                     blob = new Blob([blob], { type: contentType });
@@ -278,37 +262,12 @@ if (window.audioConverterInitialized) {
                 }
                 state.downloadTriggered = true;
                 console.log('✅ Download triggered (submit count:', state.submitCount, ')');
-                console.log('📁 Original filename from server:', filename);
 
                 // Add timestamp to filename to prevent browser de-duping
-                // Preserve the original extension from server
                 const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-                // Extract extension more reliably - look for last dot before any dash/timestamp
-                let fileExt = '';
-                let baseName = filename;
-                
-                // Try to find extension (last dot that's not part of a timestamp pattern)
-                const extMatch = filename.match(/\.([a-z0-9]+)$/i);
-                if (extMatch) {
-                    fileExt = '.' + extMatch[1];
-                    baseName = filename.slice(0, -(fileExt.length));
-                } else {
-                    // Fallback: use content type to determine extension
-                    console.warn('⚠️ Could not extract extension from filename, using content type');
-                    const extMap = {
-                        'audio/mpeg': '.mp3',
-                        'audio/wav': '.wav',
-                        'audio/ogg': '.ogg',
-                        'audio/flac': '.flac',
-                        'audio/aac': '.aac'
-                    };
-                    fileExt = extMap[contentType] || '.mp3';
-                    baseName = filename.replace(/\.[^/.]+$/, '') || filename;
-                }
-                
-                console.log('📁 Extracted extension:', fileExt, 'Base name:', baseName);
+                const fileExt = filename.match(/\.[^/.]+$/) || '.mp3';
+                const baseName = filename.replace(/\.[^/.]+$/, '');
                 const uniqueFilename = `${baseName}-${timestamp}${fileExt}`;
-                console.log('📁 Final filename:', uniqueFilename);
 
                 const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -334,23 +293,12 @@ if (window.audioConverterInitialized) {
                     return;
                 }
                 console.error('Conversion error:', err);
-                console.error('Error details:', {
-                    name: err.name,
-                    message: err.message,
-                    stack: err.stack
-                });
-                
-                // Show user-friendly error message
-                const errorMsg = err.message || 'Conversion failed';
-                alert(`Conversion failed: ${errorMsg}. Please try again.`);
-                
-                // Don't reload - let user try again
-                // window.location.reload();
+                alert('Conversion failed. Please try again.');
+                window.location.reload();
             } finally {
-                // === ALWAYS RESET ALL STATE ===
+                // === ALWAYS RESET ===
                 console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
                 state.isProcessing = false;
-                state.downloadTriggered = false; // CRITICAL: Reset download flag
                 state.abortController = null; // Clear controller
                 
                 // Find button again (in case form was re-rendered)
