@@ -35,6 +35,117 @@ def index(request):
     }
     return render(request, 'utilities/index.html', context)
 
+def _safe_evaluate(expression):
+    """
+    Safely evaluate a mathematical expression without using eval().
+    Only supports basic arithmetic operations: +, -, *, /, and parentheses.
+    """
+    import re
+    import operator
+    
+    # Remove all whitespace
+    expression = expression.replace(' ', '')
+    
+    # Validate: only allow numbers, operators, parentheses, and decimal points
+    if not re.match(r'^[0-9+\-*/().]+$', expression):
+        raise ValueError('Invalid characters in expression')
+    
+    # Use a simple stack-based evaluator
+    # This is a basic implementation that handles +, -, *, /, and parentheses
+    def evaluate_expression(tokens):
+        """Evaluate expression using operator precedence"""
+        if not tokens:
+            raise ValueError('Empty expression')
+        
+        # Handle parentheses first
+        i = 0
+        while i < len(tokens):
+            if tokens[i] == '(':
+                # Find matching closing parenthesis
+                depth = 1
+                j = i + 1
+                while j < len(tokens) and depth > 0:
+                    if tokens[j] == '(':
+                        depth += 1
+                    elif tokens[j] == ')':
+                        depth -= 1
+                    j += 1
+                
+                if depth != 0:
+                    raise ValueError('Mismatched parentheses')
+                
+                # Recursively evaluate expression inside parentheses
+                inner_result = evaluate_expression(tokens[i+1:j-1])
+                tokens = tokens[:i] + [str(inner_result)] + tokens[j:]
+                i = 0
+                continue
+            i += 1
+        
+        # Remove any remaining parentheses (shouldn't happen, but safety check)
+        tokens = [t for t in tokens if t not in ('(', ')')]
+        
+        # Handle multiplication and division
+        i = 0
+        while i < len(tokens):
+            if tokens[i] == '*':
+                if i == 0 or i == len(tokens) - 1:
+                    raise ValueError('Invalid expression')
+                result = float(tokens[i-1]) * float(tokens[i+1])
+                tokens = tokens[:i-1] + [str(result)] + tokens[i+2:]
+                i = 0
+            elif tokens[i] == '/':
+                if i == 0 or i == len(tokens) - 1:
+                    raise ValueError('Invalid expression')
+                divisor = float(tokens[i+1])
+                if divisor == 0:
+                    raise ValueError('Division by zero')
+                result = float(tokens[i-1]) / divisor
+                tokens = tokens[:i-1] + [str(result)] + tokens[i+2:]
+                i = 0
+            else:
+                i += 1
+        
+        # Handle addition and subtraction
+        result = float(tokens[0])
+        i = 1
+        while i < len(tokens):
+            if tokens[i] == '+':
+                if i == len(tokens) - 1:
+                    raise ValueError('Invalid expression')
+                result += float(tokens[i+1])
+                i += 2
+            elif tokens[i] == '-':
+                if i == len(tokens) - 1:
+                    raise ValueError('Invalid expression')
+                result -= float(tokens[i+1])
+                i += 2
+            else:
+                raise ValueError(f'Unexpected token: {tokens[i]}')
+        
+        return result
+    
+    # Tokenize the expression
+    tokens = []
+    current_number = ''
+    
+    for char in expression:
+        if char.isdigit() or char == '.':
+            current_number += char
+        else:
+            if current_number:
+                tokens.append(current_number)
+                current_number = ''
+            if char in '+-*/()':
+                tokens.append(char)
+    
+    if current_number:
+        tokens.append(current_number)
+    
+    if not tokens:
+        raise ValueError('Empty expression')
+    
+    return evaluate_expression(tokens)
+
 def calculator(request):
     """Simple calculator"""
     result = None
@@ -44,12 +155,12 @@ def calculator(request):
         try:
             expression = request.POST.get('expression', '').strip()
             if expression:
-                # Basic safety check - only allow numbers, operators, and parentheses
-                allowed_chars = set('0123456789+-*/.() ')
-                if all(c in allowed_chars for c in expression):
-                    result = eval(expression)
-                else:
-                    error = 'Invalid characters in expression'
+                # Use safe evaluation instead of eval()
+                result = _safe_evaluate(expression)
+            else:
+                error = 'Please enter an expression'
+        except ValueError as e:
+            error = f'Error: {str(e)}'
         except Exception as e:
             error = f'Error: {str(e)}'
     
@@ -79,6 +190,13 @@ def pdf_merge(request):
     if len(pdf_files) < 2:
         messages.error(request, 'Please upload at least 2 PDF files to merge.')
         return render(request, 'utilities/pdf_merge.html')
+    
+    # Validate file sizes (max 50MB per PDF for merge)
+    max_size = 50 * 1024 * 1024  # 50MB
+    for pdf_file in pdf_files:
+        if pdf_file.size > max_size:
+            messages.error(request, f'{pdf_file.name} exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
+            return render(request, 'utilities/pdf_merge.html')
     
     try:
         merger = PdfWriter()
@@ -116,6 +234,12 @@ def pdf_split(request):
         return render(request, 'utilities/pdf_split.html')
     
     pdf_file = request.FILES['pdf_file']
+    
+    # Validate file size (max 50MB for PDFs)
+    max_size = 50 * 1024 * 1024  # 50MB
+    if pdf_file.size > max_size:
+        messages.error(request, f'File size exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
+        return render(request, 'utilities/pdf_split.html')
     
     if not pdf_file.name.lower().endswith('.pdf'):
         messages.error(request, 'Please upload a valid PDF file.')
@@ -167,6 +291,12 @@ def pdf_to_images(request):
         return render(request, 'utilities/pdf_to_images.html')
     
     pdf_file = request.FILES['pdf_file']
+    
+    # Validate file size (max 50MB for PDFs)
+    max_size = 50 * 1024 * 1024  # 50MB
+    if pdf_file.size > max_size:
+        messages.error(request, f'File size exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
+        return render(request, 'utilities/pdf_to_images.html')
     
     if not pdf_file.name.lower().endswith('.pdf'):
         messages.error(request, 'Please upload a valid PDF file.')
@@ -655,6 +785,12 @@ def favicon_generator(request):
         return render(request, 'utilities/favicon_generator.html')
     
     image_file = request.FILES['image_file']
+    
+    # Validate file size (max 10MB for favicon images)
+    max_size = 10 * 1024 * 1024  # 10MB
+    if image_file.size > max_size:
+        messages.error(request, f'File size exceeds 10MB limit. Your file is {image_file.size / (1024 * 1024):.1f}MB.')
+        return render(request, 'utilities/favicon_generator.html')
     
     # Check if it's an image
     allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']

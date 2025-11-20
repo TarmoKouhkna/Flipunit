@@ -21,12 +21,37 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-&c@o820#bmef_172)$k3t-u5wbi65+k7!u6x1n*%k5evy95qqs')
+# In production, SECRET_KEY must be set via environment variable
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        # Only allow default key in development
+        SECRET_KEY = 'django-insecure-&c@o820#bmef_172)$k3t-u5wbi65+k7!u6x1n*%k5evy95qqs'
+    else:
+        raise ValueError("SECRET_KEY environment variable must be set in production!")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'flipunit.eu,www.flipunit.eu').split(',') if os.environ.get('ALLOWED_HOSTS') else ['flipunit.eu', 'www.flipunit.eu']
+# Parse ALLOWED_HOSTS from environment, stripping whitespace from each hostname
+if os.environ.get('ALLOWED_HOSTS'):
+    ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS').split(',')]
+else:
+    # Default hosts: domain names and server IP address
+    ALLOWED_HOSTS = ['flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
+
+# CSRF Trusted Origins - required for HTTPS requests
+CSRF_TRUSTED_ORIGINS = []
+if os.environ.get('CSRF_TRUSTED_ORIGINS'):
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')]
+else:
+    # Default trusted origins
+    CSRF_TRUSTED_ORIGINS = [
+        'https://flipunit.eu',
+        'https://www.flipunit.eu',
+        'http://flipunit.eu',  # For development/testing
+        'http://www.flipunit.eu',  # For development/testing
+    ]
 
 
 # Application definition
@@ -146,6 +171,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # SEO Settings
 SITE_NAME = 'FlipUnit.eu'
 SITE_DESCRIPTION = 'Simple, fast, no-login online converter hub - unit converters, image converters, media converters, and everyday utilities.'
+SITE_URL = os.environ.get('SITE_URL', 'https://flipunit.eu')
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB
@@ -157,22 +183,32 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 
 # Security settings for production
 if not DEBUG:
-    # TEMPORARILY DISABLED ALL SSL REDIRECTS TO FIX REDIRECT LOOP
-    # These will be re-enabled once the redirect issue is resolved
-    SECURE_SSL_REDIRECT = False
-    SESSION_COOKIE_SECURE = False  # Temporarily False to avoid redirect issues
-    CSRF_COOKIE_SECURE = False  # Temporarily False to avoid redirect issues
+    # IMPORTANT: SSL settings configuration
+    # If you're behind Nginx/Reverse Proxy with HTTPS:
+    # 1. Ensure Nginx sends X-Forwarded-Proto header
+    # 2. Uncomment SECURE_PROXY_SSL_HEADER below
+    # 3. Set SECURE_SSL_REDIRECT = True
+    # 4. Set SESSION_COOKIE_SECURE = True
+    # 5. Set CSRF_COOKIE_SECURE = True
+    
+    # Currently disabled to avoid redirect loops - RE-ENABLE AFTER NGINX SSL CONFIGURATION
+    SECURE_SSL_REDIRECT = False  # Set to True after Nginx SSL is configured
+    SESSION_COOKIE_SECURE = False  # Set to True after Nginx SSL is configured
+    CSRF_COOKIE_SECURE = False  # Set to True after Nginx SSL is configured
+    
+    # Basic security headers (always enabled)
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
-    # Temporarily disable HSTS to avoid redirect loops
-    # SECURE_HSTS_SECONDS = 31536000
+    
+    # HSTS (HTTP Strict Transport Security) - Enable after SSL is working
+    # SECURE_HSTS_SECONDS = 31536000  # 1 year
     # SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     # SECURE_HSTS_PRELOAD = True
     
-    # Trust proxy headers if behind a reverse proxy (nginx, etc.)
-    # Only set this if your proxy actually sends X-Forwarded-Proto header
-    # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Commented out - may cause issues if proxy doesn't send this
+    # Trust proxy headers from Nginx (REQUIRED if using Nginx reverse proxy)
+    # Uncomment this line AFTER confirming Nginx sends X-Forwarded-Proto header
+    # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Logging configuration
 LOGGING = {

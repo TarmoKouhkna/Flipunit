@@ -57,6 +57,9 @@ def youtube_to_mp3(request):
     }
     
     if request.method == 'POST':
+        # Initialize temp_dir to None for proper cleanup handling
+        temp_dir = None
+        
         # Debug: Check what we're receiving
         youtube_url = request.POST.get('youtube_url', '').strip()
         
@@ -193,11 +196,11 @@ def youtube_to_mp3(request):
         except yt_dlp.utils.DownloadError as e:
             error_msg = str(e)
             # Clean up temp directory on error
-            try:
-                if 'temp_dir' in locals():
+            if temp_dir:
+                try:
                     shutil.rmtree(temp_dir)
-            except:
-                pass
+                except:
+                    pass
             if 'ffmpeg' in error_msg.lower() or 'ffprobe' in error_msg.lower():
                 messages.error(request, 'FFmpeg is required for audio conversion. Please install FFmpeg on your system.')
             elif 'unable to download' in error_msg.lower() or 'private video' in error_msg.lower():
@@ -216,11 +219,11 @@ def youtube_to_mp3(request):
             print(f"YouTube to MP3 error: {error_msg}")
             print(traceback.format_exc())
             # Clean up temp directory on error
-            try:
-                if 'temp_dir' in locals():
+            if temp_dir:
+                try:
                     shutil.rmtree(temp_dir)
-            except:
-                pass
+                except:
+                    pass
             # Show user-friendly error message
             if 'yt_dlp' in str(type(e)).lower() or 'yt-dlp' in error_msg.lower():
                 messages.error(request, 'YouTube downloader is not available. Please contact support.')
@@ -255,6 +258,13 @@ def mp4_to_mp3(request):
         })
     
     uploaded_file = request.FILES['video_file']
+    
+    # Validate file size (max 700MB for videos)
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        return render(request, 'media_converter/mp4_to_mp3.html', {
+            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
     
     # Validate file type
     allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv']
@@ -297,6 +307,12 @@ def mp4_to_mp3(request):
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if not os.path.exists(output_path):
+            # Clean up before returning error
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except:
+                    pass
             return render(request, 'media_converter/mp4_to_mp3.html', {
                 'error': f'Conversion failed: {result.stderr}'
             })
@@ -345,6 +361,13 @@ def audio_converter(request):
     
     uploaded_file = request.FILES['audio_file']
     output_format = request.POST.get('output_format', 'mp3').lower()
+    
+    # Validate file size (max 700MB for audio files)
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        return render(request, 'media_converter/audio_converter.html', {
+            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
     
     # Debug: Log the received output format
     import logging
@@ -582,6 +605,13 @@ def video_to_gif(request):
     
     uploaded_file = request.FILES['video_file']
     
+    # Validate file size (max 700MB for videos)
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        return render(request, 'media_converter/video_to_gif.html', {
+            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
+    
     # Get parameters
     start_time = request.POST.get('start_time', '0').strip() or '0'
     duration = request.POST.get('duration', '5').strip() or '5'
@@ -757,6 +787,13 @@ def video_converter(request):
     
     uploaded_file = request.FILES['video_file']
     output_format = request.POST.get('output_format', 'mp4').lower()
+    
+    # Validate file size (max 700MB for videos, but warn about large files)
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        return render(request, 'media_converter/video_converter.html', {
+            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
     
     # Debug logging
     import logging

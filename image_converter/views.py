@@ -35,6 +35,14 @@ def convert_image(request, converter_type):
     
     uploaded_file = request.FILES['image']
     
+    # Validate file size (max 100MB for images)
+    max_size = 100 * 1024 * 1024  # 100MB
+    if uploaded_file.size > max_size:
+        return render(request, 'image_converter/converter.html', {
+            'converter_type': converter_type,
+            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
+    
     # Validate file type
     allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.svg']
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
@@ -120,6 +128,13 @@ def resize_image(request):
         })
     
     uploaded_file = request.FILES['image']
+    
+    # Validate file size (max 100MB for images)
+    max_size = 100 * 1024 * 1024  # 100MB
+    if uploaded_file.size > max_size:
+        return render(request, 'image_converter/resize.html', {
+            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
     
     # Validate file type
     allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp']

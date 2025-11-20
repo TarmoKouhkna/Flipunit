@@ -5,5 +5,6 @@ def site_settings(request):
     return {
         'SITE_NAME': getattr(settings, 'SITE_NAME', 'FlipUnit.eu'),
         'SITE_DESCRIPTION': getattr(settings, 'SITE_DESCRIPTION', 'Simple, fast, no-login online converter hub'),
+        'SITE_URL': getattr(settings, 'SITE_URL', 'https://flipunit.eu'),
     }
 

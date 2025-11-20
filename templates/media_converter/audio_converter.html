@@ -109,14 +109,14 @@ console.log('🔵🔵🔵 CODE FIX: File input handlers restored');
             isProcessing = true;
             console.log('✅ ALLOWED FETCH (lock set):', urlString);
             
-            // Clean up after request completes (with delay to catch rapid duplicates)
+            // Clean up after request completes (reduced delay to 500ms)
             const fetchPromise = originalFetch.apply(this, arguments);
             fetchPromise.finally(() => {
-                // Wait 2 seconds before releasing lock to catch any rapid duplicates
+                // Reduced delay to 500ms - enough to catch rapid duplicates but not block legitimate retries
                 setTimeout(() => {
                     isProcessing = false;
                     console.log('🔓 Lock released');
-                }, 2000);
+                }, 500);
             });
             
             return fetchPromise;
@@ -238,18 +238,31 @@ if (window.audioConverterInitialized) {
                 const contentTypeHeader = response.headers.get('content-type');
                 if (contentTypeHeader?.includes('application/json')) {
                     // JSON format - extract file data
-                    const data = await response.json();
-                    const binary = atob(data.file);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++) {
-                        bytes[i] = binary.charCodeAt(i);
+                    try {
+                        const data = await response.json();
+                        if (!data.file || !data.filename) {
+                            throw new Error('Invalid response format: missing file data');
+                        }
+                        const binary = atob(data.file);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) {
+                            bytes[i] = binary.charCodeAt(i);
+                        }
+                        blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
+                        filename = data.filename;
+                        contentType = data.content_type || 'audio/mpeg';
+                    } catch (jsonError) {
+                        console.error('JSON parsing error:', jsonError);
+                        // Try to get error message from response
+                        const errorText = await response.text();
+                        throw new Error(`Failed to parse response: ${jsonError.message}. Response: ${errorText.substring(0, 200)}`);
                     }
-                    blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
-                    filename = data.filename;
-                    contentType = data.content_type || 'audio/mpeg';
-            } else {
+                } else {
                     // Legacy format - direct audio file
                     blob = await response.blob();
+                    if (blob.size === 0) {
+                        throw new Error('Received empty file from server');
+                    }
                     filename = response.headers.get('x-filename') || 'converted.audio';
                     contentType = response.headers.get('x-content-type') || contentTypeHeader || 'audio/mpeg';
                     blob = new Blob([blob], { type: contentType });
@@ -293,12 +306,23 @@ if (window.audioConverterInitialized) {
                     return;
                 }
                 console.error('Conversion error:', err);
-                alert('Conversion failed. Please try again.');
-                window.location.reload();
+                console.error('Error details:', {
+                    name: err.name,
+                    message: err.message,
+                    stack: err.stack
+                });
+                
+                // Show user-friendly error message
+                const errorMsg = err.message || 'Conversion failed';
+                alert(`Conversion failed: ${errorMsg}. Please try again.`);
+                
+                // Don't reload - let user try again
+                // window.location.reload();
             } finally {
-                // === ALWAYS RESET ===
+                // === ALWAYS RESET ALL STATE ===
                 console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
                 state.isProcessing = false;
+                state.downloadTriggered = false; // CRITICAL: Reset download flag
                 state.abortController = null; // Clear controller
                 
                 // Find button again (in case form was re-rendered)
