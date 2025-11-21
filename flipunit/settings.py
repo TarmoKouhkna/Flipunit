@@ -20,6 +20,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+
 # SECURITY WARNING: keep the secret key used in production secret!
 # In production, SECRET_KEY must be set via environment variable
 SECRET_KEY = os.environ.get('SECRET_KEY')
@@ -29,9 +32,6 @@ if not SECRET_KEY:
         SECRET_KEY = 'django-insecure-&c@o820#bmef_172)$k3t-u5wbi65+k7!u6x1n*%k5evy95qqs'
     else:
         raise ValueError("SECRET_KEY environment variable must be set in production!")
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Parse ALLOWED_HOSTS from environment, stripping whitespace from each hostname
 if os.environ.get('ALLOWED_HOSTS'):
@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sitemaps',
+    'flipunit',  # Main project app (needed for management commands)
     'converters',
     'image_converter',
     'media_converter',

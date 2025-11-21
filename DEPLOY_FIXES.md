@@ -77,3 +77,8 @@ grep -A 10 "CSRF_TRUSTED_ORIGINS" flipunit/settings.py
 
 If you see the CSRF_TRUSTED_ORIGINS configuration, it's there. If not, you need to add it.
 
+
+
+
+
+

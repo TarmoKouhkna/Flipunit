@@ -56,3 +56,8 @@ docker-compose up -d --build
 
 This will rebuild the container with the new settings.
 
+
+
+
+
+
