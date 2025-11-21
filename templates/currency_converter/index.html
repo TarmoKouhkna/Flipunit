@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+
+{% block title %}Currency & Crypto Converter - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Currency & Crypto Converter</h1>
+    <p>Convert between major world currencies and cryptocurrencies with real-time exchange rates</p>
+</div>
+
+<div class="card" style="max-width: 800px; margin: 2rem auto;">
+    <form id="converter-form" class="converter-tool">
+        {% csrf_token %}
+        <div style="display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 1rem; align-items: end;">
+            <div class="form-group">
+                <label class="form-label">From</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="number" id="amount" name="amount" class="form-control" placeholder="Amount" step="0.01" min="0" value="1" required>
+                    <select id="from_currency" name="from_currency" class="form-control" required>
+                        <optgroup label="Fiat Currencies">
+                            {% for code, info in currencies.items %}
+                            <option value="{{ code }}" {% if code == 'USD' %}selected{% endif %}>
+                                {{ info.flag }} {{ code }} - {{ info.name }}
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Cryptocurrencies">
+                            {% for code, info in cryptocurrencies.items %}
+                            <option value="{{ code }}">
+                                {{ info.symbol }} {{ code }} - {{ info.name }}
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                <button type="button" id="swap-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem;" title="Swap currencies">
+                    ⇄
+                </button>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">To</label>
+                <select id="to_currency" name="to_currency" class="form-control" required>
+                    <optgroup label="Fiat Currencies">
+                        {% for code, info in currencies.items %}
+                        <option value="{{ code }}" {% if code == 'EUR' %}selected{% endif %}>
+                            {{ info.flag }} {{ code }} - {{ info.name }}
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="Cryptocurrencies">
+                        {% for code, info in cryptocurrencies.items %}
+                        <option value="{{ code }}">
+                            {{ info.symbol }} {{ code }} - {{ info.name }}
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">Convert</button>
+    </form>
+    
+    <div id="result" style="margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px; display: none;">
+        <h3 style="margin-top: 0;">Conversion Result</h3>
+        <div id="result-content"></div>
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+            <small style="color: var(--text-secondary);">Exchange rate: <span id="rate-display"></span></small>
+        </div>
+    </div>
+    
+    <div id="error" style="margin-top: 1rem; display: none;" class="alert alert-error"></div>
+</div>
+
+<div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px; max-width: 800px; margin-left: auto; margin-right: auto;">
+    <h3>Supported Currencies</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-top: 1rem;">
+        <div>
+            <strong>Fiat Currencies:</strong>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                {% for code, info in currencies.items %}
+                <li>{{ info.flag }} {{ code }} - {{ info.name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div>
+            <strong>Cryptocurrencies:</strong>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                {% for code, info in cryptocurrencies.items %}
+                <li>{{ info.symbol }} {{ code }} - {{ info.name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('converter-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const resultDiv = document.getElementById('result');
+    const resultContent = document.getElementById('result-content');
+    const errorDiv = document.getElementById('error');
+    const rateDisplay = document.getElementById('rate-display');
+    const swapBtn = document.getElementById('swap-btn');
+    
+    // Swap currencies
+    swapBtn.addEventListener('click', function() {
+        const fromCurrency = document.getElementById('from_currency');
+        const toCurrency = document.getElementById('to_currency');
+        const amount = document.getElementById('amount');
+        
+        const temp = fromCurrency.value;
+        fromCurrency.value = toCurrency.value;
+        toCurrency.value = temp;
+        
+        // Trigger conversion if there's a result
+        if (resultDiv.style.display !== 'none') {
+            form.dispatchEvent(new Event('submit'));
+        }
+    });
+    
+    // Handle form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const amount = document.getElementById('amount').value;
+        const fromCurrency = document.getElementById('from_currency').value;
+        const toCurrency = document.getElementById('to_currency').value;
+        
+        if (!amount || parseFloat(amount) <= 0) {
+            showError('Please enter a valid amount');
+            return;
+        }
+        
+        if (fromCurrency === toCurrency) {
+            showError('Please select different currencies');
+            return;
+        }
+        
+        // Show processing state
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        errorDiv.style.display = 'none';
+        resultDiv.style.display = 'none';
+        
+        // Make AJAX request
+        fetch('{% url "currency_converter:convert" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: `amount=${encodeURIComponent(amount)}&from_currency=${encodeURIComponent(fromCurrency)}&to_currency=${encodeURIComponent(toCurrency)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            submitBtn.textContent = 'Convert';
+            submitBtn.disabled = false;
+            
+            if (data.success) {
+                showResult(data);
+            } else {
+                showError(data.error || 'Conversion failed. Please try again.');
+            }
+        })
+        .catch(error => {
+            submitBtn.textContent = 'Convert';
+            submitBtn.disabled = false;
+            showError('Network error. Please check your connection and try again.');
+            console.error('Error:', error);
+        });
+    });
+    
+    function showResult(data) {
+        const fromCurrency = document.getElementById('from_currency');
+        const toCurrency = document.getElementById('to_currency');
+        const fromOption = fromCurrency.options[fromCurrency.selectedIndex];
+        const toOption = toCurrency.options[toCurrency.selectedIndex];
+        
+        resultContent.innerHTML = `
+            <div style="font-size: 1.5rem; font-weight: bold; margin-bottom: 0.5rem;">
+                ${formatNumber(data.amount)} ${fromOption.text.split(' - ')[0]} = 
+                <span style="color: var(--primary);">${formatNumber(data.converted_amount)} ${toOption.text.split(' - ')[0]}</span>
+            </div>
+        `;
+        
+        rateDisplay.textContent = `1 ${data.from_currency} = ${formatNumber(data.rate)} ${data.to_currency}`;
+        resultDiv.style.display = 'block';
+        errorDiv.style.display = 'none';
+    }
+    
+    function showError(message) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        resultDiv.style.display = 'none';
+    }
+    
+    function formatNumber(num) {
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(2) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(2) + 'K';
+        } else if (num >= 1) {
+            return num.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+        } else {
+            return num.toLocaleString('en-US', { maximumFractionDigits: 8, minimumFractionDigits: 2 });
+        }
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
+

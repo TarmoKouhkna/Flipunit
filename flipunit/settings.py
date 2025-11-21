@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     'converters',
     'image_converter',
     'media_converter',
+    'pdf_tools',
+    'currency_converter',
     'utilities',
 ]
 

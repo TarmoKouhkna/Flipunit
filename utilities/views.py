@@ -1,18 +1,10 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib import messages
-import io
-import zipfile
 import re
 from datetime import datetime
 import pytz
-from pypdf import PdfWriter, PdfReader
 from PIL import Image
-try:
-    from pdf2image import convert_from_bytes
-    PDF2IMAGE_AVAILABLE = True
-except ImportError:
-    PDF2IMAGE_AVAILABLE = False
 try:
     import qrcode
     QRCODE_AVAILABLE = True
@@ -23,7 +15,6 @@ def index(request):
     """Utilities index page"""
     context = {
         'utilities': [
-            {'name': 'PDF Tools', 'url_name': 'pdf_tools', 'description': 'Merge, split, and convert PDF files'},
             {'name': 'Calculator', 'url_name': 'calculator', 'description': 'Simple online calculator'},
             {'name': 'Text Tools', 'url_name': 'text_tools', 'description': 'Word count, character count, and text utilities'},
             {'name': 'Color Converter', 'url_name': 'color_converter', 'description': 'Convert between HEX, RGB, HSL, and CMYK'},
@@ -169,170 +160,6 @@ def calculator(request):
         'error': error,
     }
     return render(request, 'utilities/calculator.html', context)
-
-def pdf_tools(request):
-    """PDF tools main page"""
-    return render(request, 'utilities/pdf_tools.html', {
-        'pdf2image_available': PDF2IMAGE_AVAILABLE
-    })
-
-def pdf_merge(request):
-    """Merge multiple PDF files into one"""
-    if request.method != 'POST':
-        return render(request, 'utilities/pdf_merge.html')
-    
-    if 'pdf_files' not in request.FILES:
-        messages.error(request, 'Please upload at least one PDF file.')
-        return render(request, 'utilities/pdf_merge.html')
-    
-    pdf_files = request.FILES.getlist('pdf_files')
-    
-    if len(pdf_files) < 2:
-        messages.error(request, 'Please upload at least 2 PDF files to merge.')
-        return render(request, 'utilities/pdf_merge.html')
-    
-    # Validate file sizes (max 50MB per PDF for merge)
-    max_size = 50 * 1024 * 1024  # 50MB
-    for pdf_file in pdf_files:
-        if pdf_file.size > max_size:
-            messages.error(request, f'{pdf_file.name} exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
-            return render(request, 'utilities/pdf_merge.html')
-    
-    try:
-        merger = PdfWriter()
-        
-        for pdf_file in pdf_files:
-            if not pdf_file.name.lower().endswith('.pdf'):
-                messages.error(request, f'{pdf_file.name} is not a PDF file.')
-                return render(request, 'utilities/pdf_merge.html')
-            
-            pdf_reader = PdfReader(pdf_file)
-            for page in pdf_reader.pages:
-                merger.add_page(page)
-        
-        # Create merged PDF in memory
-        output = io.BytesIO()
-        merger.write(output)
-        output.seek(0)
-        
-        # Return merged PDF
-        response = HttpResponse(output.read(), content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="merged.pdf"'
-        return response
-        
-    except Exception as e:
-        messages.error(request, f'Error merging PDFs: {str(e)}')
-        return render(request, 'utilities/pdf_merge.html')
-
-def pdf_split(request):
-    """Split PDF into individual pages"""
-    if request.method != 'POST':
-        return render(request, 'utilities/pdf_split.html')
-    
-    if 'pdf_file' not in request.FILES:
-        messages.error(request, 'Please upload a PDF file.')
-        return render(request, 'utilities/pdf_split.html')
-    
-    pdf_file = request.FILES['pdf_file']
-    
-    # Validate file size (max 50MB for PDFs)
-    max_size = 50 * 1024 * 1024  # 50MB
-    if pdf_file.size > max_size:
-        messages.error(request, f'File size exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
-        return render(request, 'utilities/pdf_split.html')
-    
-    if not pdf_file.name.lower().endswith('.pdf'):
-        messages.error(request, 'Please upload a valid PDF file.')
-        return render(request, 'utilities/pdf_split.html')
-    
-    try:
-        pdf_reader = PdfReader(pdf_file)
-        num_pages = len(pdf_reader.pages)
-        
-        if num_pages == 0:
-            messages.error(request, 'The PDF file appears to be empty.')
-            return render(request, 'utilities/pdf_split.html')
-        
-        # Create ZIP file with all pages
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for page_num in range(num_pages):
-                writer = PdfWriter()
-                writer.add_page(pdf_reader.pages[page_num])
-                
-                page_output = io.BytesIO()
-                writer.write(page_output)
-                page_output.seek(0)
-                
-                zip_file.writestr(f'page_{page_num + 1}.pdf', page_output.read())
-        
-        zip_buffer.seek(0)
-        
-        # Return ZIP file
-        response = HttpResponse(zip_buffer.read(), content_type='application/zip')
-        response['Content-Disposition'] = 'attachment; filename="split_pages.zip"'
-        return response
-        
-    except Exception as e:
-        messages.error(request, f'Error splitting PDF: {str(e)}')
-        return render(request, 'utilities/pdf_split.html')
-
-def pdf_to_images(request):
-    """Convert PDF pages to images"""
-    if not PDF2IMAGE_AVAILABLE:
-        messages.error(request, 'PDF to images conversion requires pdf2image and poppler. Install with: brew install poppler (macOS) or apt-get install poppler-utils (Linux)')
-        return render(request, 'utilities/pdf_to_images.html')
-    
-    if request.method != 'POST':
-        return render(request, 'utilities/pdf_to_images.html')
-    
-    if 'pdf_file' not in request.FILES:
-        messages.error(request, 'Please upload a PDF file.')
-        return render(request, 'utilities/pdf_to_images.html')
-    
-    pdf_file = request.FILES['pdf_file']
-    
-    # Validate file size (max 50MB for PDFs)
-    max_size = 50 * 1024 * 1024  # 50MB
-    if pdf_file.size > max_size:
-        messages.error(request, f'File size exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
-        return render(request, 'utilities/pdf_to_images.html')
-    
-    if not pdf_file.name.lower().endswith('.pdf'):
-        messages.error(request, 'Please upload a valid PDF file.')
-        return render(request, 'utilities/pdf_to_images.html')
-    
-    try:
-        pdf_data = pdf_file.read()
-        images = convert_from_bytes(pdf_data, dpi=200)
-        
-        if not images:
-            messages.error(request, 'No images could be extracted from the PDF.')
-            return render(request, 'utilities/pdf_to_images.html')
-        
-        # Create ZIP file with all images
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for i, image in enumerate(images):
-                img_buffer = io.BytesIO()
-                image.save(img_buffer, format='PNG')
-                img_buffer.seek(0)
-                zip_file.writestr(f'page_{i + 1}.png', img_buffer.read())
-        
-        zip_buffer.seek(0)
-        
-        # Return ZIP file
-        response = HttpResponse(zip_buffer.read(), content_type='application/zip')
-        response['Content-Disposition'] = 'attachment; filename="pdf_images.zip"'
-        return response
-        
-    except Exception as e:
-        error_msg = str(e)
-        if 'poppler' in error_msg.lower() or 'pdftoppm' in error_msg.lower():
-            messages.error(request, 'Poppler is required for PDF to images conversion. Install with: brew install poppler (macOS)')
-        else:
-            messages.error(request, f'Error converting PDF to images: {error_msg}')
-        return render(request, 'utilities/pdf_to_images.html')
 
 def text_tools(request):
     """Text utilities"""

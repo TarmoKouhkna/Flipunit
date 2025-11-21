@@ -25,7 +25,7 @@
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block">Merge PDFs</button>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Merge PDFs</button>
     </form>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
@@ -38,13 +38,15 @@
     </div>
 </div>
 
-<a href="{% url 'utilities:pdf_tools' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+<a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('pdf_files');
     const uploadArea = document.querySelector('.file-upload-area');
+    const form = document.querySelector('.converter-tool');
+    const submitBtn = document.getElementById('submit-btn');
     
     // Prevent click event from bubbling to the upload area
     fileInput.addEventListener('click', function(e) {
@@ -56,6 +58,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const fileCount = e.target.files.length;
             uploadArea.querySelector('p').textContent = `Selected: ${fileCount} PDF file(s)`;
         }
+    });
+    
+    // Handle form submission
+    const originalText = submitBtn.textContent;
+    form.addEventListener('submit', function() {
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        
+        // Reset button after download starts (2 seconds should be enough)
+        setTimeout(function() {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }, 2000);
     });
 });
 </script>
