@@ -13,6 +13,8 @@ class StaticViewSitemap(Sitemap):
             'converters:index',
             'image_converter:index',
             'media_converter:index',
+            'pdf_tools:index',
+            'currency_converter:index',
             'utilities:index',
             
             # Unit converters
@@ -37,10 +39,19 @@ class StaticViewSitemap(Sitemap):
             'media_converter:video_to_gif',
             'media_converter:video_converter',
             
+            # PDF Tools
+            'pdf_tools:pdf_merge',
+            'pdf_tools:pdf_split',
+            'pdf_tools:pdf_to_images',
+            'pdf_tools:pdf_to_html',
+            'pdf_tools:html_to_pdf',
+            'pdf_tools:pdf_to_text',
+            'pdf_tools:pdf_compress',
+            'pdf_tools:pdf_rotate',
+            
             # Utilities
             'utilities:calculator',
             'utilities:text_tools',
-            'utilities:pdf_tools',
             'utilities:color_converter',
             'utilities:qr_code_generator',
             'utilities:timezone_converter',

@@ -47,6 +47,10 @@
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}">
+    <!-- Google Fonts - Varela Round for rounded, modern look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
@@ -60,7 +64,7 @@
             <div class="container">
                 <a href="{% url 'home' %}" class="logo">
                     <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
-                    <span class="logo-text">{{ SITE_NAME }}</span>
+                    <span class="logo-text">{{ SITE_DISPLAY_NAME }}</span>
                 </a>
                 <button class="mobile-menu-toggle" aria-label="Toggle menu">
                     <span></span>
@@ -72,6 +76,8 @@
                     <li><a href="{% url 'converters:index' %}">Unit Converters</a></li>
                     <li><a href="{% url 'image_converter:index' %}">Image Converters</a></li>
                     <li><a href="{% url 'media_converter:index' %}">Media Converters</a></li>
+                    <li><a href="{% url 'pdf_tools:index' %}">PDF Tools</a></li>
+                    <li><a href="{% url 'currency_converter:index' %}">Currency & Crypto</a></li>
                     <li><a href="{% url 'utilities:index' %}">Utilities</a></li>
                 </ul>
             </div>

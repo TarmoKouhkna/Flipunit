@@ -51,3 +51,5 @@ sudo systemctl reload nginx
 The corrected config is in `nginx_config_fixed.conf` - you can reference it, but make sure to keep your SSL certificate paths (lines 36-40) as they are.
 
 
+
+

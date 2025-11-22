@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}HTML to PDF - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Convert HTML to PDF</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Upload HTML File or Paste HTML Content</label>
+            <div class="file-upload-area" style="margin-bottom: 1rem;">
+                <input type="file" name="html_file" id="html_file" accept=".html,.htm">
+                <p style="margin-top: 1rem;">Click to select or drag and drop an HTML file</p>
+            </div>
+            <div style="margin-top: 1rem;">
+                <label class="form-label">Or paste HTML content:</label>
+                <textarea name="html_content" id="html_content" rows="10" class="form-control" placeholder="<html><head><title>My Document</title></head><body><h1>Hello World</h1><p>This is a paragraph.</p></body></html>"></textarea>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Convert to PDF</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Upload an HTML file or paste HTML content</li>
+            <li>Click "Convert to PDF"</li>
+            <li>Download the PDF file</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Tips for best results:</strong>
+        </p>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem; color: var(--text-secondary);">
+            <li>Use inline CSS styles or include &lt;style&gt; tags in your HTML</li>
+            <li>For images, use absolute URLs (http://...) or data URIs (data:image/...)</li>
+            <li>External CSS files and JavaScript will not be executed</li>
+            <li>Fonts should be web-safe or embedded using @font-face</li>
+            <li>Complex CSS features (flexbox, grid) may have limited support</li>
+        </ul>
+    </div>
+</div>
+
+<a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('html_file');
+    const textarea = document.getElementById('html_content');
+    const form = document.querySelector('.converter-tool');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                textarea.value = e.target.result;
+            };
+            reader.readAsText(file);
+        }
+    });
+    
+    // Handle form submission
+    const originalText = submitBtn.textContent;
+    form.addEventListener('submit', function() {
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        
+        // Reset button after download starts (2 seconds should be enough)
+        setTimeout(function() {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }, 2000);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

@@ -68,17 +68,40 @@ class Command(BaseCommand):
         response.render()
         
         # Get the XML content
-        xml_content = response.content.decode('utf-8')
+        try:
+            xml_content = response.content.decode('utf-8')
+        except UnicodeDecodeError as e:
+            self.stdout.write(
+                self.style.ERROR(f'❌ Failed to decode response content: {e}')
+            )
+            raise
         
         # Write to file
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(xml_content)
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(xml_content)
+        except (IOError, OSError, PermissionError) as e:
+            self.stdout.write(
+                self.style.ERROR(f'❌ Failed to write sitemap file: {e}')
+            )
+            raise
         
         # Set permissions (Unix-like systems)
         if os.name != 'nt':  # Not Windows
-            os.chmod(output_path, 0o644)
+            try:
+                os.chmod(output_path, 0o644)
+            except (OSError, PermissionError) as e:
+                self.stdout.write(
+                    self.style.WARNING(f'⚠️  Warning: Failed to set file permissions: {e}')
+                )
         
-        file_size = os.path.getsize(output_path)
+        try:
+            file_size = os.path.getsize(output_path)
+        except OSError as e:
+            self.stdout.write(
+                self.style.WARNING(f'⚠️  Warning: Failed to get file size: {e}')
+            )
+            file_size = 0
         self.stdout.write(
             self.style.SUCCESS(
                 f'✅ Successfully generated sitemap.xml ({file_size} bytes)'

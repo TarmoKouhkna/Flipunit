@@ -23,9 +23,21 @@ def home(request):
                 'icon': '🎵'
             },
             {
+                'name': 'PDF Tools',
+                'url': 'pdf_tools:index',
+                'description': 'Merge, split, and convert PDF files',
+                'icon': '📄'
+            },
+            {
+                'name': 'Currency & Crypto',
+                'url': 'currency_converter:index',
+                'description': 'Convert between currencies and cryptocurrencies with real-time rates',
+                'icon': '💱'
+            },
+            {
                 'name': 'Utilities',
                 'url': 'utilities:index',
-                'description': 'PDF tools, calculators, text utilities and more',
+                'description': 'Calculators, text utilities, color converter, QR codes and more',
                 'icon': '🛠️'
             },
         ]

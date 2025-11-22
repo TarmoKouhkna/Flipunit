@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Rotate PDF - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Rotate PDF Pages</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select PDF File</label>
+            <div class="file-upload-area">
+                <input type="file" name="pdf_file" id="pdf_file" accept=".pdf" required>
+                <p style="margin-top: 1rem;">Click to select or drag and drop a PDF file</p>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label">Rotation Angle</label>
+            <select name="rotation" id="rotation" class="form-control" required>
+                <option value="90">90° (Clockwise)</option>
+                <option value="180">180° (Upside Down)</option>
+                <option value="270">270° (Counter-clockwise)</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Rotate PDF</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Select a PDF file</li>
+            <li>Choose rotation angle (90°, 180°, or 270°)</li>
+            <li>Click "Rotate PDF"</li>
+            <li>Download the rotated PDF</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> All pages in the PDF will be rotated by the selected angle.
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('pdf_file');
+    const uploadArea = document.querySelector('.file-upload-area');
+    const form = document.querySelector('.converter-tool');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadArea.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+        }
+    });
+    
+    // Handle form submission
+    const originalText = submitBtn.textContent;
+    form.addEventListener('submit', function() {
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        
+        // Reset button after download starts (2 seconds should be enough)
+        setTimeout(function() {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }, 2000);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

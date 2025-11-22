@@ -33,6 +33,8 @@ urlpatterns = [
     path('converters/', include('converters.urls')),
     path('image-converter/', include('image_converter.urls')),
     path('media-converter/', include('media_converter.urls')),
+    path('pdf-tools/', include('pdf_tools.urls')),
+    path('currency/', include('currency_converter.urls')),
     path('utilities/', include('utilities.urls')),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='robots.txt', content_type='text/plain')),
