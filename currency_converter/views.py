@@ -165,7 +165,9 @@ def get_gold_price(currency='USD'):
                                     exchange_rate = get_exchange_rate('USD', currency)
                                     if exchange_rate:
                                         return price_usd * exchange_rate
-                except:
+                except (requests.RequestException, ValueError, KeyError, TypeError) as api_error:
+                    # Silently continue to next API if this one fails
+                    print(f"API {url} failed: {api_error}")
                     continue
         except Exception as e:
             print(f"Method 1 (free APIs) failed: {e}")
