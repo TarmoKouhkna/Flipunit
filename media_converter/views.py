@@ -164,7 +164,7 @@ def youtube_to_mp3(request):
                     # If cleanup fails, try to remove entire directory
                     try:
                         shutil.rmtree(temp_dir)
-                    except:
+                    except (OSError, PermissionError):
                         pass
                 
                 # Sanitize filename
@@ -199,7 +199,9 @@ def youtube_to_mp3(request):
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
-                except:
+                except (OSError, PermissionError) as cleanup_error:
+                    # Log cleanup errors but don't fail the request
+                    print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
                     pass
             if 'ffmpeg' in error_msg.lower() or 'ffprobe' in error_msg.lower():
                 messages.error(request, 'FFmpeg is required for audio conversion. Please install FFmpeg on your system.')
@@ -222,7 +224,9 @@ def youtube_to_mp3(request):
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
-                except:
+                except (OSError, PermissionError) as cleanup_error:
+                    # Log cleanup errors but don't fail the request
+                    print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
                     pass
             # Show user-friendly error message
             if 'yt_dlp' in str(type(e)).lower() or 'yt-dlp' in error_msg.lower():
@@ -311,7 +315,7 @@ def mp4_to_mp3(request):
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
-                except:
+                except (OSError, PermissionError):
                     pass
             return render(request, 'media_converter/mp4_to_mp3.html', {
                 'error': f'Conversion failed: {result.stderr}'
@@ -324,7 +328,7 @@ def mp4_to_mp3(request):
         # Clean up
         try:
             shutil.rmtree(temp_dir)
-        except:
+        except (OSError, PermissionError):
             pass
         
         # Create response
@@ -343,7 +347,9 @@ def mp4_to_mp3(request):
         if temp_dir:
             try:
                 shutil.rmtree(temp_dir)
-            except:
+            except (OSError, PermissionError) as cleanup_error:
+                # Log cleanup errors but don't fail the request
+                print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
                 pass
         return render(request, 'media_converter/mp4_to_mp3.html', {
             'error': f'Error processing file: {str(e)}'
@@ -554,7 +560,7 @@ def audio_converter(request):
         # Clean up
         try:
             shutil.rmtree(temp_dir)
-        except:
+        except (OSError, PermissionError):
             pass
         
         # Determine content type
@@ -604,7 +610,7 @@ def audio_converter(request):
         if temp_dir:
             try:
                 shutil.rmtree(temp_dir)
-            except:
+            except (OSError, PermissionError):
                 pass
         return render(request, 'media_converter/audio_converter.html', {
             'error': f'Error processing file: {str(e)}'
@@ -708,7 +714,7 @@ def video_to_gif(request):
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
-                except:
+                except (OSError, PermissionError):
                     pass
             return render(request, 'media_converter/video_to_gif.html', {
                 'error': f'Palette generation failed: {full_error}'
@@ -736,7 +742,7 @@ def video_to_gif(request):
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
-                except:
+                except (OSError, PermissionError):
                     pass
             return render(request, 'media_converter/video_to_gif.html', {
                 'error': f'GIF creation failed: {full_error}'
@@ -764,7 +770,7 @@ def video_to_gif(request):
         # Clean up
         try:
             shutil.rmtree(temp_dir)
-        except:
+        except (OSError, PermissionError):
             pass
         
         # Create response
@@ -786,7 +792,7 @@ def video_to_gif(request):
         if temp_dir:
             try:
                 shutil.rmtree(temp_dir)
-            except:
+            except (OSError, PermissionError):
                 pass
         return render(request, 'media_converter/video_to_gif.html', {
             'error': f'Error processing file: {str(e)}'
@@ -913,7 +919,7 @@ def video_converter(request):
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
-                except:
+                except (OSError, PermissionError):
                     pass
             return render(request, 'media_converter/video_converter.html', {
                 'error': f'Video conversion failed: {full_error}'
@@ -925,7 +931,7 @@ def video_converter(request):
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
-                except:
+                except (OSError, PermissionError):
                     pass
             return render(request, 'media_converter/video_converter.html', {
                 'error': f'Conversion failed - output file not created: {full_error}'
@@ -940,7 +946,7 @@ def video_converter(request):
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
-                except:
+                except (OSError, PermissionError):
                     pass
             return render(request, 'media_converter/video_converter.html', {
                 'error': 'Conversion failed - output file is empty. The video file may be corrupted or in an unsupported format.'
@@ -949,7 +955,7 @@ def video_converter(request):
         # Clean up
         try:
             shutil.rmtree(temp_dir)
-        except:
+        except (OSError, PermissionError):
             pass
         
         # Determine content type
@@ -977,7 +983,9 @@ def video_converter(request):
         if temp_dir:
             try:
                 shutil.rmtree(temp_dir)
-            except:
+            except (OSError, PermissionError) as cleanup_error:
+                # Log cleanup errors but don't fail the request
+                print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
                 pass
         return render(request, 'media_converter/video_converter.html', {
             'error': 'Video conversion timed out. The video might be too long or complex for server processing. Try a smaller file.'
@@ -986,7 +994,9 @@ def video_converter(request):
         if temp_dir:
             try:
                 shutil.rmtree(temp_dir)
-            except:
+            except (OSError, PermissionError) as cleanup_error:
+                # Log cleanup errors but don't fail the request
+                print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
                 pass
         return render(request, 'media_converter/video_converter.html', {
             'error': f'Error processing file: {str(e)}'

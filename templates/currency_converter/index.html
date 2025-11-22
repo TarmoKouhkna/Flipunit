@@ -5,7 +5,7 @@
 {% block content %}
 <div class="hero">
     <h1>Currency & Crypto Converter</h1>
-    <p>Convert between major world currencies and cryptocurrencies with real-time exchange rates</p>
+    <p>Convert between major world currencies, cryptocurrencies, and gold with real-time exchange rates</p>
 </div>
 
 <div class="card" style="max-width: 800px; margin: 2rem auto;">
@@ -28,6 +28,13 @@
                             {% for code, info in cryptocurrencies.items %}
                             <option value="{{ code }}">
                                 {{ info.symbol }} {{ code }} - {{ info.name }}
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Gold">
+                            {% for code, info in gold_units.items %}
+                            <option value="{{ code }}">
+                                {{ info.icon }} {{ info.symbol }} - {{ info.name }}
                             </option>
                             {% endfor %}
                         </optgroup>
@@ -55,6 +62,13 @@
                         {% for code, info in cryptocurrencies.items %}
                         <option value="{{ code }}">
                             {{ info.symbol }} {{ code }} - {{ info.name }}
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="Gold">
+                        {% for code, info in gold_units.items %}
+                        <option value="{{ code }}">
+                            {{ info.icon }} {{ info.symbol }} - {{ info.name }}
                         </option>
                         {% endfor %}
                     </optgroup>
@@ -92,6 +106,14 @@
             <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
                 {% for code, info in cryptocurrencies.items %}
                 <li>{{ info.symbol }} {{ code }} - {{ info.name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div>
+            <strong>Gold:</strong>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                {% for code, info in gold_units.items %}
+                <li>{{ info.icon }} {{ info.symbol }} - {{ info.name }}</li>
                 {% endfor %}
             </ul>
         </div>
@@ -183,14 +205,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const fromOption = fromCurrency.options[fromCurrency.selectedIndex];
         const toOption = toCurrency.options[toCurrency.selectedIndex];
         
+        // Extract display text (handle gold units with icons)
+        const fromText = fromOption.text.includes(' - ') ? fromOption.text.split(' - ')[0] : fromOption.text;
+        const toText = toOption.text.includes(' - ') ? toOption.text.split(' - ')[0] : toOption.text;
+        
         resultContent.innerHTML = `
             <div style="font-size: 1.5rem; font-weight: bold; margin-bottom: 0.5rem;">
-                ${formatNumber(data.amount)} ${fromOption.text.split(' - ')[0]} = 
-                <span style="color: var(--primary);">${formatNumber(data.converted_amount)} ${toOption.text.split(' - ')[0]}</span>
+                ${formatNumber(data.amount)} ${fromText} = 
+                <span style="color: var(--primary);">${formatNumber(data.converted_amount)} ${toText}</span>
             </div>
         `;
         
-        rateDisplay.textContent = `1 ${data.from_currency} = ${formatNumber(data.rate)} ${data.to_currency}`;
+        // Format rate display with proper unit names
+        const fromLabel = fromOption.text.includes(' - ') ? fromOption.text.split(' - ')[1] : data.from_currency;
+        const toLabel = toOption.text.includes(' - ') ? toOption.text.split(' - ')[1] : data.to_currency;
+        rateDisplay.textContent = `1 ${fromLabel} = ${formatNumber(data.rate)} ${toLabel}`;
         resultDiv.style.display = 'block';
         errorDiv.style.display = 'none';
     }

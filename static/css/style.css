@@ -79,8 +79,14 @@ header {
     display: inline-block;
 }
 
+.logo .logo-text,
 .logo-text {
     display: inline-block;
+    font-family: 'Varela Round', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+    font-size: 1.75rem !important;
+    color: #0d0c47 !important;
 }
 
 .logo-img[style*="display: none"] + .logo-text {
@@ -300,7 +306,9 @@ footer p {
 .hero h1 {
     font-size: 2.5rem;
     margin-bottom: 1rem;
-    color: var(--text-primary);
+    font-family: 'Varela Round', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 700;
+    color: #0d0c47;
 }
 
 .hero p {
@@ -399,6 +407,9 @@ footer p {
 
     .hero h1 {
         font-size: 2rem;
+        font-family: 'Varela Round', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-weight: 700;
+        color: #0d0c47;
     }
 
     .hero p {
@@ -427,6 +438,9 @@ footer p {
 
     .hero h1 {
         font-size: 1.75rem;
+        font-family: 'Varela Round', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-weight: 700;
+        color: #0d0c47;
     }
 }
 

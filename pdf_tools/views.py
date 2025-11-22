@@ -340,7 +340,7 @@ def pdf_to_html(request):
                                     img_buffer.seek(0)
                                     img_base64 = base64.b64encode(img_buffer.read()).decode('utf-8')
                                     html_content += f'<img src="data:image/png;base64,{img_base64}" alt="Image" />\n'
-                                except:
+                                except (OSError, PermissionError):
                                     pass
                         
                         html_content += '</div>\n'

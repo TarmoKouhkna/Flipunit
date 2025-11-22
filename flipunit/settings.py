@@ -38,7 +38,11 @@ if os.environ.get('ALLOWED_HOSTS'):
     ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS').split(',')]
 else:
     # Default hosts: domain names and server IP address
-    ALLOWED_HOSTS = ['flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
+    # Include localhost and 127.0.0.1 for local development
+    if DEBUG:
+        ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
+    else:
+        ALLOWED_HOSTS = ['flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
 
 # CSRF Trusted Origins - required for HTTPS requests
 CSRF_TRUSTED_ORIGINS = []
@@ -173,6 +177,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # SEO Settings
 SITE_NAME = 'FlipUnit.eu'
+SITE_DISPLAY_NAME = 'flipunit'  # Display name for navbar (without .eu)
 SITE_DESCRIPTION = 'Simple, fast, no-login online converter hub - unit converters, image converters, media converters, and everyday utilities.'
 SITE_URL = os.environ.get('SITE_URL', 'https://flipunit.eu')
 

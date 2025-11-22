@@ -139,3 +139,5 @@ curl -I https://flipunit.eu/sitemap.xml | grep -i "robots\|content-type"
 3. ✅ Wait 1-2 minutes → Should show green "Success"
 
 
+
+

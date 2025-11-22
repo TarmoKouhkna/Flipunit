@@ -112,3 +112,5 @@ echo "  docker exec flipunit-web python manage.py generate_sitemap --output /app
 echo "  docker cp flipunit-web:/app/sitemap.xml /opt/flipunit/sitemap.xml"
 
 
+
+
