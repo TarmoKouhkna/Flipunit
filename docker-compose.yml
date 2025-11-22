@@ -12,6 +12,7 @@ services:
       - DEBUG=${DEBUG:-False}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,217.146.78.140}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
+      - SITE_URL=${SITE_URL:-https://flipunit.eu}
       - DB_NAME=${DB_NAME:-flipunit}
       - DB_USER=${DB_USER:-flipunit_user}
       - DB_PASSWORD=${DB_PASSWORD}
