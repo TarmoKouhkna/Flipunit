@@ -2,6 +2,15 @@ from django.shortcuts import render
 from django.contrib import messages
 from .models import Feedback
 
+def get_client_ip(request):
+    """Get client IP address from request"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
 def home(request):
     """Home page"""
     if request.method == 'POST' and 'feedback' in request.POST:
@@ -15,15 +24,6 @@ def home(request):
             messages.success(request, 'Thank you for your feedback!')
         else:
             messages.error(request, 'Please enter your feedback.')
-
-def get_client_ip(request):
-    """Get client IP address from request"""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
     
     context = {
         'categories': [
