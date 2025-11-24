@@ -111,7 +111,8 @@ def youtube_to_mp3(request):
             # Configure yt-dlp options for faster processing
             # Enhanced bot evasion for VPS environments
             ydl_opts = {
-                'format': 'bestaudio[ext=m4a]/bestaudio/best',  # Prefer m4a for faster processing
+                # More flexible format selection - try multiple audio formats
+                'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio/best[height<=720]/best',  # Prefer audio, fallback to video if needed
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -205,6 +206,28 @@ def youtube_to_mp3(request):
                     if 'bot' in error_msg or 'sign in' in error_msg or 'authentication' in error_msg:
                         print(f"Bot detection with strategy {strategy}, trying next...")
                         continue
+                    # If format is not available, try with more permissive format selector
+                    elif 'format is not available' in error_msg or 'requested format' in error_msg:
+                        print(f"Format not available with strategy {strategy}, trying with permissive format...")
+                        # Try with a more permissive format selector
+                        try:
+                            ydl_opts_permissive = ydl_opts.copy()
+                            ydl_opts_permissive['format'] = 'bestaudio/best[height<=480]/best'  # Very permissive
+                            ydl_opts_permissive['extractor_args'] = {
+                                'youtube': {
+                                    'player_client': strategy,
+                                    'player_skip': ['webpage'],
+                                }
+                            }
+                            with yt_dlp.YoutubeDL(ydl_opts_permissive) as ydl:
+                                info = ydl.extract_info(youtube_url, download=False)
+                                video_title = info.get('title', 'video')
+                                ydl.download([youtube_url])
+                                success = True
+                                break
+                        except:
+                            # If that also fails, try next strategy
+                            continue
                     # If it's a player response error, try without player_skip
                     elif 'failed to extract' in error_msg or 'player response' in error_msg:
                         print(f"Player response error with strategy {strategy}, trying without player_skip...")
@@ -343,6 +366,8 @@ def youtube_to_mp3(request):
                 messages.error(request, 'Network error occurred. Please check your internet connection and try again.')
             elif 'failed to extract' in error_lower or 'player response' in error_lower:
                 messages.error(request, 'Unable to extract video information. This may be due to YouTube changes or video restrictions. Please try a different video or try again later. If the problem persists, yt-dlp may need to be updated.')
+            elif 'format is not available' in error_lower or 'requested format' in error_lower:
+                messages.error(request, 'The requested audio format is not available for this video. Please try a different video or try again later.')
             elif 'unavailable' in error_lower or 'private' in error_lower or 'restricted' in error_lower:
                 messages.error(request, 'This video is unavailable, private, or restricted. Please try a different video.')
             else:
