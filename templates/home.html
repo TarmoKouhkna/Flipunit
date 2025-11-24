@@ -16,7 +16,11 @@
     <div class="grid grid-2">
         {% for category in categories %}
         <a href="{% url category.url %}" class="category-card">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">{{ category.icon }}</div>
+            <div class="category-icon">
+                {% with 'images/icons/'|add:category.icon as icon_path %}
+                <img src="{% static icon_path %}" alt="{{ category.name }}">
+                {% endwith %}
+            </div>
             <h3>{{ category.name }}</h3>
             <p>{{ category.description }}</p>
         </a>
