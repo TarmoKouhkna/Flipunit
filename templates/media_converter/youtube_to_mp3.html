@@ -8,7 +8,7 @@
     
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            <div class="alert alert-{{ message.tags }}" data-message-type="{{ message.tags }}" data-youtube-error="true">{{ message }}</div>
         {% endfor %}
     {% endif %}
     
@@ -16,6 +16,7 @@
     
     <script>
     // Display error message from sessionStorage if available
+    // This handles errors that occurred during AJAX requests
     if (sessionStorage.getItem('youtubeError')) {
         const errorMsg = sessionStorage.getItem('youtubeError');
         const errorDiv = document.getElementById('js-error-message');
@@ -30,8 +31,20 @@
             errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             // Clear after displaying
             sessionStorage.removeItem('youtubeError');
+            console.log('Displayed error from sessionStorage:', errorMsg);
         }
     }
+    
+    // Also check if Django messages are present and log them for debugging
+    document.addEventListener('DOMContentLoaded', function() {
+        const djangoMessages = document.querySelectorAll('.messages .alert');
+        if (djangoMessages.length > 0) {
+            console.log('Django messages found on page:', djangoMessages.length);
+            djangoMessages.forEach((msg, index) => {
+                console.log(`Django message ${index + 1}:`, msg.textContent.trim(), 'Class:', msg.className);
+            });
+        }
+    });
     </script>
     
     <div class="alert alert-info">
@@ -205,42 +218,11 @@ document.addEventListener('DOMContentLoaded', function() {
             cache: 'no-cache'
         })
         .then(response => {
-            // Check if response is an error status first
-            if (!response.ok) {
-                // Handle HTTP error status codes
-                return response.text().then(html => {
-                    console.log('Received error response:', response.status, response.statusText);
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    let errorMessage = `Server error (${response.status}): ${response.statusText || 'An error occurred during conversion. Please try again.'}`;
-                    
-                    // Try to extract error message from HTML
-                    const djangoMessages = doc.querySelectorAll('.messages .alert, .messages .alert-error, .messages .alert-danger');
-                    if (djangoMessages.length > 0) {
-                        errorMessage = Array.from(djangoMessages).map(m => m.textContent.trim()).join(' ');
-                    } else {
-                        const errorAlert = doc.querySelector('.alert-error, .alert-danger, [class*="alert-error"], [class*="alert-danger"]');
-                        if (errorAlert) {
-                            errorMessage = errorAlert.textContent.trim() || errorMessage;
-                        }
-                    }
-                    
-                    sessionStorage.setItem('youtubeError', errorMessage);
-                    window.location.reload();
-                    return Promise.reject(new Error(errorMessage));
-                }).catch(err => {
-                    console.error('Error parsing error response:', err);
-                    sessionStorage.setItem('youtubeError', `Server error (${response.status}): An error occurred during conversion. Please try again.`);
-                    window.location.reload();
-                    return Promise.reject(err);
-                });
-            }
+            // Clone response so we can read it multiple times
+            const contentType = response.headers.get('content-type') || '';
             
             // Check if response is JSON (our new format) or audio file
-            const contentType = response.headers.get('content-type');
-            
-            if (contentType && contentType.includes('application/json') && response.ok) {
+            if (contentType.includes('application/json') && response.ok) {
                 // New JSON format - extract file data
                 return response.json().then(data => {
                     // Decode base64 file
@@ -272,62 +254,202 @@ document.addEventListener('DOMContentLoaded', function() {
                 const actualContentType = xContentType || contentType || 'audio/mpeg';
                 return response.blob().then(blob => ({ blob, filename, contentType: actualContentType }));
             } else {
-                // Response is HTML (error page), try to extract error message
+                // Response is HTML (could be error page or success page), try to extract error message
                 return response.text().then(html => {
                     console.log('Received HTML response, extracting error message...');
+                    console.log('Response status:', response.status, 'Content-Type:', contentType);
+                    
                     // Try to find error message in the HTML
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
                     
-                    // Try multiple selectors for error messages
-                    let errorMessage = 'An error occurred during conversion. Please try again.';
+                    // Try multiple selectors for error messages - be very thorough
+                    let errorMessage = null;
                     
-                    // Check for Django messages first (in base template)
-                    const djangoMessages = doc.querySelectorAll('.messages .alert, .messages .alert-error, .messages .alert-danger');
+                    // Method 1: Check for Django messages - first try data attribute (most reliable)
+                    const dataAttributeMessages = doc.querySelectorAll('[data-youtube-error="true"]');
+                    if (dataAttributeMessages.length > 0) {
+                        console.log(`Found ${dataAttributeMessages.length} messages with data-youtube-error attribute`);
+                        for (let msg of dataAttributeMessages) {
+                            const msgText = msg.textContent.trim();
+                            const msgType = msg.getAttribute('data-message-type') || '';
+                            if (msgType === 'error' || msgType === 'danger' || msgText) {
+                                errorMessage = msgText;
+                                console.log('✓ Found Django error message via data attribute:', errorMessage);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Method 1b: Check for Django messages in base template (.messages .alert)
+                    // Try multiple selectors to find messages
+                    if (!errorMessage) {
+                        const messageSelectors = [
+                            '.messages .alert',
+                            '.messages .alert-error',
+                            '.messages .alert-danger',
+                            '.container .messages .alert',
+                            '[class*="messages"] [class*="alert"]'
+                        ];
+                        
+                        for (let selector of messageSelectors) {
+                            const djangoMessages = doc.querySelectorAll(selector);
                     if (djangoMessages.length > 0) {
-                        errorMessage = Array.from(djangoMessages).map(m => m.textContent.trim()).join(' ');
-                        console.log('Found Django message in .messages:', errorMessage);
-                    } else {
-                        // Check for alerts in the content block (page-specific messages)
-                        const contentAlerts = doc.querySelectorAll('.card .alert-error, .card .alert-danger, .card .alert[class*="error"], .card .alert[class*="danger"]');
-                        if (contentAlerts.length > 0) {
-                            errorMessage = Array.from(contentAlerts).map(m => m.textContent.trim()).join(' ');
-                            console.log('Found error alert in content:', errorMessage);
-                        } else {
-                            // Check for any alert-error or alert-danger classes anywhere
-                            const errorAlert = doc.querySelector('.alert-error, .alert-danger, [class*="alert-error"], [class*="alert-danger"]');
-                            if (errorAlert) {
-                                errorMessage = errorAlert.textContent.trim() || errorMessage;
-                                console.log('Found error alert:', errorMessage);
-                            } else {
-                                // Check for any alert with error text
-                                const allAlerts = doc.querySelectorAll('.alert, [class*="alert"]');
-                                for (let alert of allAlerts) {
-                                    const text = alert.textContent.trim().toLowerCase();
-                                    if (text.includes('error') || text.includes('failed') || text.includes('blocking') || text.includes('unable')) {
-                                        errorMessage = alert.textContent.trim();
-                                        console.log('Found error in alert:', errorMessage);
+                                console.log(`Found ${djangoMessages.length} messages with selector: ${selector}`);
+                                for (let msg of djangoMessages) {
+                                    const msgText = msg.textContent.trim();
+                                    const msgClass = msg.className || '';
+                                    console.log('Message text:', msgText.substring(0, 100), 'Class:', msgClass);
+                                    // Check if it's an error message (has error/danger class or contains error keywords)
+                                    if (msgClass.includes('error') || msgClass.includes('danger') || 
+                                        msgText.toLowerCase().includes('error') || 
+                                        msgText.toLowerCase().includes('failed') ||
+                                        msgText.toLowerCase().includes('blocking') ||
+                                        msgText.toLowerCase().includes('unable') ||
+                                        msgText.toLowerCase().includes('youtube') ||
+                                        msgText.toLowerCase().includes('bot') ||
+                                        msgText.toLowerCase().includes('sign in')) {
+                                        errorMessage = msgText;
+                                        console.log('✓ Found Django error message:', errorMessage);
                                         break;
                                     }
+                                }
+                                if (errorMessage) break;
+                            }
+                        }
+                    }
+                    
+                    // Method 2: Check for alerts in the card/content area (page-specific messages)
+                    if (!errorMessage) {
+                        const contentSelectors = [
+                            '.card .alert-error',
+                            '.card .alert-danger',
+                            '.card .alert[class*="error"]',
+                            '.card .alert[class*="danger"]',
+                            'h1 + .alert',
+                            '.card-title + .alert'
+                        ];
+                        
+                        for (let selector of contentSelectors) {
+                            const contentAlerts = doc.querySelectorAll(selector);
+                            if (contentAlerts.length > 0) {
+                                console.log(`Found ${contentAlerts.length} content alerts with selector: ${selector}`);
+                                for (let alert of contentAlerts) {
+                                    const alertText = alert.textContent.trim();
+                                    const alertClass = alert.className || '';
+                                    console.log('Content alert text:', alertText.substring(0, 100), 'Class:', alertClass);
+                                    if (alertClass.includes('error') || alertClass.includes('danger') ||
+                                        alertText.toLowerCase().includes('error') ||
+                                        alertText.toLowerCase().includes('failed') ||
+                                        alertText.toLowerCase().includes('blocking') ||
+                                        alertText.toLowerCase().includes('unable') ||
+                                        alertText.toLowerCase().includes('youtube is blocking') ||
+                                        alertText.toLowerCase().includes('youtube') ||
+                                        alertText.toLowerCase().includes('bot')) {
+                                        errorMessage = alertText;
+                                        console.log('✓ Found error alert in content:', errorMessage);
+                                        break;
+                                    }
+                                }
+                                if (errorMessage) break;
+                            }
+                        }
+                    }
+                    
+                    // Method 3: Check for any element with alert-error or alert-danger class
+                    if (!errorMessage) {
+                        const errorAlerts = doc.querySelectorAll('.alert-error, .alert-danger, [class*="alert-error"], [class*="alert-danger"]');
+                        if (errorAlerts.length > 0) {
+                            errorMessage = errorAlerts[0].textContent.trim();
+                            console.log('Found error alert by class:', errorMessage);
+                        }
+                    }
+                    
+                    // Method 4: Search entire document for error-related text
+                    if (!errorMessage) {
+                        const bodyText = doc.body ? doc.body.textContent || '' : '';
+                        // Look for common error patterns
+                        const errorPatterns = [
+                            /YouTube is blocking/i,
+                            /unable to download/i,
+                            /private video/i,
+                            /sign in to confirm/i,
+                            /bot/i,
+                            /error downloading/i,
+                            /conversion failed/i
+                        ];
+                        
+                        for (let pattern of errorPatterns) {
+                            const match = bodyText.match(pattern);
+                            if (match) {
+                                // Try to extract surrounding context
+                                const index = bodyText.indexOf(match[0]);
+                                const start = Math.max(0, index - 50);
+                                const end = Math.min(bodyText.length, index + match[0].length + 100);
+                                errorMessage = bodyText.substring(start, end).trim();
+                                console.log('Found error pattern in body:', errorMessage.substring(0, 200));
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Fallback: If still no error found, check the HTML source directly
+                    if (!errorMessage) {
+                        // Look for any text that looks like an error message in the raw HTML
+                        const htmlText = html.toLowerCase();
+                        const errorKeywords = [
+                            'youtube is blocking',
+                            'sign in to confirm',
+                            'unable to download',
+                            'private video',
+                            'error downloading',
+                            'bot detection',
+                            'temporary youtube restriction'
+                        ];
+                        
+                        for (let keyword of errorKeywords) {
+                            if (htmlText.includes(keyword)) {
+                                // Try to extract the full sentence/paragraph containing this keyword
+                                const keywordIndex = htmlText.indexOf(keyword);
+                                const contextStart = Math.max(0, keywordIndex - 200);
+                                const contextEnd = Math.min(htmlText.length, keywordIndex + keyword.length + 200);
+                                const context = html.substring(contextStart, contextEnd);
+                                
+                                // Try to extract text between HTML tags
+                                const textMatch = context.match(/>([^<]*' + keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^<]*)</i);
+                                if (textMatch && textMatch[1]) {
+                                    errorMessage = textMatch[1].trim();
+                                    console.log('✓ Found error keyword in HTML:', errorMessage);
+                                    break;
                                 }
                             }
                         }
                     }
                     
-                    // If still no specific error found, check response status
-                    if (errorMessage === 'An error occurred during conversion. Please try again.' && !response.ok) {
-                        errorMessage = `Server error (${response.status}): ${response.statusText || 'An error occurred during conversion. Please try again.'}`;
+                    // Final fallback to generic message if nothing found
+                    if (!errorMessage) {
+                        errorMessage = 'An error occurred during conversion. Please try again.';
+                        console.warn('⚠ No specific error message found after all attempts, using generic message');
+                        console.log('HTML preview (first 1000 chars):', html.substring(0, 1000));
+                    }
+                    
+                    // If response status indicates error, include that info
+                    if (!response.ok) {
+                        errorMessage = `Server error (${response.status}): ${errorMessage}`;
                     }
                     
                     // Store error message and reload
+                    console.log('Final error message to store:', errorMessage);
                     sessionStorage.setItem('youtubeError', errorMessage);
-                    console.log('Storing error message:', errorMessage);
                     window.location.reload();
                     return Promise.reject(new Error(errorMessage));
                 }).catch(err => {
                     // If text parsing fails, still reload to show server error
                     console.error('Error parsing response:', err);
-                    sessionStorage.setItem('youtubeError', 'An error occurred during conversion. Please try again.');
+                    const fallbackMsg = !response.ok 
+                        ? `Server error (${response.status}): An error occurred during conversion. Please try again.`
+                        : 'An error occurred during conversion. Please try again.';
+                    sessionStorage.setItem('youtubeError', fallbackMsg);
                     window.location.reload();
                     return Promise.reject(err);
                 });
