@@ -205,6 +205,27 @@ def youtube_to_mp3(request):
                     if 'bot' in error_msg or 'sign in' in error_msg or 'authentication' in error_msg:
                         print(f"Bot detection with strategy {strategy}, trying next...")
                         continue
+                    # If it's a player response error, try without player_skip
+                    elif 'failed to extract' in error_msg or 'player response' in error_msg:
+                        print(f"Player response error with strategy {strategy}, trying without player_skip...")
+                        # Try one more time without player_skip
+                        try:
+                            ydl_opts_no_skip = ydl_opts.copy()
+                            ydl_opts_no_skip['extractor_args'] = {
+                                'youtube': {
+                                    'player_client': strategy,
+                                    # Don't skip webpage - might help with extraction
+                                }
+                            }
+                            with yt_dlp.YoutubeDL(ydl_opts_no_skip) as ydl:
+                                info = ydl.extract_info(youtube_url, download=False)
+                                video_title = info.get('title', 'video')
+                                ydl.download([youtube_url])
+                                success = True
+                                break
+                        except:
+                            # If that also fails, try next strategy
+                            continue
                     else:
                         # Different error, re-raise it
                         raise
@@ -320,6 +341,10 @@ def youtube_to_mp3(request):
                 messages.error(request, 'Permission error occurred. Please try again.')
             elif 'network' in error_lower or 'connection' in error_lower:
                 messages.error(request, 'Network error occurred. Please check your internet connection and try again.')
+            elif 'failed to extract' in error_lower or 'player response' in error_lower:
+                messages.error(request, 'Unable to extract video information. This may be due to YouTube changes or video restrictions. Please try a different video or try again later. If the problem persists, yt-dlp may need to be updated.')
+            elif 'unavailable' in error_lower or 'private' in error_lower or 'restricted' in error_lower:
+                messages.error(request, 'This video is unavailable, private, or restricted. Please try a different video.')
             else:
                 messages.error(request, f'An error occurred during conversion: {error_msg[:200]}. Please try again or contact support if the problem persists.')
     
