@@ -14,3 +14,4 @@ class Feedback(models.Model):
     def __str__(self):
         return f"Feedback from {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
+

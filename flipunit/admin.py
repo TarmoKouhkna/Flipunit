@@ -12,3 +12,4 @@ class FeedbackAdmin(admin.ModelAdmin):
         return obj.message[:100] + '...' if len(obj.message) > 100 else obj.message
     message_preview.short_description = 'Message'
 
+

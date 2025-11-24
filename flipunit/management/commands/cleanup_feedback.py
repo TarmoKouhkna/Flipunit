@@ -77,3 +77,4 @@ class Command(BaseCommand):
             remaining = Feedback.objects.count()
             self.stdout.write(f'   Remaining feedback entries: {remaining}')
 
+

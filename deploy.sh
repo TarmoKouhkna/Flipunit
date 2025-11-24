@@ -239,3 +239,4 @@ echo "   • Shell access: docker-compose exec web bash"
 echo ""
 echo -e "${GREEN}✨ All done! Your changes are now live.${NC}"
 
+
