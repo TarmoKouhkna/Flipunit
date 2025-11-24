@@ -27,5 +27,13 @@
         {% endfor %}
     </div>
 </div>
+
+<div class="feedback-section">
+    <form method="post" class="feedback-form">
+        {% csrf_token %}
+        <textarea name="feedback" placeholder="Your feedback..." rows="3" required></textarea>
+        <button type="submit">Send Feedback</button>
+    </form>
+</div>
 {% endblock %}
 

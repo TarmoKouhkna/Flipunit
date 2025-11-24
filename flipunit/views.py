@@ -1,7 +1,30 @@
 from django.shortcuts import render
+from django.contrib import messages
+from .models import Feedback
 
 def home(request):
     """Home page"""
+    if request.method == 'POST' and 'feedback' in request.POST:
+        feedback_text = request.POST.get('feedback', '').strip()
+        if feedback_text:
+            # Save feedback to database
+            Feedback.objects.create(
+                message=feedback_text,
+                ip_address=get_client_ip(request)
+            )
+            messages.success(request, 'Thank you for your feedback!')
+        else:
+            messages.error(request, 'Please enter your feedback.')
+
+def get_client_ip(request):
+    """Get client IP address from request"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+    
     context = {
         'categories': [
             {
