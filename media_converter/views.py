@@ -165,16 +165,25 @@ def youtube_to_mp3(request):
                 'geo_bypass_country': None,
             }
             
-            # Try different client strategies if one fails
-            # Different clients have different bot detection rates
-            client_strategies = [
-                ['ios'],                     # iOS client (often least restricted)
-                ['android'],                 # Android client
-                ['tv_embedded'],             # TV embedded (sometimes works for datacenter IPs)
-                ['ios', 'android'],          # Try both mobile
-                ['android', 'web'],          # Android with web fallback
-                ['web'],                     # Web only (most restricted, last resort)
-            ]
+            # Determine client strategy based on environment
+            # On localhost (DEBUG=True), use web client directly (works better, no bot detection)
+            # On production (VPS), try iOS/Android first (better bot evasion)
+            import os
+            is_debug = os.environ.get('DEBUG', 'False') == 'True'
+            
+            if is_debug:
+                # Localhost: Use web client directly - simpler and works better
+                client_strategies = [['web']]
+                print("DEBUG mode: Using web client directly")
+            else:
+                # Production/VPS: Try multiple clients for bot evasion
+                client_strategies = [
+                    ['ios'],                     # iOS client (often least restricted)
+                    ['android'],                 # Android client
+                    ['tv_embedded'],             # TV embedded (sometimes works for datacenter IPs)
+                    ['web'],                     # Web client (fallback)
+                ]
+                print("Production mode: Trying multiple clients for bot evasion")
             
             last_error = None
             success = False
