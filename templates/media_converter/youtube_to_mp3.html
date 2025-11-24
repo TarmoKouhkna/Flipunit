@@ -6,33 +6,37 @@
 <div class="card">
     <h1 class="card-title">YouTube to MP3 Converter</h1>
     
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}" data-message-type="{{ message.tags }}" data-youtube-error="true">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
-    
+    {# Django messages are displayed in base.html, so we don't need to duplicate them here #}
+    {# Only show JavaScript error message if there are no Django messages already displayed #}
     <div id="js-error-message" style="display: none;" class="alert alert-error" role="alert"></div>
     
     <script>
     // Display error message from sessionStorage if available
     // This handles errors that occurred during AJAX requests
+    // Only show if Django messages aren't already displayed (to avoid duplicates)
     if (sessionStorage.getItem('youtubeError')) {
         const errorMsg = sessionStorage.getItem('youtubeError');
+        // Check if Django messages are already displayed
+        const djangoMessages = document.querySelectorAll('.messages .alert, [data-youtube-error="true"]');
+        if (djangoMessages.length === 0) {
+            // No Django messages, show the JavaScript error
         const errorDiv = document.getElementById('js-error-message');
         if (errorDiv) {
             errorDiv.textContent = errorMsg;
             errorDiv.style.display = 'block';
-            errorDiv.style.marginTop = '1rem';
-            errorDiv.style.marginBottom = '1rem';
-            errorDiv.style.padding = '1rem';
-            errorDiv.style.borderRadius = '6px';
-            // Scroll to error message
-            errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            // Clear after displaying
-            sessionStorage.removeItem('youtubeError');
-            console.log('Displayed error from sessionStorage:', errorMsg);
+                errorDiv.style.marginTop = '1rem';
+                errorDiv.style.marginBottom = '1rem';
+                errorDiv.style.padding = '1rem';
+                errorDiv.style.borderRadius = '6px';
+                // Scroll to error message
+                errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                console.log('Displayed error from sessionStorage:', errorMsg);
+            }
+        } else {
+            console.log('Django messages already displayed, skipping sessionStorage error');
         }
+        // Always clear sessionStorage after checking
+        sessionStorage.removeItem('youtubeError');
     }
     
     // Also check if Django messages are present and log them for debugging
