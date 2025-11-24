@@ -490,16 +490,19 @@ footer p {
 
 .feedback-footer {
     display: flex;
+    flex-direction: row;
     justify-content: space-between;
     align-items: center;
+    width: 100%;
 }
 
 .char-count {
     font-size: 0.85rem;
     color: var(--text-secondary);
+    flex-shrink: 0;
 }
 
-.feedback-form button {
+.feedback-form .feedback-footer button {
     padding: 0.5rem 1.25rem;
     background-color: var(--text-primary);
     color: white;
@@ -508,6 +511,8 @@ footer p {
     font-size: 0.9rem;
     cursor: pointer;
     transition: background-color 0.2s;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .feedback-form button:hover {
