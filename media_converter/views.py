@@ -168,7 +168,7 @@ def youtube_to_mp3(request):
             # Determine client strategy based on environment
             # On localhost (DEBUG=True), use web client directly (works better, no bot detection)
             # On production (VPS), try iOS/Android first (better bot evasion)
-            import os
+            # Note: os is already imported at the top of the file
             is_debug = os.environ.get('DEBUG', 'False') == 'True'
             
             if is_debug:
