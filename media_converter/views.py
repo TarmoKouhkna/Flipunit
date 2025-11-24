@@ -206,29 +206,30 @@ def youtube_to_mp3(request):
                     if 'bot' in error_msg or 'sign in' in error_msg or 'authentication' in error_msg:
                         print(f"Bot detection with strategy {strategy}, trying next...")
                         continue
-                    # If format is not available, try with more permissive format selector
+                    # If format is not available, try with web client (has most format support)
                     elif 'format is not available' in error_msg or 'requested format' in error_msg:
-                        print(f"Format not available with strategy {strategy}, trying with permissive format...")
-                        # Try with a truly permissive format selector - let yt-dlp choose
+                        print(f"Format not available with strategy {strategy}, trying with web client...")
+                        # iOS/Android clients might have limited formats, try web client instead
                         try:
-                            ydl_opts_permissive = ydl_opts.copy()
-                            # Remove format restriction entirely - let yt-dlp choose best available
-                            ydl_opts_permissive['format'] = 'best'  # Most permissive - accepts any format
-                            ydl_opts_permissive['extractor_args'] = {
+                            ydl_opts_web = ydl_opts.copy()
+                            # Use web client which has best format support
+                            ydl_opts_web['extractor_args'] = {
                                 'youtube': {
-                                    'player_client': strategy,
+                                    'player_client': ['web'],  # Web client has most formats
                                     'player_skip': ['webpage'],
                                 }
                             }
-                            with yt_dlp.YoutubeDL(ydl_opts_permissive) as ydl:
+                            # Remove format restriction - let yt-dlp choose best available
+                            ydl_opts_web['format'] = 'bestaudio/best'  # Prefer audio, but accept video
+                            with yt_dlp.YoutubeDL(ydl_opts_web) as ydl:
                                 info = ydl.extract_info(youtube_url, download=False)
                                 video_title = info.get('title', 'video')
                                 ydl.download([youtube_url])
                                 success = True
                                 break
                         except Exception as e2:
-                            print(f"Permissive format also failed: {str(e2)[:200]}")
-                            # If that also fails, try next strategy
+                            print(f"Web client also failed: {str(e2)[:200]}")
+                            # If that also fails, try next strategy in the loop
                             continue
                     # If it's a player response error, try without player_skip
                     elif 'failed to extract' in error_msg or 'player response' in error_msg:
