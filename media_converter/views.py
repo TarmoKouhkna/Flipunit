@@ -109,7 +109,7 @@ def youtube_to_mp3(request):
                 os.environ['PATH'] = f"{ffmpeg_dir}:{original_path}"
             
             # Configure yt-dlp options for faster processing
-            # Add headers to bypass YouTube bot detection
+            # Enhanced bot evasion for VPS environments
             ydl_opts = {
                 'format': 'bestaudio[ext=m4a]/bestaudio/best',  # Prefer m4a for faster processing
                 'postprocessors': [{
@@ -125,14 +125,37 @@ def youtube_to_mp3(request):
                 'extract_flat': False,
                 # Optimize for speed
                 'concurrent_fragments': 4,  # Download multiple fragments in parallel
-                # Add browser-like headers to bypass bot detection
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                # Enhanced bot evasion - use more recent browser headers
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 'referer': 'https://www.youtube.com/',
+                # Add more headers to mimic real browser
+                'http_headers': {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Cache-Control': 'max-age=0',
+                },
+                # Try multiple client strategies to bypass bot detection
                 'extractor_args': {
                     'youtube': {
-                        'player_client': ['android', 'web'],  # Try android client first, fallback to web
+                        # Try ios client first (often less restricted), then android, then web
+                        'player_client': ['ios', 'android', 'web'],
+                        # Use innertube API which is more reliable
+                        'player_skip': ['webpage'],
                     }
                 },
+                # Add retry logic
+                'retries': 3,
+                'fragment_retries': 3,
+                # Add delay to avoid rate limiting
+                'sleep_interval': 1,
+                'max_sleep_interval': 5,
             }
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
