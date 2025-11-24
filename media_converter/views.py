@@ -203,13 +203,19 @@ def youtube_to_mp3(request):
                     # Log cleanup errors but don't fail the request
                     print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
                     pass
-            if 'ffmpeg' in error_msg.lower() or 'ffprobe' in error_msg.lower():
+            error_lower = error_msg.lower()
+            if 'ffmpeg' in error_lower or 'ffprobe' in error_lower:
                 messages.error(request, 'FFmpeg is required for audio conversion. Please install FFmpeg on your system.')
-            elif 'unable to download' in error_msg.lower() or 'private video' in error_msg.lower():
+            elif 'unable to download' in error_lower or 'private video' in error_lower or 'video unavailable' in error_lower:
                 messages.error(request, 'Unable to download video. The video may be private, age-restricted, or unavailable.')
-            elif 'sign in' in error_msg.lower() or 'bot' in error_msg.lower() or 'authentication' in error_msg.lower():
+            elif 'sign in' in error_lower or 'bot' in error_lower or 'authentication' in error_lower or 'blocked' in error_lower:
                 messages.error(request, 'YouTube is blocking this request. This is a temporary YouTube restriction. Please try again in a few minutes, or try a different video.')
+            elif 'not found' in error_lower or 'does not exist' in error_lower or 'invalid' in error_lower:
+                messages.error(request, 'Invalid YouTube URL or video not found. Please check the URL and try again.')
+            elif 'network' in error_lower or 'connection' in error_lower or 'timeout' in error_lower:
+                messages.error(request, 'Network error occurred. Please check your internet connection and try again.')
             else:
+                # Provide a more user-friendly error message
                 messages.error(request, f'Error downloading video: {error_msg[:200]}. Please check the URL and try again.')
         except ImportError as e:
             error_msg = str(e)
@@ -229,10 +235,17 @@ def youtube_to_mp3(request):
                     print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
                     pass
             # Show user-friendly error message
-            if 'yt_dlp' in str(type(e)).lower() or 'yt-dlp' in error_msg.lower():
+            error_lower = error_msg.lower()
+            if 'yt_dlp' in str(type(e)).lower() or 'yt-dlp' in error_lower:
                 messages.error(request, 'YouTube downloader is not available. Please contact support.')
+            elif 'timeout' in error_lower or 'timed out' in error_lower:
+                messages.error(request, 'Request timed out. The video might be too long or the server is busy. Please try again.')
+            elif 'permission' in error_lower or 'access' in error_lower:
+                messages.error(request, 'Permission error occurred. Please try again.')
+            elif 'network' in error_lower or 'connection' in error_lower:
+                messages.error(request, 'Network error occurred. Please check your internet connection and try again.')
             else:
-                messages.error(request, f'An error occurred: {error_msg[:200]}. Please try again.')
+                messages.error(request, f'An error occurred during conversion: {error_msg[:200]}. Please try again or contact support if the problem persists.')
     
     return render(request, 'media_converter/youtube_to_mp3.html', context)
 
