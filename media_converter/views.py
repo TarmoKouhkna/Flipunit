@@ -111,8 +111,9 @@ def youtube_to_mp3(request):
             # Configure yt-dlp options for faster processing
             # Enhanced bot evasion for VPS environments
             ydl_opts = {
-                # More flexible format selection - try multiple audio formats, but be permissive
-                'format': 'bestaudio/best[height<=720]/best',  # Prefer audio, fallback to video if needed, then any format
+                # More flexible format selection - be very permissive
+                # On localhost, we can be more permissive since there's no bot detection
+                'format': 'bestaudio/best',  # Prefer audio, but accept any video format
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -215,29 +216,28 @@ def youtube_to_mp3(request):
                     if 'bot' in error_msg or 'sign in' in error_msg or 'authentication' in error_msg:
                         print(f"Bot detection with strategy {strategy}, trying next...")
                         continue
-                    # If format is not available, try with web client (has most format support)
+                    # If format is not available, remove format restriction entirely
                     elif 'format is not available' in error_msg or 'requested format' in error_msg:
-                        print(f"Format not available with strategy {strategy}, trying with web client...")
-                        # iOS/Android clients might have limited formats, try web client instead
+                        print(f"Format not available with strategy {strategy}, trying without format restriction...")
+                        # Remove format restriction - let yt-dlp choose ANY available format
                         try:
-                            ydl_opts_web = ydl_opts.copy()
-                            # Use web client which has best format support
-                            ydl_opts_web['extractor_args'] = {
+                            ydl_opts_no_format = ydl_opts.copy()
+                            # Remove format selector entirely - most permissive
+                            ydl_opts_no_format['format'] = 'best'  # Accept ANY format
+                            ydl_opts_no_format['extractor_args'] = {
                                 'youtube': {
-                                    'player_client': ['web'],  # Web client has most formats
+                                    'player_client': strategy,
                                     'player_skip': ['webpage'],
                                 }
                             }
-                            # Remove format restriction - let yt-dlp choose best available
-                            ydl_opts_web['format'] = 'bestaudio/best'  # Prefer audio, but accept video
-                            with yt_dlp.YoutubeDL(ydl_opts_web) as ydl:
+                            with yt_dlp.YoutubeDL(ydl_opts_no_format) as ydl:
                                 info = ydl.extract_info(youtube_url, download=False)
                                 video_title = info.get('title', 'video')
                                 ydl.download([youtube_url])
                                 success = True
                                 break
                         except Exception as e2:
-                            print(f"Web client also failed: {str(e2)[:200]}")
+                            print(f"No format restriction also failed: {str(e2)[:200]}")
                             # If that also fails, try next strategy in the loop
                             continue
                     # If it's a player response error, try without player_skip
