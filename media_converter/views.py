@@ -113,7 +113,8 @@ def youtube_to_mp3(request):
             ydl_opts = {
                 # More flexible format selection - be very permissive
                 # On localhost, we can be more permissive since there's no bot detection
-                'format': 'bestaudio/best',  # Prefer audio, but accept any video format
+                # Use simplest format selector - let yt-dlp handle it
+                'format': 'best',  # Most permissive - accepts any format
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -216,28 +217,31 @@ def youtube_to_mp3(request):
                     if 'bot' in error_msg or 'sign in' in error_msg or 'authentication' in error_msg:
                         print(f"Bot detection with strategy {strategy}, trying next...")
                         continue
-                    # If format is not available, remove format restriction entirely
+                    # If format is not available, try without postprocessor (might be causing the issue)
                     elif 'format is not available' in error_msg or 'requested format' in error_msg:
-                        print(f"Format not available with strategy {strategy}, trying without format restriction...")
-                        # Remove format restriction - let yt-dlp choose ANY available format
+                        print(f"Format not available with strategy {strategy}, trying without postprocessor...")
+                        # The postprocessor might be causing format conflicts - try without it first
                         try:
-                            ydl_opts_no_format = ydl_opts.copy()
-                            # Remove format selector entirely - most permissive
-                            ydl_opts_no_format['format'] = 'best'  # Accept ANY format
-                            ydl_opts_no_format['extractor_args'] = {
+                            ydl_opts_simple = ydl_opts.copy()
+                            # Remove postprocessor - download raw format first
+                            ydl_opts_simple.pop('postprocessors', None)
+                            # Use most permissive format
+                            ydl_opts_simple['format'] = 'best'  # Accept ANY format
+                            ydl_opts_simple['extractor_args'] = {
                                 'youtube': {
                                     'player_client': strategy,
                                     'player_skip': ['webpage'],
                                 }
                             }
-                            with yt_dlp.YoutubeDL(ydl_opts_no_format) as ydl:
+                            with yt_dlp.YoutubeDL(ydl_opts_simple) as ydl:
                                 info = ydl.extract_info(youtube_url, download=False)
                                 video_title = info.get('title', 'video')
+                                # Download without postprocessor - we'll convert manually if needed
                                 ydl.download([youtube_url])
                                 success = True
                                 break
                         except Exception as e2:
-                            print(f"No format restriction also failed: {str(e2)[:200]}")
+                            print(f"Simple download also failed: {str(e2)[:200]}")
                             # If that also fails, try next strategy in the loop
                             continue
                     # If it's a player response error, try without player_skip
