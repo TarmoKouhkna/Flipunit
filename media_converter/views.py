@@ -113,8 +113,8 @@ def youtube_to_mp3(request):
             ydl_opts = {
                 # More flexible format selection - be very permissive
                 # On localhost, we can be more permissive since there's no bot detection
-                # Use simplest format selector - let yt-dlp handle it
-                'format': 'best',  # Most permissive - accepts any format
+                # Use format selector that works with postprocessor
+                'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',  # Try audio formats first
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
