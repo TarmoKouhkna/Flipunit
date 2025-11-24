@@ -111,8 +111,8 @@ def youtube_to_mp3(request):
             # Configure yt-dlp options for faster processing
             # Enhanced bot evasion for VPS environments
             ydl_opts = {
-                # More flexible format selection - try multiple audio formats
-                'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=mp3]/bestaudio/best[height<=720]/best',  # Prefer audio, fallback to video if needed
+                # More flexible format selection - try multiple audio formats, but be permissive
+                'format': 'bestaudio/best[height<=720]/best',  # Prefer audio, fallback to video if needed, then any format
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -209,10 +209,11 @@ def youtube_to_mp3(request):
                     # If format is not available, try with more permissive format selector
                     elif 'format is not available' in error_msg or 'requested format' in error_msg:
                         print(f"Format not available with strategy {strategy}, trying with permissive format...")
-                        # Try with a more permissive format selector
+                        # Try with a truly permissive format selector - let yt-dlp choose
                         try:
                             ydl_opts_permissive = ydl_opts.copy()
-                            ydl_opts_permissive['format'] = 'bestaudio/best[height<=480]/best'  # Very permissive
+                            # Remove format restriction entirely - let yt-dlp choose best available
+                            ydl_opts_permissive['format'] = 'best'  # Most permissive - accepts any format
                             ydl_opts_permissive['extractor_args'] = {
                                 'youtube': {
                                     'player_client': strategy,
@@ -225,7 +226,8 @@ def youtube_to_mp3(request):
                                 ydl.download([youtube_url])
                                 success = True
                                 break
-                        except:
+                        except Exception as e2:
+                            print(f"Permissive format also failed: {str(e2)[:200]}")
                             # If that also fails, try next strategy
                             continue
                     # If it's a player response error, try without player_skip
