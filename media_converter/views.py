@@ -141,30 +141,83 @@ def youtube_to_mp3(request):
                     'Sec-Fetch-Site': 'none',
                     'Cache-Control': 'max-age=0',
                 },
-                # Try multiple client strategies to bypass bot detection
+                # Initial client strategy (will be overridden in retry loop)
                 'extractor_args': {
                     'youtube': {
-                        # Try ios client first (often less restricted), then android, then web
                         'player_client': ['ios', 'android', 'web'],
-                        # Use innertube API which is more reliable
                         'player_skip': ['webpage'],
                     }
                 },
-                # Add retry logic
-                'retries': 3,
-                'fragment_retries': 3,
-                # Add delay to avoid rate limiting
-                'sleep_interval': 1,
-                'max_sleep_interval': 5,
+                # More aggressive retry logic
+                'retries': 5,
+                'fragment_retries': 5,
+                'file_access_retries': 3,
+                # Add delays to avoid rate limiting
+                'sleep_interval': 2,
+                'max_sleep_interval': 10,
+                'sleep_interval_requests': 1,
+                # Disable some features that might trigger bot detection
+                'no_check_certificate': False,
+                'prefer_insecure': False,
+                # Add geo-bypass
+                'geo_bypass': True,
+                'geo_bypass_country': None,
             }
             
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Extract video info
-                info = ydl.extract_info(youtube_url, download=False)
-                video_title = info.get('title', 'video')
-                
-                # Download and convert
-                ydl.download([youtube_url])
+            # Try different client strategies if one fails
+            # Different clients have different bot detection rates
+            client_strategies = [
+                ['ios'],                     # iOS client (often least restricted)
+                ['android'],                 # Android client
+                ['tv_embedded'],             # TV embedded (sometimes works for datacenter IPs)
+                ['ios', 'android'],          # Try both mobile
+                ['android', 'web'],          # Android with web fallback
+                ['web'],                     # Web only (most restricted, last resort)
+            ]
+            
+            last_error = None
+            success = False
+            
+            for strategy in client_strategies:
+                try:
+                    # Update extractor args with current strategy
+                    ydl_opts['extractor_args'] = {
+                        'youtube': {
+                            'player_client': strategy,
+                            'player_skip': ['webpage'],
+                        }
+                    }
+                    
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        # Extract video info
+                        info = ydl.extract_info(youtube_url, download=False)
+                        video_title = info.get('title', 'video')
+                        
+                        # Download and convert
+                        ydl.download([youtube_url])
+                        success = True
+                        break  # Success! Exit the retry loop
+                        
+                except yt_dlp.utils.DownloadError as e:
+                    error_msg = str(e).lower()
+                    last_error = e
+                    # If it's a bot detection error, try next strategy
+                    if 'bot' in error_msg or 'sign in' in error_msg or 'authentication' in error_msg:
+                        print(f"Bot detection with strategy {strategy}, trying next...")
+                        continue
+                    else:
+                        # Different error, re-raise it
+                        raise
+                except Exception as e:
+                    # Other errors, re-raise
+                    raise
+            
+            # If all strategies failed, raise the last error
+            if not success:
+                if last_error:
+                    raise last_error
+                else:
+                    raise Exception("All client strategies failed")
                 
                 # Find the downloaded file
                 downloaded_files = [f for f in os.listdir(temp_dir) if f.endswith('.mp3')]
