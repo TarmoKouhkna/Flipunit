@@ -16,12 +16,16 @@ def home(request):
     if request.method == 'POST' and 'feedback' in request.POST:
         feedback_text = request.POST.get('feedback', '').strip()
         if feedback_text:
-            # Save feedback to database
-            Feedback.objects.create(
-                message=feedback_text,
-                ip_address=get_client_ip(request)
-            )
-            messages.success(request, 'Thank you for your feedback!')
+            # Validate length (1000 characters max)
+            if len(feedback_text) > 1000:
+                messages.error(request, 'Feedback is too long. Maximum 1000 characters allowed.')
+            else:
+                # Save feedback to database
+                Feedback.objects.create(
+                    message=feedback_text,
+                    ip_address=get_client_ip(request)
+                )
+                messages.success(request, 'Thank you for your feedback!')
         else:
             messages.error(request, 'Please enter your feedback.')
     

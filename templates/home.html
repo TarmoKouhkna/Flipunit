@@ -31,8 +31,11 @@
 <div class="feedback-section">
     <form method="post" class="feedback-form">
         {% csrf_token %}
-        <textarea name="feedback" placeholder="Your feedback..." rows="3" required></textarea>
-        <button type="submit">Send Feedback</button>
+        <textarea name="feedback" id="feedback-textarea" placeholder="Your feedback..." rows="3" maxlength="1000" required></textarea>
+        <div class="feedback-footer">
+            <span class="char-count"><span id="char-count">0</span>/1000</span>
+            <button type="submit">Send Feedback</button>
+        </div>
     </form>
 </div>
 {% endblock %}

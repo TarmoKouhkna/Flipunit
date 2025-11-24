@@ -90,3 +90,29 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Feedback character counter
+document.addEventListener('DOMContentLoaded', function() {
+    const feedbackTextarea = document.getElementById('feedback-textarea');
+    const charCount = document.getElementById('char-count');
+    
+    if (feedbackTextarea && charCount) {
+        // Update counter on input
+        feedbackTextarea.addEventListener('input', function() {
+            const length = this.value.length;
+            charCount.textContent = length;
+            
+            // Change color when approaching limit
+            if (length > 900) {
+                charCount.style.color = '#ef4444'; // Red
+            } else if (length > 800) {
+                charCount.style.color = '#f59e0b'; // Orange
+            } else {
+                charCount.style.color = '';
+            }
+        });
+        
+        // Initialize counter
+        charCount.textContent = feedbackTextarea.value.length;
+    }
+});
+
