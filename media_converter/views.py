@@ -217,32 +217,45 @@ def youtube_to_mp3(request):
                     if 'bot' in error_msg or 'sign in' in error_msg or 'authentication' in error_msg:
                         print(f"Bot detection with strategy {strategy}, trying next...")
                         continue
-                    # If format is not available, try without postprocessor (might be causing the issue)
+                    # If format is not available, try with specific format IDs
                     elif 'format is not available' in error_msg or 'requested format' in error_msg:
-                        print(f"Format not available with strategy {strategy}, trying without postprocessor...")
-                        # The postprocessor might be causing format conflicts - try without it first
-                        try:
-                            ydl_opts_simple = ydl_opts.copy()
-                            # Remove postprocessor - download raw format first
-                            ydl_opts_simple.pop('postprocessors', None)
-                            # Use most permissive format
-                            ydl_opts_simple['format'] = 'best'  # Accept ANY format
-                            ydl_opts_simple['extractor_args'] = {
-                                'youtube': {
-                                    'player_client': strategy,
-                                    'player_skip': ['webpage'],
+                        print(f"Format not available with strategy {strategy}, trying specific format IDs...")
+                        # Try specific audio format IDs that are commonly available (140=m4a 130k, 251=webm 160k, etc.)
+                        format_fallbacks = [
+                            '140/251/249/139',  # Specific audio format IDs
+                            'bestaudio',        # Any audio format
+                            'best[height<=480]', # Low quality video
+                            'best',             # Any format
+                        ]
+                        
+                        for fmt in format_fallbacks:
+                            try:
+                                ydl_opts_fallback = ydl_opts.copy()
+                                ydl_opts_fallback['format'] = fmt
+                                # For non-audio formats, remove postprocessor
+                                if 'bestaudio' not in fmt and fmt != '140/251/249/139':
+                                    ydl_opts_fallback.pop('postprocessors', None)
+                                ydl_opts_fallback['extractor_args'] = {
+                                    'youtube': {
+                                        'player_client': strategy,
+                                        'player_skip': ['webpage'],
+                                    }
                                 }
-                            }
-                            with yt_dlp.YoutubeDL(ydl_opts_simple) as ydl:
-                                info = ydl.extract_info(youtube_url, download=False)
-                                video_title = info.get('title', 'video')
-                                # Download without postprocessor - we'll convert manually if needed
-                                ydl.download([youtube_url])
-                                success = True
-                                break
-                        except Exception as e2:
-                            print(f"Simple download also failed: {str(e2)[:200]}")
-                            # If that also fails, try next strategy in the loop
+                                print(f"Trying format: {fmt}")
+                                with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
+                                    info = ydl.extract_info(youtube_url, download=False)
+                                    video_title = info.get('title', 'video')
+                                    ydl.download([youtube_url])
+                                    success = True
+                                    break
+                            except Exception as e2:
+                                print(f"Format {fmt} failed: {str(e2)[:100]}")
+                                continue
+                        
+                        if success:
+                            break
+                        else:
+                            # All format fallbacks failed, try next client strategy
                             continue
                     # If it's a player response error, try without player_skip
                     elif 'failed to extract' in error_msg or 'player response' in error_msg:
