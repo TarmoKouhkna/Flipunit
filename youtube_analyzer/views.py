@@ -54,6 +54,7 @@ def extract_video_info(url, video_id):
     try:
         # Extract video info as JSON - FAST MODE (no subtitle download)
         # Get basic metadata first, then fetch subtitles separately if needed
+        # Add options to bypass YouTube bot detection
         cmd = [
             'yt-dlp',
             '--dump-json',
@@ -62,6 +63,9 @@ def extract_video_info(url, video_id):
             '--no-warnings',
             '--quiet',
             '--no-playlist',  # Don't process playlists
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '--extractor-args', 'youtube:player_client=web',
+            '--referer', 'https://www.youtube.com/',
             url
         ]
         
@@ -82,6 +86,9 @@ def extract_video_info(url, video_id):
                 '--no-warnings',
                 '--no-playlist',
                 '--ignore-errors',  # Continue even if some formats fail
+                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                '--extractor-args', 'youtube:player_client=android',
+                '--referer', 'https://www.youtube.com/',
                 url
             ]
             result = subprocess.run(
