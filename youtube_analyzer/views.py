@@ -54,53 +54,99 @@ def extract_video_info(url, video_id):
     try:
         # Extract video info as JSON - FAST MODE (no subtitle download)
         # Get basic metadata first, then fetch subtitles separately if needed
-        # Add options to bypass YouTube bot detection
-        cmd = [
-            'yt-dlp',
-            '--dump-json',
-            '--no-download',
-            '--skip-download',
-            '--no-warnings',
-            '--quiet',
-            '--no-playlist',  # Don't process playlists
-            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            '--extractor-args', 'youtube:player_client=web',
-            '--referer', 'https://www.youtube.com/',
-            url
+        # Try multiple strategies to bypass YouTube bot detection
+        
+        # Strategy 1: Try with iOS client (often less restricted)
+        strategies = [
+            {
+                'name': 'ios',
+                'cmd': [
+                    'yt-dlp',
+                    '--dump-json',
+                    '--no-download',
+                    '--skip-download',
+                    '--no-warnings',
+                    '--quiet',
+                    '--no-playlist',
+                    '--extractor-args', 'youtube:player_client=ios',
+                    '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+                    url
+                ]
+            },
+            {
+                'name': 'android',
+                'cmd': [
+                    'yt-dlp',
+                    '--dump-json',
+                    '--no-download',
+                    '--skip-download',
+                    '--no-warnings',
+                    '--quiet',
+                    '--no-playlist',
+                    '--extractor-args', 'youtube:player_client=android',
+                    '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
+                    url
+                ]
+            },
+            {
+                'name': 'web',
+                'cmd': [
+                    'yt-dlp',
+                    '--dump-json',
+                    '--no-download',
+                    '--skip-download',
+                    '--no-warnings',
+                    '--quiet',
+                    '--no-playlist',
+                    '--extractor-args', 'youtube:player_client=web',
+                    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    '--referer', 'https://www.youtube.com/',
+                    url
+                ]
+            },
+            {
+                'name': 'mweb',
+                'cmd': [
+                    'yt-dlp',
+                    '--dump-json',
+                    '--no-download',
+                    '--skip-download',
+                    '--no-warnings',
+                    '--quiet',
+                    '--no-playlist',
+                    '--extractor-args', 'youtube:player_client=mweb',
+                    '--user-agent', 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+                    url
+                ]
+            }
         ]
         
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=20  # Reasonable timeout
-        )
+        result = None
+        last_error = None
         
-        if result.returncode != 0:
-            # Try with more permissive options if first attempt fails
-            cmd_fallback = [
-                'yt-dlp',
-                '--dump-json',
-                '--no-download',
-                '--skip-download',
-                '--no-warnings',
-                '--no-playlist',
-                '--ignore-errors',  # Continue even if some formats fail
-                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                '--extractor-args', 'youtube:player_client=android',
-                '--referer', 'https://www.youtube.com/',
-                url
-            ]
-            result = subprocess.run(
-                cmd_fallback,
-                capture_output=True,
-                text=True,
-                timeout=20
-            )
-            
-            if result.returncode != 0:
-                error_msg = result.stderr[:500] if result.stderr else result.stdout[:500] if result.stdout else 'Unknown error'
-                raise Exception(f"yt-dlp error: {error_msg}")
+        for strategy in strategies:
+            try:
+                result = subprocess.run(
+                    strategy['cmd'],
+                    capture_output=True,
+                    text=True,
+                    timeout=25
+                )
+                
+                if result.returncode == 0:
+                    break  # Success!
+                else:
+                    last_error = result.stderr if result.stderr else result.stdout
+            except subprocess.TimeoutExpired:
+                last_error = f"Timeout using {strategy['name']} client"
+                continue
+            except Exception as e:
+                last_error = str(e)
+                continue
+        
+        if result is None or result.returncode != 0:
+            error_msg = last_error[:500] if last_error else 'Unknown error after trying all strategies'
+            raise Exception(f"yt-dlp error: {error_msg}")
         
         video_data = json.loads(result.stdout)
         
