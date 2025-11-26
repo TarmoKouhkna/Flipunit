@@ -68,12 +68,6 @@ def home(request):
                 'icon': 'utilities.svg'
             },
             {
-                'name': 'YouTube Video Analyzer',
-                'url': 'youtube_analyzer:index',
-                'description': 'Analyze YouTube videos - extract metadata, SEO insights, thumbnails, and more',
-                'icon': 'youtube-analyzer.svg'
-            },
-            {
                 'name': 'Color Code Generator & Picker',
                 'url': 'color_picker:index',
                 'description': 'Pick colors from screen, convert between color formats, and generate color codes',
