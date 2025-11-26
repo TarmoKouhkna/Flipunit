@@ -296,8 +296,21 @@ def audio_converter(request):
         if result.returncode != 0:
             error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
             logger.error(f'Audio conversion failed: {error_msg}')
+            # Extract the most relevant error message (usually the last few lines)
+            error_lines = error_msg.split('\n')
+            relevant_error = '\n'.join([line for line in error_lines if line.strip() and not line.startswith('frame=')][-5:])
+            if not relevant_error.strip():
+                relevant_error = error_msg[:500]
+            
+            # Check if this is an AJAX request (from fetch)
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                return HttpResponse(
+                    json.dumps({'error': f'Conversion failed: {relevant_error[:500]}'}),
+                    content_type='application/json',
+                    status=400
+                )
             return render(request, 'media_converter/audio_converter.html', {
-                'error': f'Conversion failed: {error_msg[:500]}'
+                'error': f'Conversion failed: {relevant_error[:500]}'
             })
         
         if not os.path.exists(output_path):
@@ -352,8 +365,16 @@ def audio_converter(request):
             error_msg = f'Output file format verification failed. Expected {output_format}, but file magic bytes: {magic_bytes.hex()[:24]}'
             logger.error(error_msg)
             logger.error(f'FFmpeg stderr: {result.stderr[:1000] if result.stderr else "No stderr"}')
+            error_response = f'Conversion failed: Output file is not in {output_format.upper()} format. FFmpeg may have failed silently. Please check server logs.'
+            # Check if this is an AJAX request
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                return HttpResponse(
+                    json.dumps({'error': error_response}),
+                    content_type='application/json',
+                    status=400
+                )
             return render(request, 'media_converter/audio_converter.html', {
-                'error': f'Conversion failed: Output file is not in {output_format.upper()} format. FFmpeg may have failed silently. Please check server logs.'
+                'error': error_response
             })
         
         logger.info(f'Format verified: Output file is correctly formatted as {output_format}')
@@ -413,8 +434,17 @@ def audio_converter(request):
                 shutil.rmtree(temp_dir)
             except (OSError, PermissionError):
                 pass
+        error_response = f'Error processing file: {str(e)}'
+        logger.error(f'Audio converter exception: {error_response}', exc_info=True)
+        # Check if this is an AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+            return HttpResponse(
+                json.dumps({'error': error_response}),
+                content_type='application/json',
+                status=500
+            )
         return render(request, 'media_converter/audio_converter.html', {
-            'error': f'Error processing file: {str(e)}'
+            'error': error_response
         })
 
 def video_to_gif(request):

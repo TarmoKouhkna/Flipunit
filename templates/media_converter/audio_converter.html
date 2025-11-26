@@ -223,22 +223,52 @@ if (window.audioConverterInitialized) {
                     method: 'POST',
                     body: formData,
                     credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
                     signal: state.abortController.signal // Allows abort
                 });
                 
                 console.log('📥 Fetch response received:', response.status);
                 console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
 
-                if (!response.ok) {
-                    throw new Error('Conversion failed');
-                }
-
                 let blob, filename, contentType = 'audio/mpeg';
 
                 const contentTypeHeader = response.headers.get('content-type');
+                
+                if (!response.ok) {
+                    // Try to get error message from response
+                    let errorMessage = 'Conversion failed';
+                    try {
+                        if (contentTypeHeader?.includes('application/json')) {
+                            const errorData = await response.json();
+                            errorMessage = errorData.error || errorData.message || errorMessage;
+                        } else {
+                            const text = await response.text();
+                            // Try to extract error from HTML if it's an error page
+                            const errorMatch = text.match(/<div[^>]*class="[^"]*alert[^"]*error[^"]*"[^>]*>([^<]+)<\/div>/i);
+                            if (errorMatch) {
+                                errorMessage = errorMatch[1].trim();
+                            } else if (text.length < 500) {
+                                errorMessage = text.substring(0, 200);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing error response:', e);
+                    }
+                    throw new Error(errorMessage || `Server returned status ${response.status}`);
+                }
+                
                 if (contentTypeHeader?.includes('application/json')) {
                     // JSON format - extract file data
                     const data = await response.json();
+                    
+                    // Check if response contains an error
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
                     const binary = atob(data.file);
                     const bytes = new Uint8Array(binary.length);
                     for (let i = 0; i < binary.length; i++) {
@@ -293,8 +323,12 @@ if (window.audioConverterInitialized) {
                     return;
                 }
                 console.error('Conversion error:', err);
-                alert('Conversion failed. Please try again.');
-                window.location.reload();
+                const errorMessage = err.message || 'Conversion failed. Please try again.';
+                alert(errorMessage);
+                // Don't reload if it's a specific error message - let user try again
+                if (errorMessage.includes('Please try again') || errorMessage.length < 20) {
+                    window.location.reload();
+                }
             } finally {
                 // === ALWAYS RESET ===
                 console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
