@@ -23,26 +23,11 @@ def analyzer_tool(request):
 @require_http_methods(["POST"])
 def analyze_video(request):
     """Analyze YouTube video URL"""
-    url = request.POST.get('url', '').strip()
-    
-    if not url:
-        return JsonResponse({'error': 'URL is required'}, status=400)
-    
-    # Validate YouTube URL (supports regular videos, Shorts, and youtu.be links)
-    youtube_pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com/(?:watch\?v=|shorts/|embed/)|youtu\.be/)([a-zA-Z0-9_-]{11})'
-    match = re.search(youtube_pattern, url)
-    
-    if not match:
-        return JsonResponse({'error': 'Invalid YouTube URL'}, status=400)
-    
-    video_id = match.group(1)
-    
-    try:
-        # Use yt-dlp to extract video information
-        result = extract_video_info(url, video_id)
-        return JsonResponse(result)
-    except Exception as e:
-        return JsonResponse({'error': f'Error analyzing video: {str(e)}'}, status=500)
+    # YouTube has implemented strict bot detection that requires cookies
+    # This makes the feature unreliable and not user-friendly for end users
+    return JsonResponse({
+        'error': 'YouTube Analyzer is temporarily unavailable. YouTube requires authentication cookies that cannot be reliably provided for all users. We are working on an alternative solution.'
+    }, status=503)
 
 def extract_video_info(url, video_id):
     """Extract comprehensive video information using yt-dlp"""
