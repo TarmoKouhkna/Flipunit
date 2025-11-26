@@ -160,6 +160,10 @@ def extract_video_info(url, video_id):
         
         if result is None or result.returncode != 0:
             error_msg = last_error[:500] if last_error else 'Unknown error after trying all strategies'
+            # Add helpful message about cookies if bot detection error
+            if 'bot' in error_msg.lower() or 'sign in' in error_msg.lower():
+                cookie_note = "\n\nNote: YouTube requires cookies to bypass bot detection. See youtube_analyzer/COOKIES_SETUP.md for instructions."
+                error_msg = error_msg + cookie_note
             raise Exception(f"yt-dlp error: {error_msg}")
         
         video_data = json.loads(result.stdout)
