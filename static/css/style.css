@@ -54,6 +54,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: relative;
 }
 
 .logo {
@@ -93,39 +94,83 @@ header {
     display: inline-block;
 }
 
+.navbar {
+    position: relative;
+}
+
 .nav-menu {
-    display: flex;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    flex-direction: column;
+    background-color: var(--background);
+    width: 250px;
+    text-align: left;
+    transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+    box-shadow: var(--shadow-lg);
+    padding: 0.5rem 0;
+    gap: 0;
+    z-index: 1000;
     list-style: none;
-    gap: 2rem;
-    align-items: center;
+    margin: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.nav-menu.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.nav-menu li {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-menu li:last-child {
+    border-bottom: none;
 }
 
 .nav-menu a {
+    display: block;
+    padding: 1rem 2rem;
     color: var(--text-primary);
     text-decoration: none;
     font-weight: 500;
-    transition: color 0.2s;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 .nav-menu a:hover {
+    background-color: var(--surface);
     color: var(--primary-color);
 }
 
+
 .mobile-menu-toggle {
-    display: none;
+    display: flex;
     flex-direction: column;
     background: none;
     border: none;
     cursor: pointer;
     padding: 0.5rem;
-    gap: 4px;
+    gap: 5px;
+    z-index: 1001;
 }
 
 .mobile-menu-toggle span {
-    width: 25px;
+    width: 28px;
     height: 3px;
     background: var(--text-primary);
-    transition: all 0.3s;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+    display: block;
+}
+
+.mobile-menu-toggle:hover span {
+    background: var(--primary-color);
 }
 
 /* Main Content */
@@ -387,10 +432,15 @@ footer p {
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .mobile-menu-toggle {
-        display: flex;
+    .nav-menu {
+        width: 100%;
+        right: 0;
+        left: 0;
+        border-radius: 0;
     }
+}
 
+@media (max-width: 768px) {
     .logo-img {
         height: 28px;
         max-width: 80px;
@@ -398,24 +448,6 @@ footer p {
 
     .logo {
         font-size: 1.25rem;
-    }
-
-    .nav-menu {
-        position: fixed;
-        left: -100%;
-        top: 70px;
-        flex-direction: column;
-        background-color: var(--background);
-        width: 100%;
-        text-align: center;
-        transition: 0.3s;
-        box-shadow: var(--shadow-lg);
-        padding: 2rem 0;
-        gap: 1rem;
-    }
-
-    .nav-menu.active {
-        left: 0;
     }
 
     .hero h1 {

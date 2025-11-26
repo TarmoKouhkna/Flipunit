@@ -13,3 +13,11 @@ class FeedbackAdmin(admin.ModelAdmin):
     message_preview.short_description = 'Message'
 
 
+
+
+
+
+
+
+
+

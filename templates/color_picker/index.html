@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Color Code Generator & Picker - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Convert between color formats (HEX, RGB, HSL, CMYK, LAB, XYZ, LUV, HWB), and generate color codes. Free color picker tool.{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Color Code Generator & Picker</h1>
+    <p>Pick colors, convert formats, and generate color codes</p>
+</div>
+
+<div class="grid grid-2">
+    <a href="{% url 'color_picker:picker' %}" class="category-card" style="text-align: center; padding: 2rem;">
+        <h2>Color Picker</h2>
+        <p>Interactive color picker with format conversion</p>
+        <div style="margin-top: 1.5rem; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
+            <strong style="display: block; margin-bottom: 0.75rem; font-size: 1.1rem;">Features:</strong>
+            <ul style="text-align: left; margin: 0; padding-left: 1.5rem; list-style-position: outside;">
+                <li style="margin-bottom: 0.5rem;">Interactive color picker</li>
+                <li style="margin-bottom: 0.5rem;">Multiple color format conversions</li>
+                <li style="margin-bottom: 0.5rem;">Color name detection</li>
+                <li style="margin-bottom: 0.5rem;">Copy color codes</li>
+            </ul>
+        </div>
+    </a>
+    
+    <a href="{% url 'color_picker:from_image' %}" class="category-card" style="text-align: center; padding: 2rem;">
+        <h2>Pick Color from Image</h2>
+        <p>Upload an image and pick colors from it</p>
+    </a>
+</div>
+{% endblock %}
+

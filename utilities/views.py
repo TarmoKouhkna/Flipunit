@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib import messages
 import re
+import io
 from datetime import datetime
 import pytz
 from PIL import Image

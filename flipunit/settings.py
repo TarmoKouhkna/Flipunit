@@ -75,6 +75,8 @@ INSTALLED_APPS = [
     'pdf_tools',
     'currency_converter',
     'utilities',
+    'youtube_analyzer',
+    'color_picker',
 ]
 
 MIDDLEWARE = [
@@ -185,7 +187,7 @@ SITE_URL = os.environ.get('SITE_URL', 'https://flipunit.eu')
 FILE_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB
 
-# Request timeout settings (for long-running operations like YouTube conversion)
+# Request timeout settings (for long-running operations like media conversion)
 # Note: For production, consider using async tasks (Celery) for long operations
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 

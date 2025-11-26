@@ -24,7 +24,6 @@ FlipUnit.eu is a one-stop solution for all your conversion needs. Whether you ne
 - **Image Resize**: Resize images while maintaining aspect ratio
 
 ### 🎬 Media Converters
-- **YouTube to MP3**: Extract audio from YouTube videos (with copyright usage notice)
 - **MP4 to MP3**: Extract audio from MP4 video files
 - **Audio Converter**: Convert between various audio formats
 - **Video to GIF**: Convert video files to animated GIFs
@@ -51,7 +50,7 @@ FlipUnit.eu is a one-stop solution for all your conversion needs. Whether you ne
 - **Image Processing**: Pillow 12.0.0
 - **PDF Processing**: pypdf 6.3.0, pdf2image 1.17.0
 - **SVG Processing**: CairoSVG 2.8.2
-- **Video/Audio Processing**: FFmpeg (system dependency), yt-dlp 2025.11.12
+- **Video/Audio Processing**: FFmpeg (system dependency)
 - **QR Code Generation**: qrcode[pil] 8.0
 - **Static Files**: WhiteNoise 6.8.2
 - **Web Server**: Gunicorn 23.0.0
@@ -441,7 +440,6 @@ server {
 - **pypdf 6.3.0**: PDF manipulation
 - **pdf2image 1.17.0**: PDF to image conversion
 - **CairoSVG 2.8.2**: SVG to PNG conversion
-- **yt-dlp 2025.11.12**: YouTube video downloading
 - **qrcode[pil] 8.0**: QR code generation
 - **whitenoise 6.8.2**: Static file serving
 - **gunicorn 23.0.0**: Production WSGI server

@@ -33,7 +33,6 @@ class StaticViewSitemap(Sitemap):
             'image_converter:resize',
             
             # Media converters
-            'media_converter:youtube_to_mp3',
             'media_converter:mp4_to_mp3',
             'media_converter:audio_converter',
             'media_converter:video_to_gif',

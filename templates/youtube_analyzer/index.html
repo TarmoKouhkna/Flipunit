@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}YouTube Video Analyzer - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Analyze YouTube videos - extract metadata, SEO analysis, thumbnails, and more. Free YouTube video analyzer tool.{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>YouTube Video Analyzer</h1>
+    <p>Comprehensive analysis tool for YouTube videos</p>
+</div>
+
+<div class="grid grid-1">
+    <a href="{% url 'youtube_analyzer:analyzer' %}" class="category-card" style="text-align: center; padding: 2rem;">
+        <h2>Video URL Analyzer</h2>
+        <p>Analyze any YouTube video - extract metadata, SEO insights, thumbnails, and more</p>
+        <div style="margin-top: 1.5rem; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
+            <strong style="display: block; margin-bottom: 0.75rem; font-size: 1.1rem;">Features:</strong>
+            <ul style="text-align: left; margin: 0; padding-left: 1.5rem; list-style-position: outside;">
+                <li style="margin-bottom: 0.5rem;">Basic metadata extraction</li>
+                <li style="margin-bottom: 0.5rem;">Thumbnail extraction (all resolutions)</li>
+                <li style="margin-bottom: 0.5rem;">SEO analysis & recommendations</li>
+                <li style="margin-bottom: 0.5rem;">Video format information</li>
+                <li style="margin-bottom: 0.5rem;">Engagement statistics</li>
+            </ul>
+        </div>
+    </a>
+</div>
+{% endblock %}
+

@@ -46,7 +46,7 @@ def home(request):
             {
                 'name': 'Media Converters',
                 'url': 'media_converter:index',
-                'description': 'Convert media files and download audio. YouTube to mp3 & etc.',
+                'description': 'Convert media files and download audio.',
                 'icon': 'media-converters.svg'
             },
             {
@@ -66,6 +66,18 @@ def home(request):
                 'url': 'utilities:index',
                 'description': 'Calculators, text utilities, color converter, QR codes and more',
                 'icon': 'utilities.svg'
+            },
+            {
+                'name': 'YouTube Video Analyzer',
+                'url': 'youtube_analyzer:index',
+                'description': 'Analyze YouTube videos - extract metadata, SEO insights, thumbnails, and more',
+                'icon': 'youtube-analyzer.svg'
+            },
+            {
+                'name': 'Color Code Generator & Picker',
+                'url': 'color_picker:index',
+                'description': 'Pick colors from screen, convert between color formats, and generate color codes',
+                'icon': 'color-picker.svg'
             },
         ]
     }
