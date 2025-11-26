@@ -4,13 +4,34 @@ YouTube requires cookies to bypass bot detection. To enable the YouTube Analyzer
 
 ## Quick Setup (Recommended)
 
-### Option 1: Using Browser Extension (Easiest)
+### Option 1: Using Browser Extension (Easiest) - RECOMMENDED FOR VPS
 
-1. Install a browser extension like "Get cookies.txt LOCALLY" for Chrome/Edge or "cookies.txt" for Firefox
-2. Go to https://www.youtube.com
-3. Make sure you're logged in (optional but recommended)
-4. Click the extension icon and export cookies
-5. Save the file as `youtube_cookies.txt` in the project root directory (`/opt/flipunit/youtube_cookies.txt` on VPS)
+1. **On your local computer:**
+   - Install browser extension:
+     - Chrome/Edge: "Get cookies.txt LOCALLY" 
+     - Firefox: "cookies.txt"
+   - Go to https://www.youtube.com and make sure you're logged in
+   - Click the extension icon and export cookies
+   - Save as `youtube_cookies.txt`
+
+2. **Upload to VPS:**
+   ```bash
+   scp youtube_cookies.txt ubuntu@217.146.78.140:/opt/flipunit/
+   ```
+
+3. **On VPS, verify:**
+   ```bash
+   ls -la /opt/flipunit/youtube_cookies.txt
+   ```
+
+### Option 2: Using yt-dlp Command (Local Development Only)
+
+On your local machine where you have a browser:
+```bash
+yt-dlp --cookies-from-browser chrome --dump-json https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
+
+This will use browser cookies automatically. For VPS, you need to export and upload the file.
 
 ### Option 2: Using yt-dlp Command
 

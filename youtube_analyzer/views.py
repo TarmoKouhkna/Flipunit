@@ -60,6 +60,9 @@ def extract_video_info(url, video_id):
         cookies_path = os.path.join(settings.BASE_DIR, 'youtube_cookies.txt')
         has_cookies = os.path.exists(cookies_path)
         
+        # Prepare cookie options for commands
+        cookie_options = ['--cookies', cookies_path] if has_cookies else []
+        
         # Strategy 1: Try with iOS client (often less restricted)
         strategies = [
             {
@@ -74,7 +77,7 @@ def extract_video_info(url, video_id):
                     '--no-playlist',
                     '--extractor-args', 'youtube:player_client=ios',
                     '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-                ] + (['--cookies', cookies_path] if has_cookies else []) + [url]
+                ] + cookie_options + [url]
             },
             {
                 'name': 'android',
@@ -88,7 +91,7 @@ def extract_video_info(url, video_id):
                     '--no-playlist',
                     '--extractor-args', 'youtube:player_client=android',
                     '--user-agent', 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
-                ] + (['--cookies', cookies_path] if has_cookies else []) + [url]
+                ] + cookie_options + [url]
             },
             {
                 'name': 'tv_embedded',
@@ -102,7 +105,7 @@ def extract_video_info(url, video_id):
                     '--no-playlist',
                     '--extractor-args', 'youtube:player_client=tv_embedded',
                     '--user-agent', 'Mozilla/5.0 (SMART-TV; Linux; Tizen 5.5) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.2 Chrome/63.0.3239.84 TV Safari/537.36',
-                ] + (['--cookies', cookies_path] if has_cookies else []) + [url]
+                ] + cookie_options + [url]
             },
             {
                 'name': 'web',
@@ -117,7 +120,7 @@ def extract_video_info(url, video_id):
                     '--extractor-args', 'youtube:player_client=web',
                     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     '--referer', 'https://www.youtube.com/',
-                ] + (['--cookies', cookies_path] if has_cookies else []) + [url]
+                ] + cookie_options + [url]
             },
             {
                 'name': 'mweb',
@@ -131,7 +134,7 @@ def extract_video_info(url, video_id):
                     '--no-playlist',
                     '--extractor-args', 'youtube:player_client=mweb',
                     '--user-agent', 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-                ] + (['--cookies', cookies_path] if has_cookies else []) + [url]
+                ] + cookie_options + [url]
             }
         ]
         
