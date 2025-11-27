@@ -24,7 +24,7 @@ body {
     font-family: 'Varela Round', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.6;
     color: var(--text-primary);
-    background-color: var(--background);
+    background: linear-gradient(to top, #C8E2ED, #FCFCFC);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -39,7 +39,7 @@ body {
 
 /* Header and Navigation */
 header {
-    background: var(--background);
+    background: #FBF9F6;
     box-shadow: var(--shadow);
     position: sticky;
     top: 0;
@@ -103,7 +103,7 @@ header {
     top: 100%;
     right: 0;
     flex-direction: column;
-    background-color: var(--background);
+    background-color: #FBF9F6;
     width: 250px;
     text-align: left;
     transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
@@ -367,7 +367,7 @@ footer p {
 }
 
 .category-card {
-    background: var(--background);
+    background: #FBF9F6;
     border-radius: 8px;
     padding: 2rem;
     box-shadow: var(--shadow);

@@ -32,10 +32,10 @@ def home(request):
     context = {
         'categories': [
             {
-                'name': 'Unit Converters',
-                'url': 'converters:index',
-                'description': 'Convert between different units of measurement',
-                'icon': 'unit-converters.svg'
+                'name': 'Color Code Generator & Picker',
+                'url': 'color_picker:index',
+                'description': 'Pick colors from screen, convert between color formats, and generate color codes',
+                'icon': 'color-picker.svg'
             },
             {
                 'name': 'Image Converters',
@@ -56,10 +56,10 @@ def home(request):
                 'icon': 'pdf-tools.svg'
             },
             {
-                'name': 'Currency & Crypto',
-                'url': 'currency_converter:index',
-                'description': 'Convert between currencies and cryptocurrencies with real-time rates',
-                'icon': 'currency-crypto.svg'
+                'name': 'Unit Converters',
+                'url': 'converters:index',
+                'description': 'Convert between different units of measurement',
+                'icon': 'unit-converters.svg'
             },
             {
                 'name': 'Utilities',
@@ -68,10 +68,10 @@ def home(request):
                 'icon': 'utilities.svg'
             },
             {
-                'name': 'Color Code Generator & Picker',
-                'url': 'color_picker:index',
-                'description': 'Pick colors from screen, convert between color formats, and generate color codes',
-                'icon': 'color-picker.svg'
+                'name': 'Currency & Crypto',
+                'url': 'currency_converter:index',
+                'description': 'Convert between currencies and cryptocurrencies with real-time rates',
+                'icon': 'currency-crypto.svg'
             },
         ]
     }
