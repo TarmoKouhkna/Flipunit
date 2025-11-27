@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib.sitemaps.views import sitemap
+from django.contrib.sitemaps.views import sitemap as sitemap_view
 from django.views.generic import TemplateView
 from . import views
 from .sitemaps import StaticViewSitemap
@@ -26,6 +26,16 @@ from .sitemaps import StaticViewSitemap
 sitemaps = {
     'static': StaticViewSitemap,
 }
+
+def sitemap(request):
+    """Custom sitemap view that removes noindex header for Google Search Console"""
+    response = sitemap_view(request, sitemaps)
+    # Ensure correct content type
+    response['Content-Type'] = 'application/xml; charset=utf-8'
+    # Remove X-Robots-Tag header if present (Google needs to index sitemaps)
+    if 'X-Robots-Tag' in response:
+        del response['X-Robots-Tag']
+    return response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -38,7 +48,7 @@ urlpatterns = [
     path('utilities/', include('utilities.urls')),
     path('youtube-analyzer/', include('youtube_analyzer.urls')),
     path('color-picker/', include('color_picker.urls')),
-    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
+    path('sitemap.xml', sitemap, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='robots.txt', content_type='text/plain')),
 ]
 

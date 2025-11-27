@@ -1,10 +1,12 @@
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
+from datetime import datetime
 
 class StaticViewSitemap(Sitemap):
     priority = 0.8
     changefreq = 'weekly'
     protocol = 'https'  # Force HTTPS URLs in sitemap
+    lastmod = datetime.now()  # Set lastmod for all pages
 
     def items(self):
         return [
@@ -16,6 +18,7 @@ class StaticViewSitemap(Sitemap):
             'pdf_tools:index',
             'currency_converter:index',
             'utilities:index',
+            'color_picker:index',
             
             # Unit converters
             ('converters:tool', 'length'),
