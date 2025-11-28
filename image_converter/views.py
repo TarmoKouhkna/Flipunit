@@ -13,7 +13,7 @@ except ImportError:
 
 # Check for HEIC support
 try:
-    from pillow_heif import register_heif_opener
+    from pillow_heif import register_heif_opener  # type: ignore
     register_heif_opener()
     HEIC_AVAILABLE = True
 except ImportError:
@@ -49,7 +49,7 @@ def _load_font(font_size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _validate_image_file(uploaded_file, request, template_name: str, allowed_extensions: Optional[list] = None):
+def _validate_image_file(uploaded_file, request, template_name: str, allowed_extensions: Optional[list] = None, allow_svg: bool = False):
     """
     Validate uploaded image file.
     
@@ -58,6 +58,7 @@ def _validate_image_file(uploaded_file, request, template_name: str, allowed_ext
         request: Django request object
         template_name: Template name for error rendering
         allowed_extensions: List of allowed extensions (defaults to ALLOWED_IMAGE_EXTENSIONS)
+        allow_svg: Whether SVG files are allowed (default: False, as most functions can't handle SVG)
         
     Returns:
         Tuple of (is_valid, error_response_or_none, file_ext)
@@ -77,6 +78,12 @@ def _validate_image_file(uploaded_file, request, template_name: str, allowed_ext
         ext_list = ', '.join([ext.upper().lstrip('.') for ext in allowed_extensions])
         return (False, render(request, template_name, {
             'error': f'Invalid file type. Please upload {ext_list} files.'
+        }), None)
+    
+    # Check SVG support (SVG files need special handling and can't be used with PIL directly)
+    if file_ext == '.svg' and not allow_svg:
+        return (False, render(request, template_name, {
+            'error': 'SVG files are not supported for this operation. Please convert SVG to PNG first using the Universal Converter.'
         }), None)
     
     # Check HEIC support
@@ -118,30 +125,21 @@ def convert_image(request, converter_type):
     
     uploaded_file = request.FILES['image']
     
-    # Validate file size (max 100MB for images)
-    max_size = 100 * 1024 * 1024  # 100MB
-    if uploaded_file.size > max_size:
-        return render(request, 'image_converter/converter.html', {
-            'converter_type': converter_type,
-            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Validate file type
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    if file_ext not in allowed_extensions:
-        return render(request, 'image_converter/converter.html', {
-            'converter_type': converter_type,
-            'error': 'Invalid file type. Please upload JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, or HEIC files.'
-        })
-    
-    # Check HEIC support
-    if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-        return render(request, 'image_converter/converter.html', {
-            'converter_type': converter_type,
-            'error': 'HEIC/HEIF support requires pillow-heif library. Please install it: pip install pillow-heif'
-        })
+    # Validate image file (allow SVG for converter as it handles SVG to PNG conversion)
+    is_valid, error_response, file_ext = _validate_image_file(
+        uploaded_file, request, 'image_converter/converter.html', allow_svg=True
+    )
+    if not is_valid:
+        # Add converter_type to error context
+        if hasattr(error_response, 'context_data'):
+            error_response.context_data['converter_type'] = converter_type
+        elif isinstance(error_response, HttpResponse):
+            # If it's already a rendered response, we need to re-render with converter_type
+            return render(request, 'image_converter/converter.html', {
+                'converter_type': converter_type,
+                'error': error_response.context_data.get('error', 'Validation failed') if hasattr(error_response, 'context_data') else 'Validation failed'
+            })
+        return error_response
     
     try:
         # Read image
@@ -259,7 +257,7 @@ def universal_converter(request):
     
     # Validate image file
     is_valid, error_response, file_ext = _validate_image_file(
-        uploaded_file, request, 'image_converter/universal.html'
+        uploaded_file, request, 'image_converter/universal.html', allow_svg=True
     )
     if not is_valid:
         return error_response
