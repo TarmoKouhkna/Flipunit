@@ -3,6 +3,8 @@ from django.http import HttpResponse
 import os
 from PIL import Image, ImageDraw, ImageFont
 import io
+from typing import Tuple, Optional
+
 try:
     import cairosvg
     CAIROSVG_AVAILABLE = True
@@ -16,6 +18,74 @@ try:
     HEIC_AVAILABLE = True
 except ImportError:
     HEIC_AVAILABLE = False
+
+# Constants
+ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
+MAX_IMAGE_SIZE = 100 * 1024 * 1024  # 100MB
+
+# Font paths - configurable
+FONT_PATHS = [
+    "/System/Library/Fonts/Helvetica.ttc",  # macOS
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  # Alternative Linux
+]
+
+
+def _load_font(font_size: int) -> ImageFont.FreeTypeFont:
+    """
+    Load a TrueType font with fallback to default.
+    
+    Args:
+        font_size: Size of the font to load
+        
+    Returns:
+        ImageFont object (FreeTypeFont or default)
+    """
+    for font_path in FONT_PATHS:
+        try:
+            return ImageFont.truetype(font_path, font_size)
+        except (OSError, IOError):
+            continue
+    return ImageFont.load_default()
+
+
+def _validate_image_file(uploaded_file, request, template_name: str, allowed_extensions: Optional[list] = None):
+    """
+    Validate uploaded image file.
+    
+    Args:
+        uploaded_file: Django uploaded file object
+        request: Django request object
+        template_name: Template name for error rendering
+        allowed_extensions: List of allowed extensions (defaults to ALLOWED_IMAGE_EXTENSIONS)
+        
+    Returns:
+        Tuple of (is_valid, error_response_or_none, file_ext)
+    """
+    if allowed_extensions is None:
+        allowed_extensions = ALLOWED_IMAGE_EXTENSIONS
+    
+    # Check file size
+    if uploaded_file.size > MAX_IMAGE_SIZE:
+        return (False, render(request, template_name, {
+            'error': f'File size exceeds {MAX_IMAGE_SIZE / (1024 * 1024):.0f}MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        }), None)
+    
+    # Check file extension
+    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+    if file_ext not in allowed_extensions:
+        ext_list = ', '.join([ext.upper().lstrip('.') for ext in allowed_extensions])
+        return (False, render(request, template_name, {
+            'error': f'Invalid file type. Please upload {ext_list} files.'
+        }), None)
+    
+    # Check HEIC support
+    if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
+        return (False, render(request, template_name, {
+            'error': 'HEIC/HEIF support requires pillow-heif library. Please install it: pip install pillow-heif'
+        }), None)
+    
+    return (True, None, file_ext)
 
 def index(request):
     """Image conversion and editing index page"""
@@ -187,27 +257,12 @@ def universal_converter(request):
             'error': 'Please select an output format.'
         })
     
-    # Validate file size (max 100MB for images)
-    max_size = 100 * 1024 * 1024  # 100MB
-    if uploaded_file.size > max_size:
-        return render(request, 'image_converter/universal.html', {
-            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Validate file type
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    if file_ext not in allowed_extensions:
-        return render(request, 'image_converter/universal.html', {
-            'error': 'Invalid file type. Please upload JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, or HEIC files.'
-        })
-    
-    # Check HEIC support
-    if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-        return render(request, 'image_converter/universal.html', {
-            'error': 'HEIC/HEIF support requires pillow-heif library. Please install it: pip install pillow-heif'
-        })
+    # Validate image file
+    is_valid, error_response, file_ext = _validate_image_file(
+        uploaded_file, request, 'image_converter/universal.html'
+    )
+    if not is_valid:
+        return error_response
     
     # Validate output format
     valid_formats = ['PNG', 'JPEG', 'JPG', 'WEBP', 'BMP', 'TIFF', 'GIF', 'ICO', 'AVIF', 'HEIC']
@@ -346,27 +401,12 @@ def resize_image(request):
     
     uploaded_file = request.FILES['image']
     
-    # Validate file size (max 100MB for images)
-    max_size = 100 * 1024 * 1024  # 100MB
-    if uploaded_file.size > max_size:
-        return render(request, 'image_converter/resize.html', {
-            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Validate file type
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    if file_ext not in allowed_extensions:
-        return render(request, 'image_converter/resize.html', {
-            'error': 'Invalid file type. Please upload JPG, JPEG, PNG, WebP, BMP, TIFF, GIF, ICO, AVIF, or HEIC files.'
-        })
-    
-    # Check HEIC support
-    if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-        return render(request, 'image_converter/resize.html', {
-            'error': 'HEIC/HEIF support requires pillow-heif library. Please install it: pip install pillow-heif'
-        })
+    # Validate image file
+    is_valid, error_response, file_ext = _validate_image_file(
+        uploaded_file, request, 'image_converter/resize.html'
+    )
+    if not is_valid:
+        return error_response
     
     try:
         # Get resize parameters
@@ -524,35 +564,20 @@ def rotate_flip_image(request):
     uploaded_file = request.FILES['image']
     action = request.POST.get('action', '').strip()
     
-    # Validate file size
-    max_size = 100 * 1024 * 1024
-    if uploaded_file.size > max_size:
-        return render(request, 'image_converter/rotate_flip.html', {
-            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Validate file type
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    if file_ext not in allowed_extensions:
-        return render(request, 'image_converter/rotate_flip.html', {
-            'error': 'Invalid file type. Please upload a valid image file.'
-        })
-    
     if not action:
         return render(request, 'image_converter/rotate_flip.html', {
             'error': 'Please select an action (rotate or flip).'
         })
     
+    # Validate image file
+    is_valid, error_response, file_ext = _validate_image_file(
+        uploaded_file, request, 'image_converter/rotate_flip.html'
+    )
+    if not is_valid:
+        return error_response
+    
     try:
         image_data = uploaded_file.read()
-        
-        # Check HEIC support
-        if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-            return render(request, 'image_converter/rotate_flip.html', {
-                'error': 'HEIC/HEIF support requires pillow-heif library.'
-            })
         
         image = Image.open(io.BytesIO(image_data))
         
@@ -623,30 +648,15 @@ def remove_exif(request):
     
     uploaded_file = request.FILES['image']
     
-    # Validate file size
-    max_size = 100 * 1024 * 1024
-    if uploaded_file.size > max_size:
-        return render(request, 'image_converter/remove_exif.html', {
-            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Validate file type
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    if file_ext not in allowed_extensions:
-        return render(request, 'image_converter/remove_exif.html', {
-            'error': 'Invalid file type. Please upload a valid image file.'
-        })
+    # Validate image file
+    is_valid, error_response, file_ext = _validate_image_file(
+        uploaded_file, request, 'image_converter/remove_exif.html'
+    )
+    if not is_valid:
+        return error_response
     
     try:
         image_data = uploaded_file.read()
-        
-        # Check HEIC support
-        if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-            return render(request, 'image_converter/remove_exif.html', {
-                'error': 'HEIC/HEIF support requires pillow-heif library.'
-            })
         
         image = Image.open(io.BytesIO(image_data))
         
@@ -710,30 +720,15 @@ def convert_grayscale(request):
     
     uploaded_file = request.FILES['image']
     
-    # Validate file size
-    max_size = 100 * 1024 * 1024
-    if uploaded_file.size > max_size:
-        return render(request, 'image_converter/grayscale.html', {
-            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Validate file type
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    if file_ext not in allowed_extensions:
-        return render(request, 'image_converter/grayscale.html', {
-            'error': 'Invalid file type. Please upload a valid image file.'
-        })
+    # Validate image file
+    is_valid, error_response, file_ext = _validate_image_file(
+        uploaded_file, request, 'image_converter/grayscale.html'
+    )
+    if not is_valid:
+        return error_response
     
     try:
         image_data = uploaded_file.read()
-        
-        # Check HEIC support
-        if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-            return render(request, 'image_converter/grayscale.html', {
-                'error': 'HEIC/HEIF support requires pillow-heif library.'
-            })
         
         image = Image.open(io.BytesIO(image_data))
         
@@ -797,30 +792,15 @@ def transparent_background(request):
     uploaded_file = request.FILES['image']
     tolerance = int(request.POST.get('tolerance', '10'))
     
-    # Validate file size
-    max_size = 100 * 1024 * 1024
-    if uploaded_file.size > max_size:
-        return render(request, 'image_converter/transparent.html', {
-            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Validate file type
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    if file_ext not in allowed_extensions:
-        return render(request, 'image_converter/transparent.html', {
-            'error': 'Invalid file type. Please upload a valid image file.'
-        })
+    # Validate image file
+    is_valid, error_response, file_ext = _validate_image_file(
+        uploaded_file, request, 'image_converter/transparent.html'
+    )
+    if not is_valid:
+        return error_response
     
     try:
         image_data = uploaded_file.read()
-        
-        # Check HEIC support
-        if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-            return render(request, 'image_converter/transparent.html', {
-                'error': 'HEIC/HEIF support requires pillow-heif library.'
-            })
         
         image = Image.open(io.BytesIO(image_data))
         
@@ -905,27 +885,16 @@ def merge_images(request):
     
     try:
         images = []
-        max_size = 100 * 1024 * 1024
-        allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
         
         for uploaded_file in uploaded_files:
-            if uploaded_file.size > max_size:
-                return render(request, 'image_converter/merge.html', {
-                    'error': f'File {uploaded_file.name} exceeds 100MB limit.'
-                })
-            
-            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            if file_ext not in allowed_extensions:
-                return render(request, 'image_converter/merge.html', {
-                    'error': f'Invalid file type: {uploaded_file.name}'
-                })
+            # Validate each image file
+            is_valid, error_response, file_ext = _validate_image_file(
+                uploaded_file, request, 'image_converter/merge.html'
+            )
+            if not is_valid:
+                return error_response
             
             image_data = uploaded_file.read()
-            
-            if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-                return render(request, 'image_converter/merge.html', {
-                    'error': 'HEIC/HEIF support requires pillow-heif library.'
-                })
             
             image = Image.open(io.BytesIO(image_data))
             
@@ -993,30 +962,15 @@ def watermark_image(request):
     uploaded_file = request.FILES['image']
     watermark_type = request.POST.get('watermark_type', 'text').strip()
     
-    # Validate file size
-    max_size = 100 * 1024 * 1024
-    if uploaded_file.size > max_size:
-        return render(request, 'image_converter/watermark.html', {
-            'error': f'File size exceeds 100MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Validate file type
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.ico', '.avif', '.heic', '.heif']
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    if file_ext not in allowed_extensions:
-        return render(request, 'image_converter/watermark.html', {
-            'error': 'Invalid file type. Please upload a valid image file.'
-        })
+    # Validate image file
+    is_valid, error_response, file_ext = _validate_image_file(
+        uploaded_file, request, 'image_converter/watermark.html'
+    )
+    if not is_valid:
+        return error_response
     
     try:
         image_data = uploaded_file.read()
-        
-        # Check HEIC support
-        if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
-            return render(request, 'image_converter/watermark.html', {
-                'error': 'HEIC/HEIF support requires pillow-heif library.'
-            })
         
         image = Image.open(io.BytesIO(image_data))
         
@@ -1051,14 +1005,8 @@ def watermark_image(request):
             else:
                 color = (255, 255, 255, int(255 * opacity / 100))
             
-            # Try to load font, fallback to default
-            try:
-                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
-            except:
-                try:
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
-                except:
-                    font = ImageFont.load_default()
+            # Load font with fallback
+            font = _load_font(font_size)
             
             # Get text dimensions
             bbox = draw.textbbox((0, 0), text, font=font)
