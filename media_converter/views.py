@@ -14,14 +14,38 @@ def index(request):
     context = {
         'converters': [
             {
+                'name': 'Audio Converter',
+                'url': 'media_converter:audio_converter',
+                'description': 'Convert between MP3, WAV, OGG, FLAC, AAC, AIFF, and M4A formats',
+            },
+            {
+                'name': 'Video Converter',
+                'url': 'media_converter:video_converter',
+                'description': 'Convert between MP4, AVI, MOV, MKV, WebM, and 3GP formats',
+            },
+        ],
+        'audio_utilities': [
+            {
+                'name': 'Audio Splitter',
+                'url': 'media_converter:audio_splitter',
+                'description': 'Split audio files into segments by time',
+            },
+            {
+                'name': 'Audio Merge',
+                'url': 'media_converter:audio_merge',
+                'description': 'Merge multiple audio files into one',
+            },
+            {
+                'name': 'Reduce Audio Noise',
+                'url': 'media_converter:reduce_noise',
+                'description': 'Reduce background noise from audio files',
+            },
+        ],
+        'video_utilities': [
+            {
                 'name': 'MP4 to MP3',
                 'url': 'media_converter:mp4_to_mp3',
                 'description': 'Extract audio from MP4 video files',
-            },
-            {
-                'name': 'Audio Converter',
-                'url': 'media_converter:audio_converter',
-                'description': 'Convert between MP3, WAV, OGG, FLAC, and AAC formats',
             },
             {
                 'name': 'Video to GIF',
@@ -29,9 +53,14 @@ def index(request):
                 'description': 'Convert video clips to animated GIFs',
             },
             {
-                'name': 'Video Converter',
-                'url': 'media_converter:video_converter',
-                'description': 'Convert between MP4, AVI, MOV, MKV, and WebM formats',
+                'name': 'Video Compressor',
+                'url': 'media_converter:video_compressor',
+                'description': 'Compress video files to reduce file size',
+            },
+            {
+                'name': 'Mute Video Audio',
+                'url': 'media_converter:mute_video',
+                'description': 'Remove audio track from video files',
             },
         ]
     }
@@ -72,12 +101,12 @@ def mp4_to_mp3(request):
         })
     
     # Validate file type
-    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv']
+    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.3gp']
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
     
     if file_ext not in allowed_extensions:
         return render(request, 'media_converter/mp4_to_mp3.html', {
-            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, or WMV files.'
+            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
         })
     
     # Check FFmpeg
@@ -182,15 +211,15 @@ def audio_converter(request):
     logger.info(f'Audio converter called - uploaded_file: {uploaded_file.name}, output_format from POST: {request.POST.get("output_format")}, normalized: {output_format}')
     
     # Validate file type
-    allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a']
+    allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.aiff', '.aif']
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
     
     if file_ext not in allowed_extensions:
         return render(request, 'media_converter/audio_converter.html', {
-            'error': 'Invalid file type. Please upload MP3, WAV, OGG, FLAC, or AAC files.'
+            'error': 'Invalid file type. Please upload MP3, WAV, OGG, FLAC, AAC, M4A, or AIFF files.'
         })
     
-    if output_format not in ['mp3', 'wav', 'ogg', 'flac', 'aac']:
+    if output_format not in ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'aiff']:
         return render(request, 'media_converter/audio_converter.html', {
             'error': 'Invalid output format selected.'
         })
@@ -205,8 +234,13 @@ def audio_converter(request):
         # Create temporary directory
         temp_dir = tempfile.mkdtemp()
         input_path = os.path.join(temp_dir, f'input{file_ext}')
-        # For AAC, use .m4a extension but mp4 container format
-        output_ext = output_format if output_format != 'aac' else 'm4a'
+        # Determine output extension
+        if output_format == 'aac':
+            output_ext = 'm4a'  # AAC uses m4a container
+        elif output_format == 'aiff':
+            output_ext = 'aiff'
+        else:
+            output_ext = output_format
         output_path = os.path.join(temp_dir, f'output.{output_ext}')
         
         # Save uploaded file
@@ -221,6 +255,8 @@ def audio_converter(request):
             'ogg': 'libvorbis',
             'flac': 'flac',
             'aac': 'aac',
+            'm4a': 'aac',  # M4A uses AAC codec
+            'aiff': 'pcm_s16be',  # AIFF uses big-endian PCM
         }
         
         # Format map for explicit format specification
@@ -230,6 +266,8 @@ def audio_converter(request):
             'ogg': 'ogg',
             'flac': 'flac',
             'aac': 'm4a',  # AAC typically uses m4a container
+            'm4a': 'mp4',  # M4A uses MP4 container
+            'aiff': 'aiff',
         }
         
         # Build FFmpeg command with proper flags to force re-encoding
@@ -257,10 +295,18 @@ def audio_converter(request):
             cmd.extend(['-f', 'flac'])
         elif output_format == 'aac':
             # For AAC, use MP4 container format (M4A is just MP4 with audio)
-            # The muxer error suggests we need to use mp4 format, not m4a
             cmd.extend(['-b:a', '192k'])  # Bitrate
             cmd.extend(['-f', 'mp4'])  # Use mp4 container for AAC (works with .m4a extension)
             cmd.extend(['-movflags', '+faststart'])  # Optimize for streaming
+        elif output_format == 'm4a':
+            # M4A uses AAC codec in MP4 container
+            cmd.extend(['-b:a', '192k'])  # Bitrate
+            cmd.extend(['-f', 'mp4'])  # M4A uses MP4 container
+            cmd.extend(['-movflags', '+faststart'])  # Optimize for streaming
+        elif output_format == 'aiff':
+            # AIFF uses big-endian PCM
+            cmd.extend(['-sample_fmt', 's16'])  # 16-bit signed PCM
+            cmd.extend(['-f', 'aiff'])
         elif output_format == 'mp3':
             cmd.extend(['-b:a', '192k'])  # Bitrate
             cmd.extend(['-f', 'mp3'])
@@ -356,9 +402,13 @@ def audio_converter(request):
             # FLAC files start with "fLaC"
             if magic_bytes[:4] == b'fLaC':
                 format_verified = True
-        elif output_format == 'aac':
+        elif output_format == 'aac' or output_format == 'm4a':
             # AAC/M4A files can have various headers, check for common ones
             if magic_bytes[4:8] == b'ftyp' or magic_bytes[:2] == b'\xff\xf1':
+                format_verified = True
+        elif output_format == 'aiff':
+            # AIFF files start with "FORM" and contain "AIFF"
+            if magic_bytes[:4] == b'FORM' and b'AIFF' in magic_bytes:
                 format_verified = True
         
         if not format_verified:
@@ -392,6 +442,8 @@ def audio_converter(request):
             'ogg': 'audio/ogg',
             'flac': 'audio/flac',
             'aac': 'audio/aac',
+            'm4a': 'audio/mp4',
+            'aiff': 'audio/x-aiff',
         }
         
         # Create response
@@ -497,12 +549,12 @@ def video_to_gif(request):
         })
     
     # Validate file type
-    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv']
+    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.3gp']
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
     
     if file_ext not in allowed_extensions:
         return render(request, 'media_converter/video_to_gif.html', {
-            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, or WMV files.'
+            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
         })
     
     # Check FFmpeg
@@ -655,15 +707,15 @@ def video_converter(request):
     logger.info(f'Video conversion started: {uploaded_file.name}, format: {output_format}, size: {uploaded_file.size} bytes')
     
     # Validate file type
-    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv']
+    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.3gp']
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
     
     if file_ext not in allowed_extensions:
         return render(request, 'media_converter/video_converter.html', {
-            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, or WMV files.'
+            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
         })
     
-    if output_format not in ['mp4', 'avi', 'mov', 'mkv', 'webm']:
+    if output_format not in ['mp4', 'avi', 'mov', 'mkv', 'webm', '3gp']:
         return render(request, 'media_converter/video_converter.html', {
             'error': 'Invalid output format selected.'
         })
@@ -711,6 +763,21 @@ def video_converter(request):
                 '-preset', 'ultrafast',  # Fastest encoding (less CPU intensive)
                 '-crf', '28',  # Slightly lower quality but much faster
                 '-threads', '2',  # Limit to 2 threads to prevent system overload
+                '-y',
+                output_path
+            ]
+        elif output_format == '3gp':
+            cmd = [
+                ffmpeg_path,
+                '-i', input_path,
+                '-c:v', 'libx264',  # Video codec
+                '-c:a', 'aac',  # Audio codec
+                '-preset', 'ultrafast',  # Fastest encoding (less CPU intensive)
+                '-crf', '28',  # Slightly lower quality but much faster
+                '-threads', '2',  # Limit to 2 threads to prevent system overload
+                '-s', '320x240',  # Common 3GP resolution
+                '-b:v', '128k',  # Video bitrate for 3GP
+                '-b:a', '64k',  # Audio bitrate for 3GP
                 '-y',
                 output_path
             ]
@@ -796,6 +863,7 @@ def video_converter(request):
             'mov': 'video/quicktime',
             'mkv': 'video/x-matroska',
             'webm': 'video/webm',
+            '3gp': 'video/3gpp',
         }
         
         # Create response
@@ -830,5 +898,971 @@ def video_converter(request):
                 print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
                 pass
         return render(request, 'media_converter/video_converter.html', {
+            'error': f'Error processing file: {str(e)}'
+        })
+
+def video_compressor(request):
+    """Compress video files to reduce file size"""
+    if request.method != 'POST':
+        return render(request, 'media_converter/video_compressor.html')
+    
+    if 'video_file' not in request.FILES:
+        return render(request, 'media_converter/video_compressor.html', {
+            'error': 'Please upload a video file.'
+        })
+    
+    uploaded_file = request.FILES['video_file']
+    compression_level = request.POST.get('compression_level', 'medium').strip()
+    
+    # Validate file size (max 700MB for videos)
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        return render(request, 'media_converter/video_compressor.html', {
+            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
+    
+    # Validate file type
+    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.3gp']
+    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+    
+    if file_ext not in allowed_extensions:
+        return render(request, 'media_converter/video_compressor.html', {
+            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
+        })
+    
+    if compression_level not in ['low', 'medium', 'high']:
+        compression_level = 'medium'
+    
+    # Check FFmpeg
+    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
+    if error:
+        return render(request, 'media_converter/video_compressor.html', {'error': error})
+    
+    temp_dir = None
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        input_path = os.path.join(temp_dir, f'input{file_ext}')
+        output_path = os.path.join(temp_dir, f'compressed{file_ext}')
+        
+        # Save uploaded file
+        with open(input_path, 'wb') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
+        
+        # Get file size
+        file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+        
+        # Compression settings based on level
+        if compression_level == 'low':
+            # Light compression - minimal quality loss
+            crf = '23'
+            preset = 'medium'
+            video_bitrate = None
+        elif compression_level == 'high':
+            # Heavy compression - more quality loss, smaller file
+            crf = '32'
+            preset = 'ultrafast'
+            video_bitrate = '500k'
+        else:  # medium
+            # Balanced compression
+            crf = '28'
+            preset = 'fast'
+            video_bitrate = None
+        
+        # Build FFmpeg command for compression
+        cmd = [
+            ffmpeg_path,
+            '-i', input_path,
+            '-c:v', 'libx264',  # Video codec
+            '-c:a', 'aac',  # Audio codec
+            '-preset', preset,
+            '-crf', crf,
+            '-threads', '2',  # Limit threads
+        ]
+        
+        # Add bitrate limit for high compression
+        if video_bitrate:
+            cmd.extend(['-b:v', video_bitrate])
+            cmd.extend(['-maxrate', video_bitrate])
+            cmd.extend(['-bufsize', str(int(video_bitrate.replace('k', '')) * 2) + 'k'])
+        
+        # Scale down resolution for high compression
+        if compression_level == 'high':
+            cmd.extend(['-vf', 'scale=iw*min(1280/iw\\,720/ih):ih*min(1280/iw\\,720/ih)'])
+        
+        cmd.extend(['-movflags', '+faststart', '-y', output_path])
+        
+        # Adjust timeout based on file size
+        timeout_seconds = 600
+        if file_size_mb > 300:
+            timeout_seconds = 1200
+        elif file_size_mb > 200:
+            timeout_seconds = 900
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+        
+        # Check if compression failed
+        if result.returncode != 0:
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/video_compressor.html', {
+                'error': f'Compression failed: {full_error}'
+            })
+        
+        if not os.path.exists(output_path):
+            error_msg = result.stderr if result.stderr else 'Output file was not created'
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/video_compressor.html', {
+                'error': f'Compression failed: {error_msg[:500]}'
+            })
+        
+        # Read output file
+        with open(output_path, 'rb') as f:
+            file_content = f.read()
+        
+        if len(file_content) == 0:
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/video_compressor.html', {
+                'error': 'Compression failed - output file is empty.'
+            })
+        
+        # Calculate compression ratio
+        original_size = os.path.getsize(input_path)
+        compressed_size = len(file_content)
+        compression_ratio = (1 - compressed_size / original_size) * 100
+        
+        # Clean up
+        try:
+            shutil.rmtree(temp_dir)
+        except (OSError, PermissionError):
+            pass
+        
+        # Determine content type
+        content_type_map = {
+            '.mp4': 'video/mp4',
+            '.avi': 'video/x-msvideo',
+            '.mov': 'video/quicktime',
+            '.mkv': 'video/x-matroska',
+            '.webm': 'video/webm',
+            '.flv': 'video/x-flv',
+            '.wmv': 'video/x-ms-wmv',
+            '.3gp': 'video/3gpp',
+        }
+        content_type = content_type_map.get(file_ext, 'video/mp4')
+        
+        # Create response
+        safe_filename = os.path.splitext(uploaded_file.name)[0] + '_compressed' + file_ext
+        safe_filename = re.sub(r'[^\w\s-.]', '', safe_filename).strip()
+        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
+        
+        response = HttpResponse(file_content, content_type=content_type)
+        response['Content-Length'] = len(file_content)
+        response['X-Filename'] = safe_filename
+        response['X-Compression-Ratio'] = f'{compression_ratio:.1f}%'
+        return response
+        
+    except subprocess.TimeoutExpired:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/video_compressor.html', {
+            'error': 'Compression timed out. The video might be too long or complex. Try a smaller file.'
+        })
+    except Exception as e:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/video_compressor.html', {
+            'error': f'Error processing file: {str(e)}'
+        })
+
+def mute_video(request):
+    """Remove audio track from video"""
+    if request.method != 'POST':
+        return render(request, 'media_converter/mute_video.html')
+    
+    if 'video_file' not in request.FILES:
+        return render(request, 'media_converter/mute_video.html', {
+            'error': 'Please upload a video file.'
+        })
+    
+    uploaded_file = request.FILES['video_file']
+    
+    # Validate file size (max 700MB for videos)
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        return render(request, 'media_converter/mute_video.html', {
+            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
+    
+    # Validate file type
+    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.3gp']
+    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+    
+    if file_ext not in allowed_extensions:
+        return render(request, 'media_converter/mute_video.html', {
+            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
+        })
+    
+    # Check FFmpeg
+    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
+    if error:
+        return render(request, 'media_converter/mute_video.html', {'error': error})
+    
+    temp_dir = None
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        input_path = os.path.join(temp_dir, f'input{file_ext}')
+        output_path = os.path.join(temp_dir, f'muted{file_ext}')
+        
+        # Save uploaded file
+        with open(input_path, 'wb') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
+        
+        # Get file size
+        file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+        
+        # Build FFmpeg command to remove audio
+        # Use stream copy for video (fast) and exclude audio
+        cmd = [
+            ffmpeg_path,
+            '-i', input_path,
+            '-c:v', 'copy',  # Copy video stream (no re-encoding, fast)
+            '-an',  # No audio
+            '-y',
+            output_path
+        ]
+        
+        # Adjust timeout based on file size
+        timeout_seconds = 300  # 5 minutes default (should be fast with stream copy)
+        if file_size_mb > 300:
+            timeout_seconds = 600
+        elif file_size_mb > 200:
+            timeout_seconds = 450
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+        
+        # Check if processing failed
+        if result.returncode != 0:
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/mute_video.html', {
+                'error': f'Processing failed: {full_error}'
+            })
+        
+        if not os.path.exists(output_path):
+            error_msg = result.stderr if result.stderr else 'Output file was not created'
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/mute_video.html', {
+                'error': f'Processing failed: {error_msg[:500]}'
+            })
+        
+        # Read output file
+        with open(output_path, 'rb') as f:
+            file_content = f.read()
+        
+        if len(file_content) == 0:
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/mute_video.html', {
+                'error': 'Processing failed - output file is empty.'
+            })
+        
+        # Clean up
+        try:
+            shutil.rmtree(temp_dir)
+        except (OSError, PermissionError):
+            pass
+        
+        # Determine content type
+        content_type_map = {
+            '.mp4': 'video/mp4',
+            '.avi': 'video/x-msvideo',
+            '.mov': 'video/quicktime',
+            '.mkv': 'video/x-matroska',
+            '.webm': 'video/webm',
+            '.flv': 'video/x-flv',
+            '.wmv': 'video/x-ms-wmv',
+            '.3gp': 'video/3gpp',
+        }
+        content_type = content_type_map.get(file_ext, 'video/mp4')
+        
+        # Create response
+        safe_filename = os.path.splitext(uploaded_file.name)[0] + '_muted' + file_ext
+        safe_filename = re.sub(r'[^\w\s-.]', '', safe_filename).strip()
+        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
+        
+        response = HttpResponse(file_content, content_type=content_type)
+        response['Content-Length'] = len(file_content)
+        response['X-Filename'] = safe_filename
+        return response
+        
+    except subprocess.TimeoutExpired:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/mute_video.html', {
+            'error': 'Processing timed out. The video might be too long. Try a smaller file.'
+        })
+    except Exception as e:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/mute_video.html', {
+            'error': f'Error processing file: {str(e)}'
+        })
+
+def audio_splitter(request):
+    """Split audio files into segments"""
+    if request.method != 'POST':
+        return render(request, 'media_converter/audio_splitter.html')
+    
+    if 'audio_file' not in request.FILES:
+        return render(request, 'media_converter/audio_splitter.html', {
+            'error': 'Please upload an audio file.'
+        })
+    
+    uploaded_file = request.FILES['audio_file']
+    start_time = request.POST.get('start_time', '0').strip()
+    duration = request.POST.get('duration', '').strip()
+    end_time = request.POST.get('end_time', '').strip()
+    
+    # Validate file size
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        return render(request, 'media_converter/audio_splitter.html', {
+            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
+    
+    # Validate file type
+    allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.aiff', '.aif']
+    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+    
+    if file_ext not in allowed_extensions:
+        return render(request, 'media_converter/audio_splitter.html', {
+            'error': 'Invalid file type. Please upload MP3, WAV, OGG, FLAC, AAC, M4A, or AIFF files.'
+        })
+    
+    # Validate time parameters
+    try:
+        start_seconds = float(start_time) if start_time else 0.0
+        if start_seconds < 0:
+            return render(request, 'media_converter/audio_splitter.html', {
+                'error': 'Start time cannot be negative.'
+            })
+        
+        if duration and end_time:
+            return render(request, 'media_converter/audio_splitter.html', {
+                'error': 'Please specify either duration or end time, not both.'
+            })
+        
+        if not duration and not end_time:
+            return render(request, 'media_converter/audio_splitter.html', {
+                'error': 'Please specify either duration or end time.'
+            })
+        
+        if duration:
+            duration_seconds = float(duration)
+            if duration_seconds <= 0:
+                return render(request, 'media_converter/audio_splitter.html', {
+                    'error': 'Duration must be greater than 0.'
+                })
+            end_seconds = start_seconds + duration_seconds
+        else:
+            end_seconds = float(end_time)
+            if end_seconds <= start_seconds:
+                return render(request, 'media_converter/audio_splitter.html', {
+                    'error': 'End time must be greater than start time.'
+                })
+            duration_seconds = end_seconds - start_seconds
+        
+    except ValueError:
+        return render(request, 'media_converter/audio_splitter.html', {
+            'error': 'Invalid time format. Please use numbers (e.g., 10.5 for 10.5 seconds).'
+        })
+    
+    # Check FFmpeg
+    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
+    if error:
+        return render(request, 'media_converter/audio_splitter.html', {'error': error})
+    
+    temp_dir = None
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        input_path = os.path.join(temp_dir, f'input{file_ext}')
+        output_path = os.path.join(temp_dir, f'split{file_ext}')
+        
+        # Save uploaded file
+        with open(input_path, 'wb') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
+        
+        # Build FFmpeg command to extract segment
+        # Try copy first (fast), fall back to re-encoding if needed
+        cmd = [
+            ffmpeg_path,
+            '-i', input_path,
+            '-ss', str(start_seconds),  # Start time
+            '-t', str(duration_seconds),  # Duration
+            '-c:a', 'copy',  # Copy audio stream (fast, no re-encoding)
+            '-y',
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        # If copy fails, re-encode
+        if result.returncode != 0 or not os.path.exists(output_path):
+            # Determine codec based on format
+            codec_map = {
+                '.mp3': 'libmp3lame',
+                '.wav': 'pcm_s16le',
+                '.ogg': 'libvorbis',
+                '.flac': 'flac',
+                '.aac': 'aac',
+                '.m4a': 'aac',
+                '.aiff': 'pcm_s16be',
+                '.aif': 'pcm_s16be',
+            }
+            
+            format_map = {
+                '.mp3': 'mp3',
+                '.wav': 'wav',
+                '.ogg': 'ogg',
+                '.flac': 'flac',
+                '.aac': 'mp4',
+                '.m4a': 'mp4',
+                '.aiff': 'aiff',
+                '.aif': 'aiff',
+            }
+            
+            codec = codec_map.get(file_ext, 'libmp3lame')
+            output_format = format_map.get(file_ext, 'mp3')
+            
+            cmd = [
+                ffmpeg_path,
+                '-i', input_path,
+                '-ss', str(start_seconds),
+                '-t', str(duration_seconds),
+                '-c:a', codec,
+                '-ar', '44100',
+                '-ac', '2',
+            ]
+            
+            if output_format == 'mp3':
+                cmd.extend(['-b:a', '192k', '-f', 'mp3'])
+            elif output_format == 'wav':
+                cmd.extend(['-sample_fmt', 's16', '-f', 'wav'])
+            elif output_format == 'flac':
+                cmd.extend(['-compression_level', '5', '-f', 'flac'])
+            elif output_format in ['mp4', 'aac', 'm4a']:
+                cmd.extend(['-b:a', '192k', '-f', 'mp4', '-movflags', '+faststart'])
+            elif output_format == 'aiff':
+                cmd.extend(['-sample_fmt', 's16', '-f', 'aiff'])
+            else:
+                cmd.extend(['-f', output_format])
+            
+            cmd.extend(['-y', output_path])
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/audio_splitter.html', {
+                'error': f'Splitting failed: {full_error}'
+            })
+        
+        # Read output file
+        with open(output_path, 'rb') as f:
+            file_content = f.read()
+        
+        if len(file_content) == 0:
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/audio_splitter.html', {
+                'error': 'Splitting failed - output file is empty.'
+            })
+        
+        # Clean up
+        try:
+            shutil.rmtree(temp_dir)
+        except (OSError, PermissionError):
+            pass
+        
+        # Determine content type
+        content_type_map = {
+            '.mp3': 'audio/mpeg',
+            '.wav': 'audio/wav',
+            '.ogg': 'audio/ogg',
+            '.flac': 'audio/flac',
+            '.aac': 'audio/aac',
+            '.m4a': 'audio/mp4',
+            '.aiff': 'audio/x-aiff',
+            '.aif': 'audio/x-aiff',
+        }
+        content_type = content_type_map.get(file_ext, 'audio/mpeg')
+        
+        # Create response
+        safe_filename = os.path.splitext(uploaded_file.name)[0] + f'_split_{int(start_seconds)}s-{int(end_seconds)}s{file_ext}'
+        safe_filename = re.sub(r'[^\w\s-.]', '', safe_filename).strip()
+        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
+        
+        response = HttpResponse(file_content, content_type=content_type)
+        response['Content-Length'] = len(file_content)
+        response['X-Filename'] = safe_filename
+        return response
+        
+    except subprocess.TimeoutExpired:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/audio_splitter.html', {
+            'error': 'Processing timed out. Please try again.'
+        })
+    except Exception as e:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/audio_splitter.html', {
+            'error': f'Error processing file: {str(e)}'
+        })
+
+def audio_merge(request):
+    """Merge multiple audio files into one"""
+    if request.method != 'POST':
+        return render(request, 'media_converter/audio_merge.html')
+    
+    if 'audio_files' not in request.FILES:
+        return render(request, 'media_converter/audio_merge.html', {
+            'error': 'Please upload at least one audio file.'
+        })
+    
+    uploaded_files = request.FILES.getlist('audio_files')
+    
+    if len(uploaded_files) < 2:
+        return render(request, 'media_converter/audio_merge.html', {
+            'error': 'Please upload at least 2 audio files to merge.'
+        })
+    
+    # Validate files
+    max_size = 700 * 1024 * 1024
+    allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.aiff', '.aif']
+    
+    for uploaded_file in uploaded_files:
+        if uploaded_file.size > max_size:
+            return render(request, 'media_converter/audio_merge.html', {
+                'error': f'File {uploaded_file.name} exceeds 700MB limit.'
+            })
+        
+        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+        if file_ext not in allowed_extensions:
+            return render(request, 'media_converter/audio_merge.html', {
+                'error': f'Invalid file type: {uploaded_file.name}'
+            })
+    
+    # Check FFmpeg
+    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
+    if error:
+        return render(request, 'media_converter/audio_merge.html', {'error': error})
+    
+    temp_dir = None
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        input_paths = []
+        file_list_path = os.path.join(temp_dir, 'file_list.txt')
+        
+        # Save all uploaded files
+        for i, uploaded_file in enumerate(uploaded_files):
+            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+            input_path = os.path.join(temp_dir, f'input_{i}{file_ext}')
+            input_paths.append(input_path)
+            
+            with open(input_path, 'wb') as f:
+                for chunk in uploaded_file.chunks():
+                    f.write(chunk)
+        
+        # Create file list for FFmpeg concat
+        with open(file_list_path, 'w') as f:
+            for input_path in input_paths:
+                # Escape single quotes and backslashes for FFmpeg
+                escaped_path = input_path.replace("'", "'\\''").replace("\\", "\\\\")
+                f.write(f"file '{escaped_path}'\n")
+        
+        # Determine output format (use first file's format or MP3)
+        output_ext = os.path.splitext(uploaded_files[0].name)[1].lower()
+        if output_ext not in allowed_extensions:
+            output_ext = '.mp3'
+        
+        output_path = os.path.join(temp_dir, f'merged{output_ext}')
+        
+        # Build FFmpeg command to merge
+        # First, convert all to same format if needed, then concat
+        cmd = [
+            ffmpeg_path,
+            '-f', 'concat',
+            '-safe', '0',
+            '-i', file_list_path,
+            '-c', 'copy',  # Copy streams (fast, no re-encoding if formats match)
+            '-y',
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        
+        # If concat with copy fails (different formats), re-encode
+        if result.returncode != 0:
+            # Re-encode all to same format
+            codec_map = {
+                '.mp3': 'libmp3lame',
+                '.wav': 'pcm_s16le',
+                '.ogg': 'libvorbis',
+                '.flac': 'flac',
+                '.aac': 'aac',
+                '.m4a': 'aac',
+                '.aiff': 'pcm_s16be',
+                '.aif': 'pcm_s16be',
+            }
+            
+            codec = codec_map.get(output_ext, 'libmp3lame')
+            format_map = {
+                '.mp3': 'mp3',
+                '.wav': 'wav',
+                '.ogg': 'ogg',
+                '.flac': 'flac',
+                '.aac': 'mp4',
+                '.m4a': 'mp4',
+                '.aiff': 'aiff',
+                '.aif': 'aiff',
+            }
+            output_format = format_map.get(output_ext, 'mp3')
+            
+            cmd = [
+                ffmpeg_path,
+                '-f', 'concat',
+                '-safe', '0',
+                '-i', file_list_path,
+                '-c:a', codec,
+                '-ar', '44100',
+                '-ac', '2',
+            ]
+            
+            if output_format == 'mp3':
+                cmd.extend(['-b:a', '192k'])
+            elif output_format == 'wav':
+                cmd.extend(['-sample_fmt', 's16'])
+            elif output_format in ['mp4', 'aac', 'm4a']:
+                cmd.extend(['-b:a', '192k'])
+                cmd.extend(['-movflags', '+faststart'])
+            
+            cmd.extend(['-f', output_format, '-y', output_path])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/audio_merge.html', {
+                'error': f'Merging failed: {full_error}'
+            })
+        
+        # Read output file
+        with open(output_path, 'rb') as f:
+            file_content = f.read()
+        
+        if len(file_content) == 0:
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/audio_merge.html', {
+                'error': 'Merging failed - output file is empty.'
+            })
+        
+        # Clean up
+        try:
+            shutil.rmtree(temp_dir)
+        except (OSError, PermissionError):
+            pass
+        
+        # Determine content type
+        content_type_map = {
+            '.mp3': 'audio/mpeg',
+            '.wav': 'audio/wav',
+            '.ogg': 'audio/ogg',
+            '.flac': 'audio/flac',
+            '.aac': 'audio/aac',
+            '.m4a': 'audio/mp4',
+            '.aiff': 'audio/x-aiff',
+            '.aif': 'audio/x-aiff',
+        }
+        content_type = content_type_map.get(output_ext, 'audio/mpeg')
+        
+        # Create response
+        safe_filename = 'merged_audio' + output_ext
+        response = HttpResponse(file_content, content_type=content_type)
+        response['Content-Length'] = len(file_content)
+        response['X-Filename'] = safe_filename
+        return response
+        
+    except subprocess.TimeoutExpired:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/audio_merge.html', {
+            'error': 'Processing timed out. Please try again.'
+        })
+    except Exception as e:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/audio_merge.html', {
+            'error': f'Error processing files: {str(e)}'
+        })
+
+def reduce_noise(request):
+    """Reduce background noise from audio files"""
+    if request.method != 'POST':
+        return render(request, 'media_converter/reduce_noise.html')
+    
+    if 'audio_file' not in request.FILES:
+        return render(request, 'media_converter/reduce_noise.html', {
+            'error': 'Please upload an audio file.'
+        })
+    
+    uploaded_file = request.FILES['audio_file']
+    noise_reduction_level = request.POST.get('noise_reduction', 'medium').strip()
+    
+    # Validate file size
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        return render(request, 'media_converter/reduce_noise.html', {
+            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        })
+    
+    # Validate file type
+    allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.aiff', '.aif']
+    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+    
+    if file_ext not in allowed_extensions:
+        return render(request, 'media_converter/reduce_noise.html', {
+            'error': 'Invalid file type. Please upload MP3, WAV, OGG, FLAC, AAC, M4A, or AIFF files.'
+        })
+    
+    if noise_reduction_level not in ['low', 'medium', 'high']:
+        noise_reduction_level = 'medium'
+    
+    # Check FFmpeg
+    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
+    if error:
+        return render(request, 'media_converter/reduce_noise.html', {'error': error})
+    
+    temp_dir = None
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        input_path = os.path.join(temp_dir, f'input{file_ext}')
+        output_path = os.path.join(temp_dir, f'denoised{file_ext}')
+        
+        # Save uploaded file
+        with open(input_path, 'wb') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
+        
+        # Noise reduction settings
+        # Using FFmpeg's highpass and lowpass filters combined with afftdn (FFT denoise)
+        if noise_reduction_level == 'low':
+            # Light noise reduction
+            filter_complex = 'highpass=f=80,lowpass=f=15000,afftdn=nr=10:nf=-25'
+        elif noise_reduction_level == 'high':
+            # Aggressive noise reduction
+            filter_complex = 'highpass=f=100,lowpass=f=12000,afftdn=nr=20:nf=-30'
+        else:  # medium
+            # Balanced noise reduction
+            filter_complex = 'highpass=f=90,lowpass=f=14000,afftdn=nr=15:nf=-27'
+        
+        # Build FFmpeg command
+        # Determine output codec based on input format
+        codec_map = {
+            '.mp3': 'libmp3lame',
+            '.wav': 'pcm_s16le',
+            '.ogg': 'libvorbis',
+            '.flac': 'flac',
+            '.aac': 'aac',
+            '.m4a': 'aac',
+            '.aiff': 'pcm_s16be',
+            '.aif': 'pcm_s16be',
+        }
+        
+        format_map = {
+            '.mp3': 'mp3',
+            '.wav': 'wav',
+            '.ogg': 'ogg',
+            '.flac': 'flac',
+            '.aac': 'mp4',
+            '.m4a': 'mp4',
+            '.aiff': 'aiff',
+            '.aif': 'aiff',
+        }
+        
+        codec = codec_map.get(file_ext, 'libmp3lame')
+        output_format = format_map.get(file_ext, 'mp3')
+        
+        cmd = [
+            ffmpeg_path,
+            '-i', input_path,
+            '-af', filter_complex,
+            '-c:a', codec,
+            '-ar', '44100',
+            '-ac', '2',
+        ]
+        
+        if output_format == 'mp3':
+            cmd.extend(['-b:a', '192k', '-f', 'mp3'])
+        elif output_format == 'wav':
+            cmd.extend(['-sample_fmt', 's16', '-f', 'wav'])
+        elif output_format == 'flac':
+            cmd.extend(['-compression_level', '5', '-f', 'flac'])
+        elif output_format in ['mp4', 'aac', 'm4a']:
+            cmd.extend(['-b:a', '192k', '-f', 'mp4', '-movflags', '+faststart'])
+        elif output_format == 'aiff':
+            cmd.extend(['-sample_fmt', 's16', '-f', 'aiff'])
+        else:
+            cmd.extend(['-f', output_format])
+        
+        cmd.extend(['-y', output_path])
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/reduce_noise.html', {
+                'error': f'Noise reduction failed: {full_error}'
+            })
+        
+        # Read output file
+        with open(output_path, 'rb') as f:
+            file_content = f.read()
+        
+        if len(file_content) == 0:
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/reduce_noise.html', {
+                'error': 'Noise reduction failed - output file is empty.'
+            })
+        
+        # Clean up
+        try:
+            shutil.rmtree(temp_dir)
+        except (OSError, PermissionError):
+            pass
+        
+        # Determine content type
+        content_type_map = {
+            '.mp3': 'audio/mpeg',
+            '.wav': 'audio/wav',
+            '.ogg': 'audio/ogg',
+            '.flac': 'audio/flac',
+            '.aac': 'audio/aac',
+            '.m4a': 'audio/mp4',
+            '.aiff': 'audio/x-aiff',
+            '.aif': 'audio/x-aiff',
+        }
+        content_type = content_type_map.get(file_ext, 'audio/mpeg')
+        
+        # Create response
+        safe_filename = os.path.splitext(uploaded_file.name)[0] + '_denoised' + file_ext
+        safe_filename = re.sub(r'[^\w\s-.]', '', safe_filename).strip()
+        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
+        
+        response = HttpResponse(file_content, content_type=content_type)
+        response['Content-Length'] = len(file_content)
+        response['X-Filename'] = safe_filename
+        return response
+        
+    except subprocess.TimeoutExpired:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/reduce_noise.html', {
+            'error': 'Processing timed out. Please try again.'
+        })
+    except Exception as e:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/reduce_noise.html', {
             'error': f'Error processing file: {str(e)}'
         })

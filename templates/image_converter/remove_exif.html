@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Remove EXIF Metadata - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Remove EXIF Metadata</h1>
+    <p>Remove EXIF data from your images for privacy</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.2rem;">🔒</span>
+            <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers.</span>
+        </p>
+    </div>
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
+        <p style="margin: 0; color: #92400e; font-size: 0.9rem;">
+            <strong>What is EXIF data?</strong> EXIF (Exchangeable Image File Format) metadata can include camera settings, GPS location, date/time, and other information. Removing it helps protect your privacy.
+        </p>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" id="exifForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Image File</label>
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="image" id="image" accept="image/*" required>
+                <div id="uploadContent">
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
+                </div>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">Remove EXIF & Download</button>
+    </form>
+</div>
+
+<a href="{% url 'image_converter:index' %}" class="btn btn-secondary">← Back to Image Conversion & Editing</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('image');
+    const uploadArea = document.getElementById('uploadArea');
+    const uploadContent = document.getElementById('uploadContent');
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadContent.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+        }
+    });
+    
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--primary-color)';
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border-color)';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            uploadContent.querySelector('p').textContent = 'Selected: ' + files[0].name;
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

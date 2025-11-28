@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block title %}Image Watermark - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Image Watermark</h1>
+    <p>Add text or image watermark to your images</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.2rem;">🔒</span>
+            <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers.</span>
+        </p>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" id="watermarkForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Image File</label>
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="image" id="image" accept="image/*" required>
+                <div id="uploadContent">
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label">Watermark Type</label>
+            <div class="grid grid-2" style="gap: 1rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer;">
+                    <input type="radio" name="watermark_type" value="text" checked onchange="toggleWatermarkType()">
+                    <span>📝 Text Watermark</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer;">
+                    <input type="radio" name="watermark_type" value="image" onchange="toggleWatermarkType()">
+                    <span>🖼️ Image Watermark</span>
+                </label>
+            </div>
+        </div>
+        
+        <div id="textWatermarkOptions">
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label class="form-label" for="watermark_text">Watermark Text</label>
+                <input type="text" class="form-control" id="watermark_text" name="watermark_text" placeholder="Enter watermark text" maxlength="100">
+            </div>
+            
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label" for="font_size">Font Size</label>
+                <input type="number" class="form-control" id="font_size" name="font_size" min="12" max="200" value="36">
+            </div>
+            
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label" for="color">Text Color</label>
+                <input type="color" class="form-control" id="color" name="color" value="#FFFFFF" style="height: 40px;">
+            </div>
+        </div>
+        
+        <div id="imageWatermarkOptions" style="display: none;">
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label class="form-label">Watermark Image</label>
+                <div class="file-upload-area" style="padding: 1.5rem;">
+                    <input type="file" name="watermark_image" id="watermark_image" accept="image/*">
+                    <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">Upload watermark image (PNG with transparency works best)</p>
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label" for="scale">Watermark Size (% of image)</label>
+                <input type="range" class="form-control" id="scale" name="scale" min="5" max="50" value="20" 
+                       oninput="document.getElementById('scaleValue').textContent = this.value + '%'">
+                <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Small</span>
+                    <span style="font-size: 0.9rem; font-weight: 600;" id="scaleValue">20%</span>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Large</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label" for="position">Position</label>
+            <select class="form-select" id="position" name="position">
+                <option value="top-left">Top Left</option>
+                <option value="top-right">Top Right</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-right" selected>Bottom Right</option>
+                <option value="center">Center</option>
+            </select>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label" for="opacity">Opacity</label>
+            <input type="range" class="form-control" id="opacity" name="opacity" min="10" max="100" value="50" 
+                   oninput="document.getElementById('opacityValue').textContent = this.value + '%'">
+            <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+                <span style="font-size: 0.85rem; color: var(--text-secondary);">Transparent</span>
+                <span style="font-size: 0.9rem; font-weight: 600;" id="opacityValue">50%</span>
+                <span style="font-size: 0.85rem; color: var(--text-secondary);">Opaque</span>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">Add Watermark & Download</button>
+    </form>
+</div>
+
+<a href="{% url 'image_converter:index' %}" class="btn btn-secondary">← Back to Image Conversion & Editing</a>
+
+{% block extra_js %}
+<script>
+function toggleWatermarkType() {
+    const watermarkType = document.querySelector('input[name="watermark_type"]:checked').value;
+    const textOptions = document.getElementById('textWatermarkOptions');
+    const imageOptions = document.getElementById('imageWatermarkOptions');
+    
+    if (watermarkType === 'text') {
+        textOptions.style.display = 'block';
+        imageOptions.style.display = 'none';
+        document.getElementById('watermark_text').required = true;
+        document.getElementById('watermark_image').required = false;
+    } else {
+        textOptions.style.display = 'none';
+        imageOptions.style.display = 'block';
+        document.getElementById('watermark_text').required = false;
+        document.getElementById('watermark_image').required = true;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('image');
+    const uploadArea = document.getElementById('uploadArea');
+    const uploadContent = document.getElementById('uploadContent');
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadContent.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+        }
+    });
+    
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--primary-color)';
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border-color)';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            uploadContent.querySelector('p').textContent = 'Selected: ' + files[0].name;
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

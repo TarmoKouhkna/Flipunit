@@ -1,18 +1,43 @@
 {% extends 'base.html' %}
 
-{% block title %}Image Converters - {{ SITE_NAME }}{% endblock %}
+{% block title %}Image Conversion & Editing - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online image conversion and editing tools - Convert between JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC formats. Resize, rotate, watermark, and edit images. Fast, secure, no registration required.{% endblock %}
 
 {% block content %}
 <div class="hero">
-    <h1>Image Converters</h1>
-    <p>Convert images between different formats</p>
+    <h1>Image Conversion & Editing</h1>
+    <p>Convert images between different formats and edit them with powerful tools</p>
 </div>
 
-<div class="grid grid-2">
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+    <h3 style="margin-bottom: 0.75rem; color: var(--primary-color);">✨ Features</h3>
+    <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+        <li>Support for multiple formats: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</li>
+        <li>Image preview before conversion</li>
+        <li>Quality control for JPEG, WebP, AVIF, and HEIC formats</li>
+        <li>Drag and drop file upload</li>
+        <li>Image metadata display (dimensions, file size, format)</li>
+        <li>Advanced editing tools: resize, rotate, flip, watermark, merge, and more</li>
+        <li>Secure processing - files are not stored on our servers</li>
+    </ul>
+</div>
+
+<h2 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Converters</h2>
+<div class="grid grid-2" style="margin-bottom: 2rem;">
     {% for converter in converters %}
-    <a href="{% url 'image_converter:convert' converter.url %}" class="category-card">
+    <a href="{% if converter.url_name == 'universal' %}{% url 'image_converter:universal' %}{% elif converter.url_name == 'resize' %}{% url 'image_converter:resize' %}{% else %}{% url 'image_converter:convert' converter.url %}{% endif %}" class="category-card">
         <h3>{{ converter.name }}</h3>
         <p>{{ converter.description }}</p>
+    </a>
+    {% endfor %}
+</div>
+
+<h2 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Image Editing Utilities</h2>
+<div class="grid grid-2">
+    {% for utility in utilities %}
+    <a href="{% if utility.url_name == 'resize' %}{% url 'image_converter:resize' %}{% elif utility.url_name == 'rotate_flip' %}{% url 'image_converter:rotate_flip' %}{% elif utility.url_name == 'remove_exif' %}{% url 'image_converter:remove_exif' %}{% elif utility.url_name == 'grayscale' %}{% url 'image_converter:grayscale' %}{% elif utility.url_name == 'transparent' %}{% url 'image_converter:transparent' %}{% elif utility.url_name == 'merge' %}{% url 'image_converter:merge' %}{% elif utility.url_name == 'watermark' %}{% url 'image_converter:watermark' %}{% endif %}" class="category-card">
+        <h3>{{ utility.name }}</h3>
+        <p>{{ utility.description }}</p>
     </a>
     {% endfor %}
 </div>

@@ -38,9 +38,9 @@ def home(request):
                 'icon': 'color-picker.svg'
             },
             {
-                'name': 'Image Converters',
+                'name': 'Image Conversion & Editing',
                 'url': 'image_converter:index',
-                'description': 'Convert images between different formats',
+                'description': 'Convert images between different formats and edit them',
                 'icon': 'image-converters.svg'
             },
             {

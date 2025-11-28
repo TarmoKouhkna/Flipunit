@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block title %}Audio Splitter - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online audio splitter - Split audio files into segments by time. Extract specific portions from MP3, WAV, OGG, FLAC, AAC, M4A, and AIFF files. Fast, secure, no registration required.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Audio Splitter</h1>
+    <p>Split audio files into segments by time</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.2rem;">🔒</span>
+            <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers.</span>
+        </p>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" id="splitterForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Audio File</label>
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="audio_file" id="audio_file" accept="audio/*" required>
+                <div id="uploadContent">
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: MP3, WAV, OGG, FLAC, AAC, M4A, AIFF</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-2" style="margin-top: 1.5rem; gap: 1rem;">
+            <div class="form-group">
+                <label class="form-label" for="start_time">Start Time (seconds)</label>
+                <input type="number" class="form-control" id="start_time" name="start_time" 
+                       min="0" step="0.1" value="0" placeholder="0" required>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
+                    When to start the segment (e.g., 10.5 for 10.5 seconds)
+                </p>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="duration">Duration (seconds)</label>
+                <input type="number" class="form-control" id="duration" name="duration" 
+                       min="0.1" step="0.1" placeholder="Leave empty if using end time">
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
+                    Length of segment (e.g., 30 for 30 seconds)
+                </p>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label" for="end_time">End Time (seconds) - Alternative</label>
+            <input type="number" class="form-control" id="end_time" name="end_time" 
+                   min="0" step="0.1" placeholder="Leave empty if using duration">
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
+                When to end the segment. Use either duration or end time, not both.
+            </p>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">Split & Download</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.8;">
+            <li>Upload your audio file</li>
+            <li>Enter start time (when to begin the segment)</li>
+            <li>Enter either duration (how long) or end time (when to stop)</li>
+            <li>Click "Split & Download"</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Example:</strong> To extract 30 seconds starting at 1 minute, enter Start Time: 60, Duration: 30
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('splitterForm');
+    const fileInput = document.getElementById('audio_file');
+    const uploadArea = document.getElementById('uploadArea');
+    const uploadContent = document.getElementById('uploadContent');
+    const durationInput = document.getElementById('duration');
+    const endTimeInput = document.getElementById('end_time');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    // Update UI when file is selected
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadContent.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+        }
+    });
+    
+    // Drag and drop
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--primary-color)';
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border-color)';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            uploadContent.querySelector('p').textContent = 'Selected: ' + files[0].name;
+        }
+    });
+    
+    // Ensure only one of duration or end_time is filled
+    durationInput.addEventListener('input', function() {
+        if (this.value) {
+            endTimeInput.value = '';
+        }
+    });
+    
+    endTimeInput.addEventListener('input', function() {
+        if (this.value) {
+            durationInput.value = '';
+        }
+    });
+    
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!fileInput.files.length) {
+            alert('Please select an audio file.');
+            return;
+        }
+        
+        if (!durationInput.value && !endTimeInput.value) {
+            alert('Please specify either duration or end time.');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        
+        const formData = new FormData(form);
+        
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+        })
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            
+            if (contentType.includes('audio/')) {
+                return response.blob().then(blob => {
+                    const filename = response.headers.get('x-filename') || 'split_audio.mp3';
+                    return { blob, filename };
+                });
+            }
+            
+            if (contentType.includes('text/html')) {
+                return response.text().then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const errorDiv = doc.querySelector('.alert-error') || doc.querySelector('.error');
+                    const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Splitting failed.';
+                    throw new Error(errorMessage);
+                });
+            }
+            
+            return response.text().then(text => {
+                throw new Error('Unexpected response: ' + text.substring(0, 200));
+            });
+        })
+        .then(({ blob, filename }) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }, 100);
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Split & Download';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Split & Download';
+            alert('Error: ' + error.message);
+        });
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

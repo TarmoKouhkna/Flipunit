@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}Mute Video Audio - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online tool to remove audio from video files. Mute video audio from MP4, AVI, MOV, MKV, WebM, FLV, WMV, and 3GP videos. Fast, secure, no registration required.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Mute Video Audio</h1>
+    <p>Remove audio track from video files</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.2rem;">🔒</span>
+            <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers. Files are temporarily saved during processing and deleted immediately after.</span>
+        </p>
+    </div>
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
+        <p style="margin: 0; color: #92400e; font-size: 0.9rem;">
+            <strong>Note:</strong> This tool removes the audio track completely. The video will be silent. The original video quality is preserved (no re-encoding).
+        </p>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool" id="muteForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Video File</label>
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="video_file" id="video_file" accept="video/*" required>
+                <div id="uploadContent">
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: MP4, AVI, MOV, MKV, WebM, FLV, WMV, 3GP</p>
+                </div>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">Remove Audio & Download</button>
+    </form>
+    
+    <!-- Progress indicator -->
+    <div id="processing-indicator" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem;"></div>
+        <span id="processing-message">Removing audio... This should be quick as video is not re-encoded.</span>
+    </div>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How it works:</h3>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.8;">
+            <li>Upload your video file</li>
+            <li>Click "Remove Audio & Download"</li>
+            <li>Download the video file without audio</li>
+        </ul>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Benefits:</strong> This process is fast because the video stream is copied without re-encoding. Only the audio track is removed, preserving original video quality.
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('muteForm');
+    const fileInput = document.getElementById('video_file');
+    const uploadArea = document.getElementById('uploadArea');
+    const uploadContent = document.getElementById('uploadContent');
+    const submitBtn = document.getElementById('submit-btn');
+    const processingIndicator = document.getElementById('processing-indicator');
+    
+    // Update UI when file is selected
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadContent.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+        }
+    });
+    
+    // Drag and drop
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--primary-color)';
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border-color)';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            uploadContent.querySelector('p').textContent = 'Selected: ' + files[0].name;
+        }
+    });
+    
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!fileInput.files.length) {
+            alert('Please select a video file.');
+            return;
+        }
+        
+        // Show processing indicator
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        if (processingIndicator) {
+            processingIndicator.style.display = 'block';
+        }
+        
+        const formData = new FormData(form);
+        
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+        })
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            
+            if (contentType.includes('video/')) {
+                return response.blob().then(blob => {
+                    const filename = response.headers.get('x-filename') || 'muted_video.mp4';
+                    return { blob, filename };
+                });
+            }
+            
+            if (contentType.includes('text/html')) {
+                return response.text().then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const errorDiv = doc.querySelector('.alert-error') || doc.querySelector('.error');
+                    const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Processing failed.';
+                    throw new Error(errorMessage);
+                });
+            }
+            
+            return response.text().then(text => {
+                throw new Error('Unexpected response: ' + text.substring(0, 200));
+            });
+        })
+        .then(({ blob, filename }) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }, 100);
+            
+            if (processingIndicator) {
+                processingIndicator.style.display = 'none';
+            }
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Remove Audio & Download';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (processingIndicator) {
+                processingIndicator.style.display = 'none';
+            }
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Remove Audio & Download';
+            alert('Error: ' + error.message);
+        });
+    });
+});
+</script>
+<style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+{% endblock %}
+

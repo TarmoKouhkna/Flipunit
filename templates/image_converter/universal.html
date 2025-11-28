@@ -1,16 +1,12 @@
 {% extends 'base.html' %}
 
-{% block title %}Image Converter - {{ SITE_NAME }}{% endblock %}
+{% block title %}Universal Image Converter - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free universal image converter - Convert images between any format (JPG, PNG, WebP, SVG, BMP, TIFF, GIF). Choose your input and output formats. Fast, secure, no registration required.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">
-        {% if converter_type == 'jpeg-to-png' %}JPEG to PNG Converter
-        {% elif converter_type == 'png-to-jpg' %}PNG to JPG Converter
-        {% elif converter_type == 'webp' %}WebP Converter
-        {% elif converter_type == 'svg-to-png' %}SVG to PNG Converter
-        {% else %}Image Converter{% endif %}
-    </h1>
+    <h1 class="card-title">Universal Image Converter</h1>
+    <p>Convert images to any format - choose your input and output formats</p>
     
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
@@ -45,8 +41,26 @@
             </div>
         </div>
         
-        {% if converter_type == 'png-to-jpg' or converter_type == 'webp' %}
         <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label" for="output_format">Convert To Format</label>
+            <select class="form-select" id="output_format" name="output_format" required>
+                <option value="">-- Select output format --</option>
+                <option value="PNG">PNG (Portable Network Graphics)</option>
+                <option value="JPEG">JPEG / JPG (Joint Photographic Experts Group)</option>
+                <option value="WEBP">WebP (Modern Web Format)</option>
+                <option value="BMP">BMP (Bitmap Image)</option>
+                <option value="TIFF">TIFF (Tagged Image File Format)</option>
+                <option value="GIF">GIF (Graphics Interchange Format)</option>
+                <option value="ICO">ICO (Icon File)</option>
+                <option value="AVIF">AVIF (AV1 Image File Format)</option>
+                <option value="HEIC">HEIC (High Efficiency Image Container)</option>
+            </select>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
+                <strong>Note:</strong> Converting to JPEG or BMP will remove transparency. PNG, WebP, GIF, AVIF, and HEIC support transparency.
+            </p>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem; display: none;" id="qualityGroup">
             <label class="form-label" for="quality">Image Quality</label>
             <input type="range" class="form-control" id="quality" name="quality" min="1" max="100" value="95" 
                    oninput="document.getElementById('qualityValue').textContent = this.value + '%'">
@@ -59,13 +73,27 @@
                 Recommended: 85-95 for photos, 90-100 for graphics
             </p>
         </div>
-        {% endif %}
         
         <button type="submit" class="btn btn-primary btn-block" id="convertBtn" style="margin-top: 1.5rem;">
             <span id="btnText">Convert & Download</span>
             <span id="btnLoader" style="display: none;">⏳ Converting...</span>
         </button>
     </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3 style="margin-bottom: 0.75rem;">Format Information</h3>
+        <div style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.8;">
+            <p><strong>PNG:</strong> Best for images with transparency, graphics, and screenshots. Lossless compression.</p>
+            <p><strong>JPEG:</strong> Best for photographs. Smaller file sizes but lossy compression. No transparency support.</p>
+            <p><strong>WebP:</strong> Modern format with excellent compression. Supports both lossy and lossless modes. Good for web use.</p>
+            <p><strong>BMP:</strong> Uncompressed bitmap format. Large file sizes but high quality. No transparency.</p>
+            <p><strong>TIFF:</strong> High-quality format often used in professional photography and printing. Supports transparency.</p>
+            <p><strong>GIF:</strong> Supports animation and transparency. Limited to 256 colors. Good for simple graphics.</p>
+            <p><strong>ICO:</strong> Icon format used for Windows icons. Supports multiple sizes in one file.</p>
+            <p><strong>AVIF:</strong> Next-generation format with superior compression. Excellent quality at smaller file sizes. Modern browsers support it.</p>
+            <p><strong>HEIC:</strong> Apple's High Efficiency Image format. Excellent compression with high quality. Used by iOS devices.</p>
+        </div>
+    </div>
 </div>
 
 <a href="{% url 'image_converter:index' %}" class="btn btn-secondary">← Back to Image Conversion & Editing</a>
@@ -86,6 +114,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const convertBtn = document.getElementById('convertBtn');
     const btnText = document.getElementById('btnText');
     const btnLoader = document.getElementById('btnLoader');
+    const outputFormatSelect = document.getElementById('output_format');
+    const qualityGroup = document.getElementById('qualityGroup');
     
     // Format file size
     function formatFileSize(bytes) {
@@ -100,6 +130,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function getFileExtension(filename) {
         return filename.split('.').pop().toUpperCase();
     }
+    
+    // Show/hide quality slider based on output format
+    function toggleQualitySlider() {
+        const selectedFormat = outputFormatSelect.value.toUpperCase();
+        if (selectedFormat === 'JPEG' || selectedFormat === 'WEBP' || selectedFormat === 'AVIF' || selectedFormat === 'HEIC') {
+            qualityGroup.style.display = 'block';
+        } else {
+            qualityGroup.style.display = 'none';
+        }
+    }
+    
+    outputFormatSelect.addEventListener('change', toggleQualitySlider);
     
     // Handle file selection
     function handleFileSelect(file) {
@@ -164,6 +206,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!fileInput.files.length) {
             e.preventDefault();
             alert('Please select an image file first.');
+            return;
+        }
+        
+        if (!outputFormatSelect.value) {
+            e.preventDefault();
+            alert('Please select an output format.');
             return;
         }
         

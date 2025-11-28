@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block title %}Reduce Audio Noise - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online audio noise reduction tool - Remove background noise from audio files. Clean up MP3, WAV, OGG, FLAC, AAC, M4A, and AIFF recordings. Fast, secure, no registration required.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Reduce Audio Noise</h1>
+    <p>Remove background noise from audio files</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.2rem;">🔒</span>
+            <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers.</span>
+        </p>
+    </div>
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
+        <p style="margin: 0; color: #92400e; font-size: 0.9rem;">
+            <strong>How it works:</strong> Uses advanced FFT-based noise reduction filters to remove background noise, hum, and hiss from your audio recordings. Works best on recordings with consistent background noise.
+        </p>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" id="noiseForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Audio File</label>
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="audio_file" id="audio_file" accept="audio/*" required>
+                <div id="uploadContent">
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: MP3, WAV, OGG, FLAC, AAC, M4A, AIFF</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label" for="noise_reduction">Noise Reduction Level</label>
+            <select class="form-select" id="noise_reduction" name="noise_reduction" required>
+                <option value="low">Low - Light noise reduction, minimal audio changes</option>
+                <option value="medium" selected>Medium - Balanced noise reduction (Recommended)</option>
+                <option value="high">High - Aggressive noise reduction, may affect audio quality</option>
+            </select>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
+                <strong>Low:</strong> Best for subtle noise, preserves audio quality<br>
+                <strong>Medium:</strong> Good balance for most recordings<br>
+                <strong>High:</strong> Maximum noise removal, may slightly affect voice/music quality
+            </p>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">Reduce Noise & Download</button>
+    </form>
+    
+    <!-- Progress indicator -->
+    <div id="processing-indicator" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem;"></div>
+        <span id="processing-message">Processing audio... This may take a few minutes for large files.</span>
+    </div>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>Tips for best results:</h3>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.8;">
+            <li>Works best on recordings with consistent background noise</li>
+            <li>Start with Medium level and adjust if needed</li>
+            <li>High level may remove some audio detail along with noise</li>
+            <li>For best quality, use lossless formats (WAV, FLAC) as input</li>
+        </ul>
+    </div>
+</div>
+
+<a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('noiseForm');
+    const fileInput = document.getElementById('audio_file');
+    const uploadArea = document.getElementById('uploadArea');
+    const uploadContent = document.getElementById('uploadContent');
+    const submitBtn = document.getElementById('submit-btn');
+    const processingIndicator = document.getElementById('processing-indicator');
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadContent.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+        }
+    });
+    
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--primary-color)';
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border-color)';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            uploadContent.querySelector('p').textContent = 'Selected: ' + files[0].name;
+        }
+    });
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!fileInput.files.length) {
+            alert('Please select an audio file.');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        if (processingIndicator) {
+            processingIndicator.style.display = 'block';
+        }
+        
+        const formData = new FormData(form);
+        
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+        })
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            
+            if (contentType.includes('audio/')) {
+                return response.blob().then(blob => {
+                    const filename = response.headers.get('x-filename') || 'denoised_audio.mp3';
+                    return { blob, filename };
+                });
+            }
+            
+            if (contentType.includes('text/html')) {
+                return response.text().then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const errorDiv = doc.querySelector('.alert-error') || doc.querySelector('.error');
+                    const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Noise reduction failed.';
+                    throw new Error(errorMessage);
+                });
+            }
+            
+            return response.text().then(text => {
+                throw new Error('Unexpected response: ' + text.substring(0, 200));
+            });
+        })
+        .then(({ blob, filename }) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }, 100);
+            
+            if (processingIndicator) {
+                processingIndicator.style.display = 'none';
+            }
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Reduce Noise & Download';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (processingIndicator) {
+                processingIndicator.style.display = 'none';
+            }
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Reduce Noise & Download';
+            alert('Error: ' + error.message);
+        });
+    });
+});
+</script>
+<style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+{% endblock %}
+

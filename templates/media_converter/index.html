@@ -5,10 +5,11 @@
 {% block content %}
 <div class="hero">
     <h1>Media Converters</h1>
-    <p>Convert media files and download audio.</p>
+    <p>Convert media files and download audio</p>
 </div>
 
-<div class="grid grid-2">
+<h2 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Converters</h2>
+<div class="grid grid-2" style="margin-bottom: 2rem;">
     {% for converter in converters %}
     <a href="{% url converter.url %}" class="category-card">
         <h3>{{ converter.name }}</h3>
@@ -18,6 +19,26 @@
             <strong>Notice:</strong> {{ converter.notice }}
         </div>
         {% endif %}
+    </a>
+    {% endfor %}
+</div>
+
+<h2 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Audio Utilities</h2>
+<div class="grid grid-2" style="margin-bottom: 2rem;">
+    {% for utility in audio_utilities %}
+    <a href="{% url utility.url %}" class="category-card">
+        <h3>{{ utility.name }}</h3>
+        <p>{{ utility.description }}</p>
+    </a>
+    {% endfor %}
+</div>
+
+<h2 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Video Utilities</h2>
+<div class="grid grid-2">
+    {% for utility in video_utilities %}
+    <a href="{% url utility.url %}" class="category-card">
+        <h3>{{ utility.name }}</h3>
+        <p>{{ utility.description }}</p>
     </a>
     {% endfor %}
 </div>

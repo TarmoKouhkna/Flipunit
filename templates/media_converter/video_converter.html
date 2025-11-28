@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block title %}Video Converter - {{ SITE_NAME }}{% endblock %}
-{% block meta_description %}Free online video converter - Convert between MP4, AVI, MOV, MKV, and WebM formats. Fast, simple, no registration required.{% endblock %}
+{% block meta_description %}Free online video converter - Convert between MP4, AVI, MOV, MKV, WebM, and 3GP formats. Fast, simple, no registration required.{% endblock %}
 {% block og_title %}Video Converter - {{ SITE_NAME }}{% endblock %}
 {% block og_description %}Free online video converter - Convert between different video formats.{% endblock %}
 
@@ -29,7 +29,7 @@
                 <input type="file" name="video_file" id="video_file" accept="video/*" required>
                 <div style="text-align: center; padding: 2rem;">
                     <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: MP4, AVI, MOV, MKV, WebM, FLV, WMV</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: MP4, AVI, MOV, MKV, WebM, FLV, WMV, 3GP</p>
                 </div>
             </div>
         </div>
@@ -42,6 +42,7 @@
                 <option value="mov">MOV</option>
                 <option value="mkv">MKV</option>
                 <option value="webm">WebM</option>
+                <option value="3gp">3GP</option>
             </select>
         </div>
         
@@ -64,7 +65,7 @@
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
         <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
-            <li>Upload a video file (MP4, AVI, MOV, MKV, WebM, FLV, or WMV)</li>
+            <li>Upload a video file (MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP)</li>
             <li>Select the desired output format</li>
             <li>Click "Convert & Download"</li>
             <li>Download the converted video file</li>
