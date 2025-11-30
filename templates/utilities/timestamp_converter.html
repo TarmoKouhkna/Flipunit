@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Timestamp Converter - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Convert between Unix timestamps and dates. Convert timestamps to readable dates and dates to timestamps.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Timestamp ↔ Date Converter</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Convert between Unix timestamps and human-readable dates</p>
+    
+    {% if error %}
+        <div class="alert alert-error">
+            {{ error }}
+        </div>
+    {% endif %}
+    
+    {% if result %}
+        <div class="alert alert-success" style="margin-bottom: 2rem;">
+            <h3 style="margin-bottom: 0.5rem;">Result:</h3>
+            {% if result.type == 'date' %}
+                <p><strong>UTC:</strong> {{ result.utc }}</p>
+                <p><strong>Local:</strong> {{ result.local }}</p>
+                <p><strong>ISO:</strong> {{ result.iso }}</p>
+            {% else %}
+                <p><strong>Seconds:</strong> {{ result.seconds }}</p>
+                <p><strong>Milliseconds:</strong> {{ result.milliseconds }}</p>
+            {% endif %}
+        </div>
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Conversion Type</label>
+            <select name="conversion_type" id="conversion_type" class="form-control">
+                <option value="timestamp_to_date" {% if conversion_type == 'timestamp_to_date' or not conversion_type %}selected{% endif %}>Timestamp → Date</option>
+                <option value="date_to_timestamp" {% if conversion_type == 'date_to_timestamp' %}selected{% endif %}>Date → Timestamp</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" id="input_label">Enter Timestamp</label>
+            <input type="text" name="input_value" id="input_value" class="form-control" placeholder="1699123456" required>
+            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;" id="input_hint">
+                Enter Unix timestamp (seconds or milliseconds)
+            </small>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li><strong>Timestamp → Date:</strong> Enter Unix timestamp (seconds or milliseconds) to get human-readable date</li>
+            <li><strong>Date → Timestamp:</strong> Enter date in format YYYY-MM-DD HH:MM:SS to get Unix timestamp</li>
+        </ul>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> Timestamps are in UTC. Dates can be entered in various formats (YYYY-MM-DD, DD/MM/YYYY, etc.)
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const conversionType = document.getElementById('conversion_type');
+    const inputLabel = document.getElementById('input_label');
+    const inputValue = document.getElementById('input_value');
+    const inputHint = document.getElementById('input_hint');
+    
+    conversionType.addEventListener('change', function() {
+        if (this.value === 'timestamp_to_date') {
+            inputLabel.textContent = 'Enter Timestamp';
+            inputValue.placeholder = '1699123456';
+            inputHint.textContent = 'Enter Unix timestamp (seconds or milliseconds)';
+        } else {
+            inputLabel.textContent = 'Enter Date';
+            inputValue.placeholder = '2023-11-04 12:34:56';
+            inputHint.textContent = 'Enter date in format YYYY-MM-DD HH:MM:SS or DD/MM/YYYY';
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+
+
+

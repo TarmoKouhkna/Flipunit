@@ -75,7 +75,6 @@ INSTALLED_APPS = [
     'pdf_tools',
     'currency_converter',
     'utilities',
-    'youtube_analyzer',
     'color_picker',
 ]
 
@@ -178,7 +177,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # SEO Settings
-SITE_NAME = 'FlipUnit.eu'
+SITE_NAME = 'FlipUnit'
 SITE_DISPLAY_NAME = 'flipunit'  # Display name for navbar (without .eu)
 SITE_DESCRIPTION = 'Simple, fast, no-login online converter hub - unit converters, image converters, media converters, and everyday utilities.'
 SITE_URL = os.environ.get('SITE_URL', 'https://flipunit.eu')

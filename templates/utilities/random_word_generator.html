@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Random Word Generator - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Generate random words from a dictionary. Create random words with options for length and starting letter filters.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Random Word Generator</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Generate random words from a dictionary with customizable filters</p>
+    
+    {% if error %}
+        <div class="alert alert-error">
+            {{ error }}
+        </div>
+    {% endif %}
+    
+    {% if result %}
+        <div class="alert alert-success" style="margin-bottom: 2rem;">
+            <h3 style="margin-bottom: 0.5rem;">Generated Words:</h3>
+            <p style="font-size: 1.2rem; font-family: monospace; word-break: break-all;">
+                {% for word in result.words %}
+                    <span style="display: inline-block; margin: 0.25rem; padding: 0.5rem 1rem; background: var(--surface); border-radius: 4px;">{{ word }}</span>
+                {% endfor %}
+            </p>
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <p><strong>Count:</strong> {{ result.count }} word{{ result.count|pluralize }}</p>
+                {% if result.note %}
+                    <p style="color: var(--text-secondary);"><em>{{ result.note }}</em></p>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Number of Words</label>
+            <input type="number" name="count" id="count" class="form-control" value="5" min="1" max="100" required>
+            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">
+                Maximum 100 words
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Minimum Word Length (optional)</label>
+            <input type="number" name="min_length" id="min_length" class="form-control" value="" min="1" placeholder="e.g., 4">
+            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">
+                Filter words by minimum number of characters
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Maximum Word Length (optional)</label>
+            <input type="number" name="max_length" id="max_length" class="form-control" value="" min="1" placeholder="e.g., 8">
+            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">
+                Filter words by maximum number of characters
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Starts With Letter (optional)</label>
+            <input type="text" name="starts_with" id="starts_with" class="form-control" value="" maxlength="1" placeholder="e.g., a">
+            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">
+                Filter words that start with a specific letter
+            </small>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Generate Words</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Specify how many random words you want to generate</li>
+            <li>Optionally set minimum and/or maximum word length</li>
+            <li>Optionally specify a starting letter</li>
+            <li>Click "Generate Words"</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> The generator uses a dictionary of common English words. If your filters are too restrictive, fewer words may be returned than requested.
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+{% endblock %}
+

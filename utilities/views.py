@@ -3,6 +3,7 @@ from django.http import HttpResponse
 from django.contrib import messages
 import re
 import io
+import random
 from datetime import datetime
 import pytz
 from PIL import Image
@@ -11,6 +12,11 @@ try:
     QRCODE_AVAILABLE = True
 except ImportError:
     QRCODE_AVAILABLE = False
+try:
+    from gtts import gTTS
+    GTTS_AVAILABLE = True
+except ImportError:
+    GTTS_AVAILABLE = False
 
 def index(request):
     """Utilities index page"""
@@ -23,6 +29,13 @@ def index(request):
             {'name': 'Time Zone Converter', 'url_name': 'timezone_converter', 'description': 'Convert time between different time zones'},
             {'name': 'Roman Numeral Converter', 'url_name': 'roman_numeral_converter', 'description': 'Convert between Roman and Arabic numerals'},
             {'name': 'Favicon Generator', 'url_name': 'favicon_generator', 'description': 'Generate favicon.ico from any image'},
+            {'name': 'Timestamp Converter', 'url_name': 'timestamp_converter', 'description': 'Convert between timestamps and dates'},
+            {'name': 'Text-to-Speech', 'url_name': 'text_to_speech', 'description': 'Convert text to speech audio'},
+            {'name': 'Random Number Generator', 'url_name': 'random_number_generator', 'description': 'Generate random numbers'},
+            {'name': 'Lorem Ipsum Generator', 'url_name': 'lorem_ipsum_generator', 'description': 'Generate Lorem Ipsum placeholder text'},
+            {'name': 'Random Word Generator', 'url_name': 'random_word_generator', 'description': 'Generate random words from a dictionary'},
+            {'name': 'Random Name Generator', 'url_name': 'random_name_generator', 'description': 'Generate random names from different regions'},
+            {'name': 'Word Lottery', 'url_name': 'word_lottery', 'description': 'Pick a random word or name from your list'},
         ]
     }
     return render(request, 'utilities/index.html', context)
@@ -675,3 +688,569 @@ def favicon_generator(request):
     except Exception as e:
         messages.error(request, f'Error generating favicon: {str(e)}')
         return render(request, 'utilities/favicon_generator.html')
+
+def timestamp_converter(request):
+    """Convert between timestamps and dates"""
+    result = None
+    error = None
+    conversion_type = None
+    
+    if request.method == 'POST':
+        conversion_type = request.POST.get('conversion_type', 'timestamp_to_date')
+        input_value = request.POST.get('input_value', '').strip()
+        
+        if not input_value:
+            error = 'Please enter a value'
+        else:
+            try:
+                if conversion_type == 'timestamp_to_date':
+                    # Convert timestamp to date
+                    try:
+                        # Try as seconds (Unix timestamp)
+                        timestamp = float(input_value)
+                        if timestamp > 1e12:
+                            # Milliseconds timestamp
+                            timestamp = timestamp / 1000
+                        dt = datetime.fromtimestamp(timestamp, tz=pytz.UTC)
+                        result = {
+                            'type': 'date',
+                            'utc': dt.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                            'local': dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z'),
+                            'iso': dt.isoformat(),
+                        }
+                    except (ValueError, OSError) as e:
+                        error = f'Invalid timestamp: {str(e)}'
+                else:
+                    # Convert date to timestamp
+                    try:
+                        # Try different date formats
+                        date_formats = [
+                            '%Y-%m-%d %H:%M:%S',
+                            '%Y-%m-%d %H:%M',
+                            '%Y-%m-%d',
+                            '%d/%m/%Y %H:%M:%S',
+                            '%d/%m/%Y %H:%M',
+                            '%d/%m/%Y',
+                            '%m/%d/%Y %H:%M:%S',
+                            '%m/%d/%Y %H:%M',
+                            '%m/%d/%Y',
+                        ]
+                        dt = None
+                        for fmt in date_formats:
+                            try:
+                                dt = datetime.strptime(input_value, fmt)
+                                break
+                            except ValueError:
+                                continue
+                        
+                        if dt is None:
+                            error = 'Invalid date format. Try: YYYY-MM-DD HH:MM:SS'
+                        else:
+                            # Make timezone-aware (assume UTC if not specified)
+                            if dt.tzinfo is None:
+                                dt = pytz.UTC.localize(dt)
+                            
+                            timestamp_seconds = dt.timestamp()
+                            timestamp_milliseconds = int(timestamp_seconds * 1000)
+                            
+                            result = {
+                                'type': 'timestamp',
+                                'seconds': int(timestamp_seconds),
+                                'milliseconds': timestamp_milliseconds,
+                            }
+                    except Exception as e:
+                        error = f'Error converting date: {str(e)}'
+            except Exception as e:
+                error = str(e)
+    
+    context = {
+        'result': result,
+        'error': error,
+        'conversion_type': conversion_type or 'timestamp_to_date',
+    }
+    return render(request, 'utilities/timestamp_converter.html', context)
+
+def text_to_speech(request):
+    """Convert text to speech"""
+    if request.method != 'POST':
+        return render(request, 'utilities/text_to_speech.html', {'gtts_available': GTTS_AVAILABLE})
+    
+    if not GTTS_AVAILABLE:
+        messages.error(request, 'Text-to-speech requires gTTS library. Install with: pip install gtts')
+        return render(request, 'utilities/text_to_speech.html', {'gtts_available': False})
+    
+    text = request.POST.get('text', '').strip()
+    language = request.POST.get('language', 'en')
+    
+    if not text:
+        messages.error(request, 'Please enter text to convert to speech.')
+        return render(request, 'utilities/text_to_speech.html', {'gtts_available': GTTS_AVAILABLE})
+    
+    if len(text) > 5000:
+        messages.error(request, 'Text is too long. Maximum 5000 characters allowed.')
+        return render(request, 'utilities/text_to_speech.html', {'gtts_available': GTTS_AVAILABLE})
+    
+    try:
+        # Create text-to-speech
+        tts = gTTS(text=text, lang=language, slow=False)
+        
+        # Save to bytes
+        audio_buffer = io.BytesIO()
+        tts.write_to_fp(audio_buffer)
+        audio_buffer.seek(0)
+        
+        # Return audio file
+        response = HttpResponse(audio_buffer.read(), content_type='audio/mpeg')
+        response['Content-Disposition'] = 'attachment; filename="speech.mp3"'
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'Error generating speech: {str(e)}')
+        return render(request, 'utilities/text_to_speech.html', {'gtts_available': GTTS_AVAILABLE})
+
+def random_number_generator(request):
+    """Generate random numbers"""
+    result = None
+    error = None
+    
+    if request.method == 'POST':
+        try:
+            min_val = int(request.POST.get('min_value', '1'))
+            max_val = int(request.POST.get('max_value', '100'))
+            count = int(request.POST.get('count', '1'))
+            allow_duplicates = request.POST.get('allow_duplicates', 'off') == 'on'
+            
+            if min_val > max_val:
+                error = 'Minimum value must be less than or equal to maximum value'
+            elif count < 1:
+                error = 'Count must be at least 1'
+            elif count > 1000:
+                error = 'Count cannot exceed 1000'
+            elif not allow_duplicates and count > (max_val - min_val + 1):
+                error = f'Cannot generate {count} unique numbers in range {min_val}-{max_val}'
+            else:
+                if allow_duplicates:
+                    # Allow duplicates
+                    numbers = [random.randint(min_val, max_val) for _ in range(count)]
+                else:
+                    # No duplicates
+                    numbers = random.sample(range(min_val, max_val + 1), min(count, max_val - min_val + 1))
+                
+                result = {
+                    'numbers': numbers,
+                    'count': len(numbers),
+                    'min': min_val,
+                    'max': max_val,
+                    'sum': sum(numbers),
+                    'average': sum(numbers) / len(numbers) if numbers else 0,
+                }
+        except ValueError:
+            error = 'Please enter valid numbers'
+        except Exception as e:
+            error = str(e)
+    
+    context = {
+        'result': result,
+        'error': error,
+    }
+    return render(request, 'utilities/random_number_generator.html', context)
+
+def lorem_ipsum_generator(request):
+    """Generate Lorem Ipsum text"""
+    result = None
+    error = None
+    
+    if request.method == 'POST':
+        try:
+            text_type = request.POST.get('text_type', 'paragraphs')
+            count = int(request.POST.get('count', '3'))
+            
+            if count < 1:
+                error = 'Count must be at least 1'
+            elif count > 100:
+                error = 'Count cannot exceed 100'
+            else:
+                lorem_words = [
+                    'lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit',
+                    'sed', 'do', 'eiusmod', 'tempor', 'incididunt', 'ut', 'labore', 'et', 'dolore',
+                    'magna', 'aliqua', 'enim', 'ad', 'minim', 'veniam', 'quis', 'nostrud',
+                    'exercitation', 'ullamco', 'laboris', 'nisi', 'aliquip', 'ex', 'ea', 'commodo',
+                    'consequat', 'duis', 'aute', 'irure', 'in', 'reprehenderit', 'voluptate',
+                    'velit', 'esse', 'cillum', 'fugiat', 'nulla', 'pariatur', 'excepteur', 'sint',
+                    'occaecat', 'cupidatat', 'non', 'proident', 'sunt', 'culpa', 'qui', 'officia',
+                    'deserunt', 'mollit', 'anim', 'id', 'est', 'laborum'
+                ]
+                
+                if text_type == 'paragraphs':
+                    paragraphs = []
+                    for _ in range(count):
+                        # Generate 3-5 sentences per paragraph
+                        sentences = []
+                        for _ in range(random.randint(3, 5)):
+                            # Generate 8-15 words per sentence
+                            words = random.sample(lorem_words, random.randint(8, min(15, len(lorem_words))))
+                            sentence = ' '.join(words).capitalize() + '.'
+                            sentences.append(sentence)
+                        paragraphs.append(' '.join(sentences))
+                    result = '\n\n'.join(paragraphs)
+                elif text_type == 'words':
+                    words = random.choices(lorem_words, k=count)
+                    result = ' '.join(words)
+                elif text_type == 'sentences':
+                    sentences = []
+                    for _ in range(count):
+                        words = random.sample(lorem_words, random.randint(8, min(15, len(lorem_words))))
+                        sentence = ' '.join(words).capitalize() + '.'
+                        sentences.append(sentence)
+                    result = ' '.join(sentences)
+                else:
+                    error = 'Invalid text type'
+        except ValueError:
+            error = 'Please enter a valid number'
+        except Exception as e:
+            error = str(e)
+    
+    context = {
+        'result': result,
+        'error': error,
+    }
+    return render(request, 'utilities/lorem_ipsum_generator.html', context)
+
+def random_word_generator(request):
+    """Generate random words"""
+    result = None
+    error = None
+    
+    # Common English words dictionary
+    word_list = [
+        'apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house', 'island', 'jungle',
+        'kite', 'lion', 'mountain', 'ocean', 'piano', 'queen', 'river', 'sun', 'tree', 'umbrella',
+        'violin', 'water', 'xylophone', 'yacht', 'zebra', 'adventure', 'beautiful', 'courage', 'dream',
+        'energy', 'freedom', 'garden', 'happiness', 'imagine', 'journey', 'kindness', 'laughter', 'magic',
+        'nature', 'ocean', 'peace', 'quiet', 'rainbow', 'sunshine', 'travel', 'universe', 'victory',
+        'wisdom', 'youth', 'zeal', 'art', 'book', 'cloud', 'dance', 'earth', 'fire', 'grace',
+        'hope', 'ice', 'joy', 'kiss', 'light', 'music', 'night', 'ocean', 'peace', 'quest',
+        'rain', 'star', 'time', 'unity', 'voice', 'wind', 'xenon', 'year', 'zenith', 'action',
+        'brave', 'calm', 'daring', 'eager', 'faith', 'gentle', 'honest', 'ideal', 'jolly', 'keen',
+        'loyal', 'mighty', 'noble', 'optimistic', 'proud', 'quick', 'radiant', 'strong', 'true', 'unique',
+        'vital', 'wise', 'young', 'zealous', 'amazing', 'brilliant', 'creative', 'dynamic', 'excellent',
+        'fantastic', 'glorious', 'heroic', 'incredible', 'joyful', 'kind', 'lovely', 'magnificent', 'noble',
+        'outstanding', 'perfect', 'remarkable', 'splendid', 'terrific', 'unbelievable', 'wonderful', 'extraordinary',
+        'zestful', 'achieve', 'believe', 'create', 'discover', 'explore', 'flourish', 'grow', 'inspire',
+        'journey', 'kindle', 'learn', 'master', 'nurture', 'overcome', 'progress', 'quest', 'reach',
+        'succeed', 'thrive', 'unite', 'venture', 'wonder', 'excel', 'yearn', 'zoom', 'abundant', 'bright',
+        'colorful', 'diverse', 'elegant', 'fragrant', 'glowing', 'harmonious', 'inspiring', 'jubilant',
+        'kaleidoscopic', 'luminous', 'majestic', 'nostalgic', 'optimistic', 'peaceful', 'quaint', 'radiant',
+        'serene', 'tranquil', 'uplifting', 'vibrant', 'whimsical', 'exquisite', 'youthful', 'zestful'
+    ]
+    
+    if request.method == 'POST':
+        try:
+            count = int(request.POST.get('count', '5'))
+            min_length = request.POST.get('min_length', '').strip()
+            max_length = request.POST.get('max_length', '').strip()
+            starts_with = request.POST.get('starts_with', '').strip().lower()
+            
+            if count < 1:
+                error = 'Count must be at least 1'
+            elif count > 100:
+                error = 'Count cannot exceed 100'
+            else:
+                # Filter words based on criteria
+                filtered_words = word_list.copy()
+                
+                # Filter by minimum length
+                if min_length:
+                    min_len = int(min_length)
+                    if min_len < 1:
+                        error = 'Minimum length must be at least 1'
+                    else:
+                        filtered_words = [w for w in filtered_words if len(w) >= min_len]
+                
+                # Filter by maximum length
+                if max_length and not error:
+                    max_len = int(max_length)
+                    if max_len < 1:
+                        error = 'Maximum length must be at least 1'
+                    elif min_length and max_len < int(min_length):
+                        error = 'Maximum length must be greater than or equal to minimum length'
+                    else:
+                        filtered_words = [w for w in filtered_words if len(w) <= max_len]
+                
+                # Filter by starting letter
+                if starts_with and not error:
+                    if len(starts_with) != 1 or not starts_with.isalpha():
+                        error = 'Starting letter must be a single alphabet character'
+                    else:
+                        filtered_words = [w for w in filtered_words if w.startswith(starts_with)]
+                
+                if not error:
+                    if not filtered_words:
+                        error = 'No words match the specified criteria. Try adjusting your filters.'
+                    elif count > len(filtered_words):
+                        # If requesting more words than available, use all available
+                        words = random.sample(filtered_words, len(filtered_words))
+                        result = {
+                            'words': words,
+                            'count': len(words),
+                            'requested': count,
+                            'note': f'Only {len(words)} words available matching your criteria'
+                        }
+                    else:
+                        words = random.sample(filtered_words, count)
+                        result = {
+                            'words': words,
+                            'count': len(words),
+                            'requested': count,
+                        }
+        except ValueError:
+            error = 'Please enter valid numbers'
+        except Exception as e:
+            error = str(e)
+    
+    context = {
+        'result': result,
+        'error': error,
+    }
+    return render(request, 'utilities/random_word_generator.html', context)
+
+def random_name_generator(request):
+    """Generate random names from different regions"""
+    result = None
+    error = None
+    
+    # Name databases organized by region and gender
+    name_databases = {
+        'european': {
+            'male_first': [
+                'Alexander', 'Andreas', 'Anton', 'Bjorn', 'Christoph', 'Dimitri', 'Erik', 'Felix',
+                'Franz', 'Georg', 'Hans', 'Henrik', 'Ivan', 'Jakob', 'Klaus', 'Lars', 'Magnus',
+                'Matthias', 'Nikolai', 'Oliver', 'Pavel', 'Rafael', 'Sebastian', 'Stefan',
+                'Thomas', 'Ulrich', 'Viktor', 'Wolfgang', 'Yannick', 'Zoran', 'Adrian', 'Boris',
+                'Christian', 'Daniel', 'Emil', 'Fabian', 'Gabriel', 'Hugo', 'Igor', 'Jan',
+                'Konstantin', 'Leon', 'Marcel', 'Nicolas', 'Oscar', 'Patrick', 'Quentin', 'Roman',
+                'Simon', 'Tobias', 'Uwe', 'Valentin', 'Werner', 'Xavier', 'Yves', 'Zachary'
+            ],
+            'female_first': [
+                'Anna', 'Beatrice', 'Catherine', 'Diana', 'Elena', 'Franziska', 'Gabriela', 'Helena',
+                'Isabella', 'Julia', 'Katarina', 'Laura', 'Maria', 'Natalia', 'Olivia', 'Petra',
+                'Rosa', 'Sofia', 'Tatiana', 'Ulrike', 'Valentina', 'Wendy', 'Xenia', 'Yvonne',
+                'Zara', 'Adriana', 'Bianca', 'Clara', 'Daria', 'Elisabeth', 'Fiona', 'Greta',
+                'Hannah', 'Irina', 'Jana', 'Klara', 'Lena', 'Marta', 'Nina', 'Oksana',
+                'Patricia', 'Renata', 'Sara', 'Teresa', 'Ursula', 'Vera', 'Wanda', 'Yara', 'Zoe'
+            ],
+            'last': [
+                'Andersen', 'Berg', 'Berger', 'Bjork', 'Borg', 'Braun', 'Christensen', 'Eriksson',
+                'Fischer', 'Garcia', 'Hansen', 'Hoffmann', 'Jensen', 'Klein', 'Kovac', 'Larsen',
+                'Muller', 'Nielsen', 'Olsen', 'Petrov', 'Rasmussen', 'Schmidt', 'Svensson',
+                'Wagner', 'Weber', 'Andersson', 'Bergmann', 'Carlsson', 'Dahl', 'Eriksen',
+                'Forsberg', 'Gustafsson', 'Holm', 'Johansson', 'Karlsson', 'Lindberg', 'Martinez',
+                'Nilsson', 'Petersen', 'Sandberg', 'Viktor', 'Zimmermann', 'Albrecht', 'Bauer',
+                'Carter', 'Dvorak', 'Engel', 'Friedrich', 'Gruber', 'Hartmann', 'Ivanov',
+                'Jankovic', 'Keller', 'Lehmann', 'Meyer', 'Novak', 'Peters', 'Richter', 'Stein'
+            ]
+        },
+        'english': {
+            'male_first': [
+                'James', 'William', 'John', 'George', 'Charles', 'Thomas', 'Henry', 'Edward',
+                'Robert', 'Richard', 'David', 'Michael', 'Christopher', 'Daniel', 'Matthew',
+                'Andrew', 'Joseph', 'Mark', 'Peter', 'Paul', 'Steven', 'Anthony', 'Kenneth',
+                'Brian', 'Kevin', 'Stephen', 'Gary', 'Eric', 'Jonathan', 'Ryan', 'Jacob',
+                'Nicholas', 'Benjamin', 'Samuel', 'Adam', 'Nathan', 'Luke', 'Oliver', 'Jack',
+                'Harry', 'Oscar', 'Arthur', 'Noah', 'Leo', 'Theo', 'Freddie', 'Archie', 'Joshua'
+            ],
+            'female_first': [
+                'Mary', 'Elizabeth', 'Sarah', 'Margaret', 'Anne', 'Jane', 'Catherine', 'Emma',
+                'Olivia', 'Sophia', 'Isabella', 'Charlotte', 'Amelia', 'Mia', 'Harper', 'Evelyn',
+                'Abigail', 'Emily', 'Ella', 'Scarlett', 'Grace', 'Chloe', 'Victoria', 'Rebecca',
+                'Lucy', 'Anna', 'Alice', 'Lily', 'Freya', 'Ivy', 'Florence', 'Rosie', 'Matilda',
+                'Phoebe', 'Isla', 'Poppy', 'Elsie', 'Lottie', 'Maya', 'Sienna', 'Willow', 'Ava'
+            ],
+            'last': [
+                'Smith', 'Jones', 'Taylor', 'Williams', 'Brown', 'Davies', 'Evans', 'Wilson',
+                'Thomas', 'Roberts', 'Johnson', 'Lewis', 'Walker', 'Robinson', 'Wood', 'Thompson',
+                'White', 'Watson', 'Jackson', 'Wright', 'Green', 'Harris', 'Cooper', 'King',
+                'Lee', 'Martin', 'Clarke', 'James', 'Morgan', 'Hughes', 'Edwards', 'Hill',
+                'Moore', 'Clark', 'Harrison', 'Scott', 'Young', 'Morris', 'Hall', 'Ward',
+                'Turner', 'Carter', 'Phillips', 'Mitchell', 'Patel', 'Adams', 'Campbell', 'Anderson'
+            ]
+        },
+        'usa': {
+            'male_first': [
+                'Michael', 'James', 'Robert', 'John', 'William', 'David', 'Richard', 'Joseph',
+                'Thomas', 'Charles', 'Christopher', 'Daniel', 'Matthew', 'Anthony', 'Mark',
+                'Donald', 'Steven', 'Paul', 'Andrew', 'Joshua', 'Kenneth', 'Kevin', 'Brian',
+                'George', 'Timothy', 'Ronald', 'Jason', 'Edward', 'Jeffrey', 'Ryan', 'Jacob',
+                'Gary', 'Nicholas', 'Eric', 'Jonathan', 'Stephen', 'Larry', 'Justin', 'Scott',
+                'Brandon', 'Benjamin', 'Samuel', 'Frank', 'Gregory', 'Raymond', 'Alexander',
+                'Patrick', 'Jack', 'Dennis', 'Jerry', 'Tyler', 'Aaron', 'Jose', 'Adam', 'Nathan'
+            ],
+            'female_first': [
+                'Mary', 'Patricia', 'Jennifer', 'Linda', 'Elizabeth', 'Barbara', 'Susan', 'Jessica',
+                'Sarah', 'Karen', 'Nancy', 'Lisa', 'Betty', 'Margaret', 'Sandra', 'Ashley',
+                'Kimberly', 'Emily', 'Donna', 'Michelle', 'Dorothy', 'Carol', 'Amanda', 'Melissa',
+                'Deborah', 'Stephanie', 'Rebecca', 'Sharon', 'Laura', 'Cynthia', 'Kathleen',
+                'Amy', 'Angela', 'Shirley', 'Anna', 'Brenda', 'Pamela', 'Emma', 'Nicole',
+                'Helen', 'Samantha', 'Olivia', 'Catherine', 'Christine', 'Samantha', 'Debra',
+                'Rachel', 'Carolyn', 'Janet', 'Virginia', 'Maria', 'Heather', 'Diane', 'Julie'
+            ],
+            'last': [
+                'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis',
+                'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Wilson', 'Anderson', 'Thomas',
+                'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Thompson', 'White', 'Harris',
+                'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson', 'Walker', 'Young', 'Allen',
+                'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores', 'Green',
+                'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell', 'Carter',
+                'Roberts', 'Gomez', 'Phillips', 'Evans', 'Turner', 'Diaz', 'Parker', 'Cruz'
+            ]
+        },
+        'spanish': {
+            'male_first': [
+                'Alejandro', 'Carlos', 'Diego', 'Fernando', 'Gabriel', 'Hector', 'Ignacio', 'Javier',
+                'Jose', 'Luis', 'Manuel', 'Miguel', 'Nicolas', 'Oscar', 'Pablo', 'Rafael',
+                'Ricardo', 'Santiago', 'Tomas', 'Victor', 'Adrian', 'Alberto', 'Andres', 'Antonio',
+                'Arturo', 'Benjamin', 'Cesar', 'Daniel', 'Eduardo', 'Enrique', 'Esteban', 'Felipe',
+                'Francisco', 'Gonzalo', 'Guillermo', 'Hugo', 'Ivan', 'Jorge', 'Juan', 'Leonardo',
+                'Mario', 'Martin', 'Mateo', 'Mauricio', 'Nestor', 'Octavio', 'Pedro', 'Ramon',
+                'Raul', 'Roberto', 'Rodrigo', 'Sebastian', 'Sergio', 'Valentin', 'Xavier'
+            ],
+            'female_first': [
+                'Maria', 'Carmen', 'Isabel', 'Ana', 'Laura', 'Patricia', 'Guadalupe', 'Rosa',
+                'Andrea', 'Monica', 'Sofia', 'Elena', 'Lucia', 'Paula', 'Marta', 'Cristina',
+                'Beatriz', 'Diana', 'Fernanda', 'Gabriela', 'Alejandra', 'Valentina', 'Camila',
+                'Isabella', 'Valeria', 'Natalia', 'Daniela', 'Mariana', 'Carolina', 'Adriana',
+                'Elena', 'Claudia', 'Silvia', 'Raquel', 'Pilar', 'Dolores', 'Mercedes', 'Dolores',
+                'Esperanza', 'Consuelo', 'Soledad', 'Amparo', 'Milagros', 'Rocio', 'Paloma',
+                'Ines', 'Teresa', 'Angela', 'Catalina', 'Jimena', 'Ximena', 'Renata', 'Regina'
+            ],
+            'last': [
+                'Garcia', 'Rodriguez', 'Gonzalez', 'Fernandez', 'Lopez', 'Martinez', 'Sanchez',
+                'Perez', 'Gomez', 'Martin', 'Jimenez', 'Ruiz', 'Hernandez', 'Diaz', 'Moreno',
+                'Alvarez', 'Munoz', 'Romero', 'Alonso', 'Gutierrez', 'Navarro', 'Torres', 'Dominguez',
+                'Vazquez', 'Ramos', 'Gil', 'Ramirez', 'Serrano', 'Blanco', 'Suarez', 'Molina',
+                'Morales', 'Ortega', 'Delgado', 'Castro', 'Ortiz', 'Rubio', 'Marin', 'Sanz',
+                'Nunez', 'Iglesias', 'Medina', 'Garrido', 'Cortes', 'Castillo', 'Lozano', 'Guerrero',
+                'Cano', 'Prieto', 'Mendez', 'Calvo', 'Cruz', 'Gallego', 'Vidal', 'Leon', 'Herrera'
+            ]
+        }
+    }
+    
+    if request.method == 'POST':
+        try:
+            count = int(request.POST.get('count', '5'))
+            name_type = request.POST.get('name_type', 'full')  # full, first_only, last_only
+            gender = request.POST.get('gender', 'any')  # any, male, female
+            regions = request.POST.getlist('regions')  # Can select multiple
+            
+            if count < 1:
+                error = 'Count must be at least 1'
+            elif count > 100:
+                error = 'Count cannot exceed 100'
+            elif not regions:
+                error = 'Please select at least one region'
+            else:
+                # Collect names from selected regions
+                all_male_first = []
+                all_female_first = []
+                all_last = []
+                
+                for region in regions:
+                    if region in name_databases:
+                        all_male_first.extend(name_databases[region]['male_first'])
+                        all_female_first.extend(name_databases[region]['female_first'])
+                        all_last.extend(name_databases[region]['last'])
+                
+                # Remove duplicates while preserving order
+                all_male_first = list(dict.fromkeys(all_male_first))
+                all_female_first = list(dict.fromkeys(all_female_first))
+                all_last = list(dict.fromkeys(all_last))
+                
+                if not all_male_first or not all_female_first or not all_last:
+                    error = 'No names available for selected regions'
+                else:
+                    generated_names = []
+                    
+                    for _ in range(count):
+                        # Determine gender
+                        if gender == 'male':
+                            first_name_pool = all_male_first
+                        elif gender == 'female':
+                            first_name_pool = all_female_first
+                        else:  # any
+                            first_name_pool = random.choice([all_male_first, all_female_first])
+                        
+                        first_name = random.choice(first_name_pool)
+                        last_name = random.choice(all_last)
+                        
+                        if name_type == 'full':
+                            generated_names.append(f"{first_name} {last_name}")
+                        elif name_type == 'first_only':
+                            generated_names.append(first_name)
+                        else:  # last_only
+                            generated_names.append(last_name)
+                    
+                    result = {
+                        'names': generated_names,
+                        'count': len(generated_names),
+                        'name_type': name_type,
+                        'gender': gender,
+                        'regions': regions,
+                    }
+        except ValueError:
+            error = 'Please enter valid numbers'
+        except Exception as e:
+            error = str(e)
+    
+    context = {
+        'result': result,
+        'error': error,
+    }
+    return render(request, 'utilities/random_name_generator.html', context)
+
+def word_lottery(request):
+    """Word lottery - pick a random word/name from user's list"""
+    result = None
+    error = None
+    input_text = ''
+    
+    if request.method == 'POST':
+        try:
+            input_text = request.POST.get('words', '').strip()
+            input_format = request.POST.get('input_format', 'lines')  # lines or commas
+            
+            if not input_text:
+                error = 'Please enter at least one word or name'
+            else:
+                # Parse input based on format
+                if input_format == 'lines':
+                    # Split by newlines
+                    words = [line.strip() for line in input_text.split('\n') if line.strip()]
+                else:  # commas
+                    # Split by commas
+                    words = [word.strip() for word in input_text.split(',') if word.strip()]
+                
+                # Remove duplicates while preserving order
+                words = list(dict.fromkeys(words))
+                
+                if not words:
+                    error = 'No valid words found. Please enter at least one word or name.'
+                elif len(words) > 100:
+                    error = f'Too many entries! You entered {len(words)} words. Maximum is 100.'
+                else:
+                    # Pick a random word
+                    winner = random.choice(words)
+                    
+                    result = {
+                        'winner': winner,
+                        'total_entries': len(words),
+                        'all_entries': words,
+                    }
+        except Exception as e:
+            error = f'Error: {str(e)}'
+    
+    context = {
+        'result': result,
+        'error': error,
+        'input_text': input_text,
+    }
+    return render(request, 'utilities/word_lottery.html', context)

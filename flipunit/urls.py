@@ -46,7 +46,6 @@ urlpatterns = [
     path('pdf-tools/', include('pdf_tools.urls')),
     path('currency/', include('currency_converter.urls')),
     path('utilities/', include('utilities.urls')),
-    path('youtube-analyzer/', include('youtube_analyzer.urls')),
     path('color-picker/', include('color_picker.urls')),
     path('sitemap.xml', sitemap, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='robots.txt', content_type='text/plain')),

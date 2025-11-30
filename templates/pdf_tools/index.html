@@ -1,55 +1,66 @@
 {% extends 'base.html' %}
 
 {% block title %}PDF Tools - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Convert PDF files to PNG, JPG, HTML, Text, SVG, or RTF. Convert PNG, JPG, HTML, Text, SVG, or RTF to PDF. Merge, split, compress, and rotate PDF files.{% endblock %}
 
 {% block content %}
 <div class="hero">
     <h1>PDF Tools</h1>
-    <p>Merge, split, convert, and manipulate PDF files</p>
+    <p>Convert, merge, split, and manipulate PDF files</p>
 </div>
 
-<div class="grid grid-3">
-    <a href="{% url 'pdf_tools:pdf_merge' %}" class="category-card">
-        <h3>Merge PDFs</h3>
-        <p>Combine multiple PDF files into one</p>
-    </a>
-    <a href="{% url 'pdf_tools:pdf_split' %}" class="category-card">
-        <h3>Split PDF</h3>
-        <p>Split a PDF into individual pages</p>
-    </a>
-    <a href="{% url 'pdf_tools:pdf_to_images' %}" class="category-card">
-        <h3>PDF to Images</h3>
-        <p>Convert PDF pages to PNG images</p>
-        {% if not pdf2image_available %}
-        <div class="alert alert-info" style="margin-top: 1rem; text-align: left; font-size: 0.9rem;">
-            Requires poppler installation
-        </div>
-        {% endif %}
-    </a>
-    <a href="{% url 'pdf_tools:pdf_to_html' %}" class="category-card">
-        <h3>PDF to HTML</h3>
-        <p>Convert PDF to HTML format</p>
-    </a>
-    <a href="{% url 'pdf_tools:html_to_pdf' %}" class="category-card">
-        <h3>HTML to PDF</h3>
-        <p>Convert HTML files or content to PDF</p>
-        {% if not weasyprint_available %}
-        <div class="alert alert-info" style="margin-top: 1rem; text-align: left; font-size: 0.9rem;">
-            Requires weasyprint
-        </div>
-        {% endif %}
-    </a>
-    <a href="{% url 'pdf_tools:pdf_to_text' %}" class="category-card">
-        <h3>PDF to Text</h3>
-        <p>Extract plain text from PDF</p>
-    </a>
-    <a href="{% url 'pdf_tools:pdf_compress' %}" class="category-card">
-        <h3>Compress PDF</h3>
-        <p>Reduce PDF file size</p>
-    </a>
-    <a href="{% url 'pdf_tools:pdf_rotate' %}" class="category-card">
-        <h3>Rotate PDF</h3>
-        <p>Rotate PDF pages (90°, 180°, 270°)</p>
-    </a>
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+    <h3 style="margin-bottom: 0.75rem; color: var(--primary-color);">✨ Features</h3>
+    <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+        <li>Convert PDF to PNG, JPG, HTML, Text, SVG, or RTF</li>
+        <li>Convert PNG, JPG, HTML, Text, SVG, or RTF to PDF</li>
+        <li>Merge multiple PDFs into one</li>
+        <li>Split PDF into individual pages</li>
+        <li>Compress PDF files to reduce file size</li>
+        <li>Rotate PDF pages (90°, 180°, 270°)</li>
+        <li>OCR PDF to make scanned documents searchable</li>
+        <li>Remove metadata and personal information</li>
+        <li>Secure processing - files are not stored on our servers</li>
+    </ul>
+</div>
+
+<div style="margin-bottom: 3rem;">
+    <h2 style="margin-bottom: 1.5rem;">Converters</h2>
+    <div class="grid grid-3">
+        <a href="{% url 'pdf_tools:universal' %}" class="category-card">
+            <h3>Universal Converter</h3>
+            <p>Convert PDF to PNG, JPG, HTML, Text, SVG, or RTF. Convert PNG, JPG, HTML, Text, SVG, or RTF to PDF.</p>
+        </a>
+    </div>
+</div>
+
+<div style="margin-bottom: 3rem;">
+    <h2 style="margin-bottom: 1.5rem;">PDF Utilities</h2>
+    <div class="grid grid-3">
+        <a href="{% url 'pdf_tools:pdf_merge' %}" class="category-card">
+            <h3>Merge PDFs</h3>
+            <p>Combine multiple PDF files into one</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_split' %}" class="category-card">
+            <h3>Split PDF</h3>
+            <p>Split a PDF into individual pages</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_compress' %}" class="category-card">
+            <h3>Compress PDF</h3>
+            <p>Reduce PDF file size</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_rotate' %}" class="category-card">
+            <h3>Rotate PDF</h3>
+            <p>Rotate PDF pages (90°, 180°, 270°)</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_ocr' %}" class="category-card">
+            <h3>OCR PDF</h3>
+            <p>Convert scanned PDFs to searchable text</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_remove_metadata' %}" class="category-card">
+            <h3>Remove Metadata</h3>
+            <p>Remove metadata and personal information</p>
+        </a>
+    </div>
 </div>
 {% endblock %}

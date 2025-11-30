@@ -1,9 +1,13 @@
 FROM python:3.12-slim
 
-# Install system dependencies including FFmpeg and yt-dlp
+# Install system dependencies including FFmpeg, pandoc, poppler, tesseract, and yt-dlp
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     postgresql-client \
+    pandoc \
+    poppler-utils \
+    tesseract-ocr \
+    tesseract-ocr-eng \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

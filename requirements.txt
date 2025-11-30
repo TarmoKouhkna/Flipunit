@@ -28,3 +28,7 @@ python-docx==1.1.2
 docx2pdf==0.1.8
 pdfplumber==0.11.4
 pillow-heif==0.13.0
+pymupdf>=1.23.0  # For PDF to SVG conversion
+pypandoc>=1.11  # For PDF ↔ RTF conversion (also requires pandoc binary: brew install pandoc on macOS)
+pytesseract>=0.3.10  # For OCR PDF conversion (also requires tesseract-ocr binary)
+gtts>=2.5.0  # For text-to-speech conversion

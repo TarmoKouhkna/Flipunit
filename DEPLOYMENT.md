@@ -283,10 +283,12 @@ This opens the `nano` text editor. Copy and paste this entire content:
 ```dockerfile
 FROM python:3.11-slim
 
-# Install system dependencies including FFmpeg
+# Install system dependencies including FFmpeg, pandoc, and poppler
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     postgresql-client \
+    pandoc \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory

@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}Word Lottery - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Word lottery tool. Enter up to 100 words or names and randomly pick one winner. Perfect for contests, giveaways, and random selection.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Word Lottery</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Enter up to 100 words or names, and we'll randomly pick one winner!</p>
+    
+    {% if error %}
+        <div class="alert alert-error">
+            {{ error }}
+        </div>
+    {% endif %}
+    
+    {% if result %}
+        <div class="alert alert-success" style="margin-bottom: 2rem; text-align: center;">
+            <h2 style="margin-bottom: 1rem; color: var(--primary);">🎉 Winner! 🎉</h2>
+            <div style="font-size: 2rem; font-weight: bold; padding: 1.5rem; background: var(--surface); border-radius: 8px; margin: 1rem 0; border: 3px solid var(--primary);">
+                {{ result.winner }}
+            </div>
+            <p style="margin-top: 1rem; color: var(--text-secondary);">
+                Selected from <strong>{{ result.total_entries }}</strong> entr{{ result.total_entries|pluralize:"y,ies" }}
+            </p>
+            
+            {% if result.total_entries > 1 %}
+            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                <details style="text-align: left;">
+                    <summary style="cursor: pointer; font-weight: bold; margin-bottom: 0.5rem;">View all entries ({{ result.total_entries }})</summary>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem;">
+                        {% for entry in result.all_entries %}
+                            <span style="display: inline-block; padding: 0.5rem 1rem; background: {% if entry == result.winner %}var(--primary); color: white; font-weight: bold;{% else %}var(--surface);{% endif %} border-radius: 4px; border: {% if entry == result.winner %}3px{% else %}1px{% endif %} solid {% if entry == result.winner %}var(--primary){% else %}var(--border-color){% endif %};">
+                                {{ entry }}
+                            </span>
+                        {% endfor %}
+                    </div>
+                </details>
+            </div>
+            {% endif %}
+            
+            <button onclick="pickAgain()" class="btn btn-primary" style="margin-top: 1rem;">Pick Again</button>
+        </div>
+    {% endif %}
+    
+    <form method="post" class="converter-tool" id="lotteryForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Input Format</label>
+            <select name="input_format" id="input_format" class="form-control" onchange="updatePlaceholder()">
+                <option value="lines">One per line (recommended)</option>
+                <option value="commas">Comma-separated</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Words or Names</label>
+            <textarea 
+                name="words" 
+                id="words" 
+                class="form-control" 
+                rows="10" 
+                placeholder="Enter your words or names here, one per line...&#10;&#10;Example:&#10;Alice&#10;Bob&#10;Charlie&#10;Diana"
+                required
+                style="font-family: monospace; resize: vertical; min-height: 200px;">{{ input_text }}</textarea>
+            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">
+                Enter up to 100 words or names. Each entry will be trimmed of whitespace, and duplicates will be removed.
+            </small>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Pick Random Winner</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Enter your words or names (up to 100 entries)</li>
+            <li>Choose input format: one per line (recommended) or comma-separated</li>
+            <li>Click "Pick Random Winner" to randomly select one entry</li>
+            <li>View all entries by expanding the details section</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Perfect for:</strong> Contests, giveaways, random selection, decision making, team assignments, and more!
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+
+{% block extra_js %}
+<script>
+function updatePlaceholder() {
+    const format = document.getElementById('input_format').value;
+    const textarea = document.getElementById('words');
+    
+    if (format === 'lines') {
+        textarea.placeholder = 'Enter your words or names here, one per line...\n\nExample:\nAlice\nBob\nCharlie\nDiana';
+    } else {
+        textarea.placeholder = 'Enter your words or names here, separated by commas...\n\nExample:\nAlice, Bob, Charlie, Diana';
+    }
+}
+
+function pickAgain() {
+    // Scroll to form and focus on textarea
+    document.getElementById('lotteryForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(function() {
+        document.getElementById('words').focus();
+    }, 500);
+}
+
+// Count entries in real-time
+document.addEventListener('DOMContentLoaded', function() {
+    const textarea = document.getElementById('words');
+    const formatSelect = document.getElementById('input_format');
+    
+    if (textarea) {
+        // Create a counter element
+        const counter = document.createElement('small');
+        counter.style.cssText = 'color: var(--text-secondary); margin-top: 0.5rem; display: block; font-weight: bold;';
+        counter.id = 'entry-counter';
+        textarea.parentNode.insertBefore(counter, textarea.nextSibling);
+        
+        function updateCounter() {
+            const text = textarea.value.trim();
+            const format = formatSelect.value;
+            
+            if (!text) {
+                counter.textContent = '0 entries';
+                counter.style.color = 'var(--text-secondary)';
+                return;
+            }
+            
+            let entries;
+            if (format === 'lines') {
+                entries = text.split('\n').filter(line => line.trim()).length;
+            } else {
+                entries = text.split(',').filter(word => word.trim()).length;
+            }
+            
+            counter.textContent = `${entries} entr${entries === 1 ? 'y' : 'ies'}`;
+            
+            if (entries > 100) {
+                counter.style.color = 'var(--error, #dc3545)';
+                counter.textContent += ' (Maximum is 100!)';
+            } else if (entries > 0) {
+                counter.style.color = 'var(--success, #28a745)';
+            } else {
+                counter.style.color = 'var(--text-secondary)';
+            }
+        }
+        
+        textarea.addEventListener('input', updateCounter);
+        formatSelect.addEventListener('change', updateCounter);
+        updateCounter(); // Initial count
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
+

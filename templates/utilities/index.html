@@ -5,7 +5,7 @@
 {% block content %}
 <div class="hero">
     <h1>Utilities</h1>
-    <p>Calculators, text utilities, color converter, QR code generator, time zone converter, roman numeral converter, favicon generator</p>
+    <p>Calculators, text utilities, converters, generators, and more</p>
 </div>
 
 <div class="grid grid-3">
@@ -36,6 +36,34 @@
     <a href="{% url 'utilities:favicon_generator' %}" class="category-card">
         <h3>Favicon Generator</h3>
         <p>Generate favicon.ico from any image</p>
+    </a>
+    <a href="{% url 'utilities:timestamp_converter' %}" class="category-card">
+        <h3>Timestamp Converter</h3>
+        <p>Convert between timestamps and dates</p>
+    </a>
+    <a href="{% url 'utilities:text_to_speech' %}" class="category-card">
+        <h3>Text-to-Speech</h3>
+        <p>Convert text to speech audio</p>
+    </a>
+    <a href="{% url 'utilities:random_number_generator' %}" class="category-card">
+        <h3>Random Number Generator</h3>
+        <p>Generate random numbers</p>
+    </a>
+    <a href="{% url 'utilities:lorem_ipsum_generator' %}" class="category-card">
+        <h3>Lorem Ipsum Generator</h3>
+        <p>Generate Lorem Ipsum placeholder text</p>
+    </a>
+    <a href="{% url 'utilities:random_word_generator' %}" class="category-card">
+        <h3>Random Word Generator</h3>
+        <p>Generate random words from a dictionary</p>
+    </a>
+    <a href="{% url 'utilities:random_name_generator' %}" class="category-card">
+        <h3>Random Name Generator</h3>
+        <p>Generate random names from different regions</p>
+    </a>
+    <a href="{% url 'utilities:word_lottery' %}" class="category-card">
+        <h3>Word Lottery</h3>
+        <p>Pick a random word or name from your list</p>
     </a>
 </div>
 {% endblock %}

@@ -33,7 +33,9 @@ Required variables in `.env` file:
 - ✅ All required packages in `requirements.txt`
 - ✅ WeasyPrint included (for HTML to PDF)
 - ✅ FFmpeg will be installed in Docker container
-- ✅ All Python dependencies listed
+- ✅ Pandoc will be installed in Docker container (for RTF conversions)
+- ✅ Poppler-utils will be installed in Docker container (for PDF to images)
+- ✅ All Python dependencies listed (pymupdf, pypandoc, cairosvg)
 
 ### 4. **Code Quality**
 - ✅ Bare except clauses fixed (specific exceptions used)
@@ -131,6 +133,7 @@ After deployment, verify:
 ---
 
 **Ready to deploy!** 🚀
+
 
 
 

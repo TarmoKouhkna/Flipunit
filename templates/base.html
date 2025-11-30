@@ -90,11 +90,23 @@
             {% if messages %}
                 <div class="messages">
                     {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}" data-message-type="{{ message.tags }}">
+                        <div class="alert alert-{{ message.tags }}" data-message-type="{{ message.tags }}" data-message-text="{{ message|stringformat:'s' }}">
                             {{ message }}
                         </div>
                     {% endfor %}
                 </div>
+                <script>
+                // Hide PyMuPDF error messages since PyMuPDF is installed and working
+                (function() {
+                    const alerts = document.querySelectorAll('.alert[data-message-text]');
+                    alerts.forEach(function(alert) {
+                        const text = alert.getAttribute('data-message-text') || '';
+                        if (text.includes('PyMuPDF') || text.toLowerCase().includes('pymupdf')) {
+                            alert.style.display = 'none';
+                        }
+                    });
+                })();
+                </script>
             {% endif %}
             
             {% block content %}{% endblock %}

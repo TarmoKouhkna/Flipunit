@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Remove PDF Metadata - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Remove metadata and personal information from PDF files. Clean PDFs for privacy and security.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Remove PDF Metadata</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Remove metadata and personal information from PDF files</p>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Upload PDF File</label>
+            <div class="file-upload-area">
+                <input type="file" name="pdf_file" id="pdf_file" accept=".pdf" required>
+                <p>Click to select or drag and drop a PDF file</p>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Remove Metadata</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>What is removed:</h3>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Author information</li>
+            <li>Creator/Producer information</li>
+            <li>Creation and modification dates</li>
+            <li>Title and subject</li>
+            <li>Keywords and tags</li>
+            <li>Other embedded metadata</li>
+        </ul>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> This creates a new PDF file without metadata. The original file is not modified. Content and formatting remain unchanged.
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.converter-tool');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    const originalText = submitBtn.textContent;
+    form.addEventListener('submit', function() {
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        
+        setTimeout(function() {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }, 2000);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+
+
+

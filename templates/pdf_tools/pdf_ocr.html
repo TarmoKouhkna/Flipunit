@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}OCR PDF - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Convert scanned PDFs to searchable PDFs using OCR technology. Extract text from image-based PDFs.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">OCR PDF → Searchable Text</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Convert scanned PDFs to searchable PDFs using OCR (Optical Character Recognition)</p>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    {% if not pytesseract_available or not pdf2image_available %}
+    <div class="alert alert-info">
+        <strong>Note:</strong> OCR functionality requires pytesseract and pdf2image libraries, as well as Tesseract OCR engine.
+        {% if not pytesseract_available %}
+        <br>Install: pip install pytesseract
+        {% endif %}
+        {% if not pdf2image_available %}
+        <br>Install: pip install pdf2image && brew install poppler (macOS) or apt-get install poppler-utils (Linux)
+        {% endif %}
+        <br>Install Tesseract: brew install tesseract (macOS) or apt-get install tesseract-ocr (Linux)
+    </div>
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Upload PDF File</label>
+            <div class="file-upload-area">
+                <input type="file" name="pdf_file" id="pdf_file" accept=".pdf" required>
+                <p>Click to select or drag and drop a PDF file</p>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Make PDF Searchable</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How it works:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Upload a scanned PDF or image-based PDF</li>
+            <li>OCR technology extracts text from each page</li>
+            <li>Download a new searchable PDF with invisible text layer</li>
+            <li>The PDF will be searchable and selectable</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> OCR accuracy depends on image quality. Clear, high-resolution scans produce better results.
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.converter-tool');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    const originalText = submitBtn.textContent;
+    form.addEventListener('submit', function() {
+        submitBtn.textContent = 'Processing OCR...';
+        submitBtn.disabled = true;
+        
+        setTimeout(function() {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }, 2000);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+
+
+

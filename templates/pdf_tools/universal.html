@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+
+{% block title %}Universal PDF Converter - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Convert PDF to images (PNG, JPG), HTML, or text. Convert HTML to PDF. Universal PDF converter supporting multiple formats.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Universal PDF Converter</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Convert between PDF and various formats</p>
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool" id="converter-form">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label class="form-label">Output Format</label>
+            <select name="output_format" id="output_format" class="form-control" required>
+                <option value="">Select output format...</option>
+                <optgroup label="From PDF">
+                    <option value="png">PDF to PNG (Images)</option>
+                    <option value="jpg">PDF to JPG (Images)</option>
+                    <option value="html">PDF to HTML</option>
+                    <option value="txt">PDF to Text</option>
+                    <option value="svg">PDF to SVG</option>
+                    <option value="rtf">PDF to RTF</option>
+                </optgroup>
+                <optgroup label="To PDF">
+                    <option value="pdf">PNG to PDF</option>
+                    <option value="pdf">JPG to PDF</option>
+                    <option value="pdf">HTML to PDF</option>
+                    <option value="pdf">Text to PDF</option>
+                    <option value="pdf">SVG to PDF</option>
+                    <option value="pdf">RTF to PDF</option>
+                </optgroup>
+            </select>
+        </div>
+        
+        <div id="file-upload-section" class="form-group">
+            <label class="form-label">Upload File</label>
+            <div class="file-upload-area" id="upload-area">
+                <input type="file" name="input_file" id="input_file" accept=".pdf,.html,.htm,.svg,.svgz,.rtf,.png,.jpg,.jpeg,.txt">
+                <div id="upload-content">
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop a file</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;" id="file-info">Supports: PDF, HTML, SVG, RTF, PNG, JPG, TXT</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="html-content-section" class="form-group" style="display: none;">
+            <label class="form-label">Or Paste HTML Content</label>
+            <textarea name="html_content" id="html_content" rows="10" class="form-control" placeholder="<html><head><title>My Document</title></head><body><h1>Hello World</h1><p>This is a paragraph.</p></body></html>"></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Convert</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>Supported Conversions:</h3>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li><strong>PDF to PNG/JPG:</strong> Convert PDF pages to image files</li>
+            <li><strong>PNG/JPG to PDF:</strong> Convert image files to PDF</li>
+            <li><strong>PDF to HTML:</strong> Convert PDF to HTML with preserved formatting and tables</li>
+            <li><strong>HTML to PDF:</strong> Convert HTML files or content to PDF</li>
+            <li><strong>PDF to Text:</strong> Extract plain text from PDF documents</li>
+            <li><strong>Text to PDF:</strong> Convert text files to PDF</li>
+            <li><strong>PDF to SVG:</strong> Convert PDF pages to SVG format</li>
+            <li><strong>SVG to PDF:</strong> Convert SVG files to PDF</li>
+            <li><strong>PDF to RTF:</strong> Convert PDF to RTF format</li>
+            <li><strong>RTF to PDF:</strong> Convert RTF files to PDF</li>
+        </ul>
+    </div>
+</div>
+
+<a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Hide PyMuPDF error messages if PyMuPDF is available
+    {% if pymupdf_available %}
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(function(alert) {
+        const text = alert.textContent || alert.innerText || '';
+        if (text.includes('PyMuPDF') || text.toLowerCase().includes('pymupdf')) {
+            alert.style.display = 'none';
+        }
+    });
+    {% endif %}
+    
+    const outputFormat = document.getElementById('output_format');
+    const fileUploadSection = document.getElementById('file-upload-section');
+    const htmlContentSection = document.getElementById('html_content');
+    const htmlContentSectionDiv = document.getElementById('html-content-section');
+    const inputFile = document.getElementById('input_file');
+    const form = document.getElementById('converter-form');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    // Update accept attribute and show/hide sections based on output format
+    outputFormat.addEventListener('change', function() {
+        const format = this.value;
+        
+        if (format === 'pdf') {
+            // All formats to PDF - accept all possible input formats
+            inputFile.setAttribute('accept', '.html,.htm,.svg,.svgz,.rtf,.png,.jpg,.jpeg,.txt');
+            fileUploadSection.style.display = 'block';
+            // Show HTML content section only for HTML to PDF
+            htmlContentSectionDiv.style.display = 'block';
+            inputFile.required = false;
+        } else if (format === 'png' || format === 'jpg' || format === 'html' || format === 'txt' || format === 'svg' || format === 'rtf') {
+            // PDF to other formats
+            inputFile.setAttribute('accept', '.pdf');
+            fileUploadSection.style.display = 'block';
+            htmlContentSectionDiv.style.display = 'none';
+            inputFile.required = true;
+        } else {
+            fileUploadSection.style.display = 'block';
+            htmlContentSectionDiv.style.display = 'none';
+        }
+    });
+    
+    // Handle file input change for HTML files and update display
+    inputFile.addEventListener('change', function(e) {
+        const fileInfo = document.getElementById('file-info');
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            // Update file info display
+            if (fileInfo) {
+                const fileSize = (file.size / 1024).toFixed(2);
+                fileInfo.textContent = `Selected: ${file.name} (${fileSize} KB)`;
+            }
+            
+            if (outputFormat.value === 'pdf') {
+                // Only auto-fill textarea for HTML files
+                if (file.type === 'text/html' || file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        htmlContentSection.value = e.target.result;
+                    };
+                    reader.readAsText(file);
+                } else {
+                    // Clear textarea for non-HTML files
+                    htmlContentSection.value = '';
+                }
+            }
+        } else {
+            if (fileInfo) {
+                fileInfo.textContent = 'Supports: PDF, HTML, SVG, RTF, PNG, JPG, TXT';
+            }
+        }
+    });
+    
+    // Ensure file input is clickable - add explicit styling
+    const uploadArea = document.getElementById('upload-area');
+    if (uploadArea && inputFile) {
+        // Make sure file input is accessible
+        inputFile.style.display = 'block';
+        inputFile.style.opacity = '0';
+        inputFile.style.position = 'absolute';
+        inputFile.style.width = '100%';
+        inputFile.style.height = '100%';
+        inputFile.style.cursor = 'pointer';
+        inputFile.style.top = '0';
+        inputFile.style.left = '0';
+        inputFile.style.zIndex = '2';
+        
+        // Ensure upload area is clickable
+        uploadArea.style.cursor = 'pointer';
+        uploadArea.style.position = 'relative';
+        
+        // Add a backup click handler in case main.js didn't attach one
+        uploadArea.addEventListener('click', function(e) {
+            if (e.target !== inputFile && !inputFile.contains(e.target)) {
+                inputFile.click();
+            }
+        }, { capture: false });
+    }
+    
+    // Handle form submission
+    const originalText = submitBtn.textContent;
+    form.addEventListener('submit', function(e) {
+        // Validate form before submission
+        if (!outputFormat.value) {
+            e.preventDefault();
+            alert('Please select an output format.');
+            return false;
+        }
+        
+        if (!inputFile.files || inputFile.files.length === 0) {
+            // Check if HTML content is provided for HTML to PDF
+            if (outputFormat.value === 'pdf' && htmlContentSection.value.trim()) {
+                // HTML to PDF - allow submission
+            } else {
+                e.preventDefault();
+                alert('Please upload a file.');
+                return false;
+            }
+        }
+        
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        
+        // Reset button after a delay (for file downloads that don't reload the page)
+        // If the page reloads (error case), the button will be reset automatically
+        setTimeout(function() {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }, 2000); // Reset after 2 seconds - enough time for download to start
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+
