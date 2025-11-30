@@ -26,7 +26,7 @@
         <div class="form-group">
             <label class="form-label">Select Image File</label>
             <div class="file-upload-area">
-                <input type="file" name="image" id="image" accept="image/jpeg,image/png,image/webp" required>
+                <input type="file" name="image" id="image" accept="image/*,.heic,.heif,image/heic,image/heif" required>
                 <div style="text-align: center; padding: 2rem;">
                     <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
                     <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: JPG, JPEG, PNG, WebP, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
@@ -70,7 +70,6 @@
                 <option value="GIF">GIF</option>
                 <option value="ICO">ICO</option>
                 <option value="AVIF">AVIF</option>
-                <option value="HEIC">HEIC</option>
             </select>
         </div>
         
@@ -199,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function toggleQualitySlider() {
         const selectedFormat = outputFormatSelect.value.toUpperCase();
-        if (selectedFormat === 'JPEG' || selectedFormat === 'WEBP' || selectedFormat === 'AVIF' || selectedFormat === 'HEIC') {
+        if (selectedFormat === 'JPEG' || selectedFormat === 'WEBP' || selectedFormat === 'AVIF') {
             qualityGroup.style.display = 'block';
         } else {
             qualityGroup.style.display = 'none';
@@ -225,6 +224,14 @@ document.addEventListener('DOMContentLoaded', function() {
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
         resizeBtn.disabled = true;
+        
+        // Reset button after download starts (for file downloads that don't reload the page)
+        // If the page reloads (error case), the button will be reset automatically
+        setTimeout(function() {
+            btnText.style.display = 'inline';
+            btnLoader.style.display = 'none';
+            resizeBtn.disabled = false;
+        }, 2000); // Reset after 2 seconds - enough time for download to start
     });
 });
 </script>

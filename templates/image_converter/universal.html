@@ -24,7 +24,7 @@
         <div class="form-group">
             <label class="form-label">Select Image File</label>
             <div class="file-upload-area" id="uploadArea">
-                <input type="file" name="image" id="image" accept="image/*" required>
+                <input type="file" name="image" id="image" accept="image/*,.heic,.heif" required>
                 <div id="uploadContent">
                     <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
                     <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
@@ -53,10 +53,9 @@
                 <option value="GIF">GIF (Graphics Interchange Format)</option>
                 <option value="ICO">ICO (Icon File)</option>
                 <option value="AVIF">AVIF (AV1 Image File Format)</option>
-                <option value="HEIC">HEIC (High Efficiency Image Container)</option>
             </select>
             <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
-                <strong>Note:</strong> Converting to JPEG or BMP will remove transparency. PNG, WebP, GIF, AVIF, and HEIC support transparency.
+                <strong>Note:</strong> Converting to JPEG or BMP will remove transparency. PNG, WebP, GIF, and AVIF support transparency.
             </p>
         </div>
         
@@ -91,7 +90,6 @@
             <p><strong>GIF:</strong> Supports animation and transparency. Limited to 256 colors. Good for simple graphics.</p>
             <p><strong>ICO:</strong> Icon format used for Windows icons. Supports multiple sizes in one file.</p>
             <p><strong>AVIF:</strong> Next-generation format with superior compression. Excellent quality at smaller file sizes. Modern browsers support it.</p>
-            <p><strong>HEIC:</strong> Apple's High Efficiency Image format. Excellent compression with high quality. Used by iOS devices.</p>
         </div>
     </div>
 </div>
@@ -134,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show/hide quality slider based on output format
     function toggleQualitySlider() {
         const selectedFormat = outputFormatSelect.value.toUpperCase();
-        if (selectedFormat === 'JPEG' || selectedFormat === 'WEBP' || selectedFormat === 'AVIF' || selectedFormat === 'HEIC') {
+        if (selectedFormat === 'JPEG' || selectedFormat === 'WEBP' || selectedFormat === 'AVIF') {
             qualityGroup.style.display = 'block';
         } else {
             qualityGroup.style.display = 'none';
@@ -152,31 +150,57 @@ document.addEventListener('DOMContentLoaded', function() {
         fileSize.textContent = formatFileSize(file.size);
         imageFormat.textContent = getFileExtension(file.name);
         
-        // Show preview
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            previewImg.src = e.target.result;
-            
-            // Get image dimensions
-            const img = new Image();
-            img.onload = function() {
-                imageDimensions.textContent = img.width + ' × ' + img.height + ' pixels';
+        // Check if file is HEIC/HEIF (browsers can't preview these)
+        const fileExt = getFileExtension(file.name).toLowerCase();
+        const isHeic = fileExt === 'heic' || fileExt === 'heif';
+        
+        if (isHeic) {
+            // For HEIC files, show file info without preview
+            imageDimensions.textContent = 'HEIC format - dimensions will be detected during conversion';
+            imagePreview.style.display = 'block';
+            uploadContent.style.display = 'none';
+            // Hide the preview image for HEIC files
+            previewImg.style.display = 'none';
+        } else {
+            // Show preview for other formats
+            previewImg.style.display = 'block';
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                
+                // Get image dimensions
+                const img = new Image();
+                img.onload = function() {
+                    imageDimensions.textContent = img.width + ' × ' + img.height + ' pixels';
+                    imagePreview.style.display = 'block';
+                    uploadContent.style.display = 'none';
+                };
+                img.onerror = function() {
+                    // If image fails to load, still show file info
+                    imageDimensions.textContent = 'Unable to load preview';
+                    imagePreview.style.display = 'block';
+                    uploadContent.style.display = 'none';
+                };
+                img.src = e.target.result;
+            };
+            reader.onerror = function() {
+                // If file read fails, still show file info
+                imageDimensions.textContent = 'File selected - preview unavailable';
                 imagePreview.style.display = 'block';
                 uploadContent.style.display = 'none';
             };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+            reader.readAsDataURL(file);
+        }
     }
     
-    // File input change
+    // File input change - main.js handles the click event, we just handle file selection
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
             handleFileSelect(e.target.files[0]);
         }
     });
     
-    // Drag and drop
+    // Override drag and drop handlers (main.js has basic handlers, we need custom preview)
     uploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
         uploadArea.style.borderColor = 'var(--primary-color)';
@@ -197,7 +221,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             fileInput.files = files;
-            handleFileSelect(files[0]);
+            // Trigger change event to update preview
+            const changeEvent = new Event('change', { bubbles: true });
+            fileInput.dispatchEvent(changeEvent);
         }
     });
     
@@ -219,13 +245,14 @@ document.addEventListener('DOMContentLoaded', function() {
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
         convertBtn.disabled = true;
-    });
-    
-    // Click to upload
-    uploadArea.addEventListener('click', function(e) {
-        if (e.target !== fileInput && e.target !== uploadContent && !uploadContent.contains(e.target)) {
-            fileInput.click();
-        }
+        
+        // Reset button after download starts (for file downloads that don't reload the page)
+        // If the page reloads (error case), the button will be reset automatically
+        setTimeout(function() {
+            btnText.style.display = 'inline';
+            btnLoader.style.display = 'none';
+            convertBtn.disabled = false;
+        }, 2000); // Reset after 2 seconds - enough time for download to start
     });
 });
 </script>

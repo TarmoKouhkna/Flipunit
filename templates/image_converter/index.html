@@ -35,7 +35,7 @@
 <h2 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Image Editing Utilities</h2>
 <div class="grid grid-2">
     {% for utility in utilities %}
-    <a href="{% if utility.url_name == 'resize' %}{% url 'image_converter:resize' %}{% elif utility.url_name == 'rotate_flip' %}{% url 'image_converter:rotate_flip' %}{% elif utility.url_name == 'remove_exif' %}{% url 'image_converter:remove_exif' %}{% elif utility.url_name == 'grayscale' %}{% url 'image_converter:grayscale' %}{% elif utility.url_name == 'transparent' %}{% url 'image_converter:transparent' %}{% elif utility.url_name == 'merge' %}{% url 'image_converter:merge' %}{% elif utility.url_name == 'watermark' %}{% url 'image_converter:watermark' %}{% endif %}" class="category-card">
+    <a href="{% if utility.url_name == 'resize' %}{% url 'image_converter:resize' %}{% elif utility.url_name == 'rotate_flip' %}{% url 'image_converter:rotate_flip' %}{% elif utility.url_name == 'remove_exif' %}{% url 'image_converter:remove_exif' %}{% elif utility.url_name == 'grayscale' %}{% url 'image_converter:grayscale' %}{% elif utility.url_name == 'merge' %}{% url 'image_converter:merge' %}{% elif utility.url_name == 'watermark' %}{% url 'image_converter:watermark' %}{% endif %}" class="category-card">
         <h3>{{ utility.name }}</h3>
         <p>{{ utility.description }}</p>
     </a>

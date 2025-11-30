@@ -105,7 +105,6 @@ def index(request):
             {'name': 'Rotate & Flip', 'url': 'rotate-flip', 'url_name': 'rotate_flip', 'description': 'Rotate images 90°, 180°, 270° or flip horizontally/vertically'},
             {'name': 'Remove EXIF', 'url': 'remove-exif', 'url_name': 'remove_exif', 'description': 'Remove EXIF metadata from images for privacy'},
             {'name': 'Grayscale', 'url': 'grayscale', 'url_name': 'grayscale', 'description': 'Convert images to grayscale (black and white)'},
-            {'name': 'Transparent Background', 'url': 'transparent', 'url_name': 'transparent', 'description': 'Remove background and make it transparent'},
             {'name': 'Merge Images', 'url': 'merge', 'url_name': 'merge', 'description': 'Merge multiple images horizontally or vertically'},
             {'name': 'Watermark', 'url': 'watermark', 'url_name': 'watermark', 'description': 'Add text or image watermark to your images'},
         ]
@@ -263,7 +262,8 @@ def universal_converter(request):
         return error_response
     
     # Validate output format
-    valid_formats = ['PNG', 'JPEG', 'JPG', 'WEBP', 'BMP', 'TIFF', 'GIF', 'ICO', 'AVIF', 'HEIC']
+    # Note: HEIC is removed from valid formats as PIL doesn't support saving to HEIC
+    valid_formats = ['PNG', 'JPEG', 'JPG', 'WEBP', 'BMP', 'TIFF', 'GIF', 'ICO', 'AVIF']
     if output_format not in valid_formats:
         return render(request, 'image_converter/universal.html', {
             'error': f'Invalid output format: {output_format}. Please select a valid format.'
@@ -274,9 +274,10 @@ def universal_converter(request):
         output_format = 'JPEG'
     
     # Check HEIC output support
-    if output_format == 'HEIC' and not HEIC_AVAILABLE:
+    # Note: pillow-heif only supports reading HEIC, not writing. PIL doesn't support saving HEIC format.
+    if output_format == 'HEIC':
         return render(request, 'image_converter/universal.html', {
-            'error': 'HEIC output requires pillow-heif library. Please install it: pip install pillow-heif'
+            'error': 'HEIC output format is not supported. PIL/Pillow does not support saving to HEIC format. Please choose a different output format like PNG, JPEG, or WebP.'
         })
     
     try:
@@ -327,9 +328,9 @@ def universal_converter(request):
             image = background
         # Note: HEIC and AVIF support transparency, so we don't convert them
         
-        # Get quality setting (for JPEG and WebP)
+        # Get quality setting (for JPEG, WebP, AVIF, and HEIC)
         quality = 95  # default
-        if output_format in ('JPEG', 'WEBP'):
+        if output_format in ('JPEG', 'WEBP', 'AVIF', 'HEIC'):
             try:
                 quality_param = request.POST.get('quality', '95')
                 quality = int(quality_param)
@@ -340,12 +341,13 @@ def universal_converter(request):
         # Save to memory
         output = io.BytesIO()
         save_kwargs = {'format': output_format}
-        if output_format in ('JPEG', 'WEBP'):
+        if output_format in ('JPEG', 'WEBP', 'AVIF'):
             save_kwargs['quality'] = quality
             if output_format == 'JPEG':
                 save_kwargs['optimize'] = True
         elif output_format == 'PNG':
             save_kwargs['optimize'] = True
+        # Note: HEIC output is not supported by PIL, so it's blocked earlier in the function
         
         image.save(output, **save_kwargs)
         output.seek(0)
@@ -360,7 +362,6 @@ def universal_converter(request):
             'GIF': 'image/gif',
             'ICO': 'image/x-icon',
             'AVIF': 'image/avif',
-            'HEIC': 'image/heic',
         }
         ext_map = {
             'PNG': 'png',
@@ -371,7 +372,6 @@ def universal_converter(request):
             'GIF': 'gif',
             'ICO': 'ico',
             'AVIF': 'avif',
-            'HEIC': 'heic',
         }
         
         content_type = content_type_map.get(output_format, 'image/png')
@@ -487,6 +487,12 @@ def resize_image(request):
         else:
             output_format = output_format.upper()
         
+        # Block HEIC output (PIL doesn't support saving to HEIC)
+        if output_format == 'HEIC':
+            return render(request, 'image_converter/resize.html', {
+                'error': 'HEIC output format is not supported. PIL/Pillow does not support saving to HEIC format. Please choose a different output format like PNG, JPEG, or WebP.'
+            })
+        
         # Convert RGBA to RGB for formats that don't support transparency
         if output_format in ('JPEG', 'BMP') and resized_image.mode in ('RGBA', 'LA', 'P'):
             background = Image.new('RGB', resized_image.size, (255, 255, 255))
@@ -515,8 +521,7 @@ def resize_image(request):
                 save_kwargs['optimize'] = True
         elif output_format == 'PNG':
             save_kwargs['optimize'] = True
-        elif output_format == 'HEIC':
-            save_kwargs['quality'] = quality
+        # Note: HEIC output is blocked earlier in the function
         
         resized_image.save(output, **save_kwargs)
         output.seek(0)
@@ -531,7 +536,6 @@ def resize_image(request):
             'GIF': 'gif',
             'ICO': 'ico',
             'AVIF': 'avif',
-            'HEIC': 'heic',
         }
         output_ext = format_ext_map.get(output_format, 'png')
         
@@ -774,87 +778,6 @@ def convert_grayscale(request):
         
     except Exception as e:
         return render(request, 'image_converter/grayscale.html', {
-            'error': f'Error processing image: {str(e)}'
-        })
-
-def transparent_background(request):
-    """Convert image background to transparent"""
-    if request.method != 'POST':
-        return render(request, 'image_converter/transparent.html')
-    
-    if 'image' not in request.FILES:
-        return render(request, 'image_converter/transparent.html', {
-            'error': 'Please upload an image file.'
-        })
-    
-    uploaded_file = request.FILES['image']
-    tolerance = int(request.POST.get('tolerance', '10'))
-    
-    # Validate image file
-    is_valid, error_response, file_ext = _validate_image_file(
-        uploaded_file, request, 'image_converter/transparent.html'
-    )
-    if not is_valid:
-        return error_response
-    
-    try:
-        image_data = uploaded_file.read()
-        
-        image = Image.open(io.BytesIO(image_data))
-        
-        # Handle animated GIFs
-        if hasattr(image, 'is_animated') and image.is_animated:
-            image.seek(0)
-            image = image.copy()
-        
-        # Convert to RGBA if not already
-        if image.mode != 'RGBA':
-            image = image.convert('RGBA')
-        
-        # Get image data
-        data = image.getdata()
-        new_data = []
-        
-        # Get corner color as background color (assuming corners are background)
-        corner_colors = [
-            data[0],  # top-left
-            data[image.width - 1],  # top-right
-            data[(image.height - 1) * image.width],  # bottom-left
-            data[image.width * image.height - 1]  # bottom-right
-        ]
-        # Use most common corner color as background
-        bg_color = max(set(corner_colors), key=corner_colors.count)
-        
-        # Make background transparent
-        for item in data:
-            # Check if pixel is similar to background color
-            if len(item) == 4:  # RGBA
-                r, g, b, a = item
-                bg_r, bg_g, bg_b, bg_a = bg_color if len(bg_color) == 4 else (*bg_color[:3], 255)
-                
-                # Calculate color distance
-                distance = ((r - bg_r) ** 2 + (g - bg_g) ** 2 + (b - bg_b) ** 2) ** 0.5
-                
-                if distance <= tolerance:
-                    new_data.append((r, g, b, 0))  # Make transparent
-                else:
-                    new_data.append(item)
-            else:
-                new_data.append(item)
-        
-        image.putdata(new_data)
-        
-        # Save to memory as PNG (supports transparency)
-        output = io.BytesIO()
-        image.save(output, format='PNG', optimize=True)
-        output.seek(0)
-        
-        response = HttpResponse(output.read(), content_type='image/png')
-        response['Content-Disposition'] = 'attachment; filename="transparent.png"'
-        return response
-        
-    except Exception as e:
-        return render(request, 'image_converter/transparent.html', {
             'error': f'Error processing image: {str(e)}'
         })
 
