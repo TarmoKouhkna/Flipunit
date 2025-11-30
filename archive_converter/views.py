@@ -7,6 +7,7 @@ import tarfile
 import os
 import tempfile
 import shutil
+import logging
 
 # Check for optional dependencies
 try:
@@ -174,14 +175,23 @@ def rar_to_zip(request):
                 'rarfile_available': RARFILE_AVAILABLE,
             })
         
-        # Create ZIP
+        # Create ZIP with path traversal protection
         output_zip = io.BytesIO()
+        extract_dir_abs = os.path.abspath(extract_dir)
         with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zip_out:
             for root, dirs, files in os.walk(extract_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
+                    # Security: Ensure file is within extract_dir (prevent path traversal)
+                    file_path_abs = os.path.abspath(file_path)
+                    if not file_path_abs.startswith(extract_dir_abs):
+                        continue  # Skip files outside extract directory
                     arcname = os.path.relpath(file_path, extract_dir)
-                    zip_out.write(file_path, arcname)
+                    # Additional security: Normalize path and check for path traversal
+                    arcname_normalized = os.path.normpath(arcname)
+                    if arcname_normalized.startswith('..') or os.path.isabs(arcname_normalized):
+                        continue  # Skip malicious paths
+                    zip_out.write(file_path, arcname_normalized)
         
         output_zip.seek(0)
         
@@ -277,14 +287,23 @@ def zip_to_7z(request):
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_dir)
         
-        # Create 7Z
+        # Create 7Z with path traversal protection
         output_7z = io.BytesIO()
+        extract_dir_abs = os.path.abspath(extract_dir)
         with py7zr.SevenZipFile(output_7z, 'w') as archive:
             for root, dirs, files in os.walk(extract_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
+                    # Security: Ensure file is within extract_dir (prevent path traversal)
+                    file_path_abs = os.path.abspath(file_path)
+                    if not file_path_abs.startswith(extract_dir_abs):
+                        continue  # Skip files outside extract directory
                     arcname = os.path.relpath(file_path, extract_dir)
-                    archive.write(file_path, arcname)
+                    # Additional security: Normalize path and check for path traversal
+                    arcname_normalized = os.path.normpath(arcname)
+                    if arcname_normalized.startswith('..') or os.path.isabs(arcname_normalized):
+                        continue  # Skip malicious paths
+                    archive.write(file_path, arcname_normalized)
         
         output_7z.seek(0)
         
@@ -367,14 +386,23 @@ def sevenz_to_zip(request):
         with py7zr.SevenZipFile(sevenz_path, mode='r') as archive:
             archive.extractall(path=extract_dir)
         
-        # Create ZIP
+        # Create ZIP with path traversal protection
         output_zip = io.BytesIO()
+        extract_dir_abs = os.path.abspath(extract_dir)
         with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zip_out:
             for root, dirs, files in os.walk(extract_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
+                    # Security: Ensure file is within extract_dir (prevent path traversal)
+                    file_path_abs = os.path.abspath(file_path)
+                    if not file_path_abs.startswith(extract_dir_abs):
+                        continue  # Skip files outside extract directory
                     arcname = os.path.relpath(file_path, extract_dir)
-                    zip_out.write(file_path, arcname)
+                    # Additional security: Normalize path and check for path traversal
+                    arcname_normalized = os.path.normpath(arcname)
+                    if arcname_normalized.startswith('..') or os.path.isabs(arcname_normalized):
+                        continue  # Skip malicious paths
+                    zip_out.write(file_path, arcname_normalized)
         
         output_zip.seek(0)
         
@@ -441,14 +469,23 @@ def targz_to_zip(request):
         with tarfile.open(targz_path, 'r:gz') as tar_ref:
             tar_ref.extractall(extract_dir)
         
-        # Create ZIP
+        # Create ZIP with path traversal protection
         output_zip = io.BytesIO()
+        extract_dir_abs = os.path.abspath(extract_dir)
         with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zip_out:
             for root, dirs, files in os.walk(extract_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
+                    # Security: Ensure file is within extract_dir (prevent path traversal)
+                    file_path_abs = os.path.abspath(file_path)
+                    if not file_path_abs.startswith(extract_dir_abs):
+                        continue  # Skip files outside extract directory
                     arcname = os.path.relpath(file_path, extract_dir)
-                    zip_out.write(file_path, arcname)
+                    # Additional security: Normalize path and check for path traversal
+                    arcname_normalized = os.path.normpath(arcname)
+                    if arcname_normalized.startswith('..') or os.path.isabs(arcname_normalized):
+                        continue  # Skip malicious paths
+                    zip_out.write(file_path, arcname_normalized)
         
         output_zip.seek(0)
         
@@ -518,14 +555,23 @@ def zip_to_targz(request):
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_dir)
         
-        # Create TAR.GZ
+        # Create TAR.GZ with path traversal protection
         output_targz = io.BytesIO()
+        extract_dir_abs = os.path.abspath(extract_dir)
         with tarfile.open(fileobj=output_targz, mode='w:gz') as tar_out:
             for root, dirs, files in os.walk(extract_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
+                    # Security: Ensure file is within extract_dir (prevent path traversal)
+                    file_path_abs = os.path.abspath(file_path)
+                    if not file_path_abs.startswith(extract_dir_abs):
+                        continue  # Skip files outside extract directory
                     arcname = os.path.relpath(file_path, extract_dir)
-                    tar_out.add(file_path, arcname=arcname)
+                    # Additional security: Normalize path and check for path traversal
+                    arcname_normalized = os.path.normpath(arcname)
+                    if arcname_normalized.startswith('..') or os.path.isabs(arcname_normalized):
+                        continue  # Skip malicious paths
+                    tar_out.add(file_path, arcname=arcname_normalized)
         
         output_targz.seek(0)
         
@@ -606,13 +652,22 @@ def extract_iso(request):
         iso = pycdlib.PyCdlib()
         iso.open(iso_path)
         
-        # Recursive function to extract files from ISO
+        # Recursive function to extract files from ISO with proper error handling
+        extract_dir_abs = os.path.abspath(extract_dir)
+        failed_files = []
+        
         def extract_iso_recursive(iso_path_internal, extract_path):
+            nonlocal failed_files
             try:
                 children = iso.list_children(iso_path=iso_path_internal)
                 for child in children:
                     # Skip . and .. entries
                     if child in ['.', '..']:
+                        continue
+                    
+                    # Security: Validate child name (prevent path traversal)
+                    if '..' in child or '/' in child or '\\' in child:
+                        failed_files.append(f"Invalid path in ISO: {child}")
                         continue
                     
                     child_path = iso_path_internal
@@ -621,6 +676,12 @@ def extract_iso(request):
                     child_path += child
                     
                     child_extract_path = os.path.join(extract_path, child)
+                    
+                    # Security: Ensure extract path stays within extract_dir (prevent path traversal)
+                    child_extract_path_abs = os.path.abspath(child_extract_path)
+                    if not child_extract_path_abs.startswith(extract_dir_abs):
+                        failed_files.append(f"Path traversal attempt blocked: {child_path}")
+                        continue
                     
                     try:
                         if iso.is_file(iso_path=child_path):
@@ -634,25 +695,46 @@ def extract_iso(request):
                             # Recursively extract directory
                             extract_iso_recursive(child_path, child_extract_path)
                     except Exception as e:
-                        # Skip files that can't be extracted
+                        # Log the error instead of silently suppressing
+                        error_msg = f"Failed to extract {child_path}: {str(e)}"
+                        failed_files.append(error_msg)
+                        logger = logging.getLogger(__name__)
+                        logger.warning(error_msg, exc_info=True)
                         continue
-            except Exception:
-                # Some ISOs may have issues, try to continue
-                pass
+            except Exception as e:
+                # Log the error instead of silently suppressing
+                error_msg = f"Error listing children in ISO path {iso_path_internal}: {str(e)}"
+                failed_files.append(error_msg)
+                logger = logging.getLogger(__name__)
+                logger.warning(error_msg, exc_info=True)
         
         # Start extraction from root
         extract_iso_recursive('/', extract_dir)
         
         iso.close()
         
-        # Create ZIP of extracted files
+        # Log any failed files
+        if failed_files:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"ISO extraction completed with {len(failed_files)} failed files: {failed_files[:5]}")
+        
+        # Create ZIP of extracted files with path traversal protection
         output_zip = io.BytesIO()
+        extract_dir_abs = os.path.abspath(extract_dir)
         with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zip_out:
             for root, dirs, files in os.walk(extract_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
+                    # Security: Ensure file is within extract_dir (prevent path traversal)
+                    file_path_abs = os.path.abspath(file_path)
+                    if not file_path_abs.startswith(extract_dir_abs):
+                        continue  # Skip files outside extract directory
                     arcname = os.path.relpath(file_path, extract_dir)
-                    zip_out.write(file_path, arcname)
+                    # Additional security: Normalize path and check for path traversal
+                    arcname_normalized = os.path.normpath(arcname)
+                    if arcname_normalized.startswith('..') or os.path.isabs(arcname_normalized):
+                        continue  # Skip malicious paths
+                    zip_out.write(file_path, arcname_normalized)
         
         output_zip.seek(0)
         

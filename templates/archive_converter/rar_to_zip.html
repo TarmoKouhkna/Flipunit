@@ -64,17 +64,43 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     const originalText = submitBtn.textContent;
-    form.addEventListener('submit', function() {
+    let isProcessing = false;
+    
+    form.addEventListener('submit', function(e) {
+        if (isProcessing) {
+            e.preventDefault();
+            return false;
+        }
+        
+        isProcessing = true;
         submitBtn.textContent = 'Processing...';
         submitBtn.disabled = true;
         
-        setTimeout(function() {
-            submitBtn.textContent = originalText;
-            submitBtn.disabled = false;
-        }, 2000);
+        // Reset will happen on page reload after successful submission
+        // For errors, the page will reload and button will reset automatically
     });
+    
+    // Handle drag and drop
+    if (uploadArea) {
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', function() {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                uploadArea.querySelector('p').textContent = `Selected: ${e.dataTransfer.files[0].name}`;
+            }
+        });
+    }
 });
 </script>
-{% endblock %}
 {% endblock %}
 
