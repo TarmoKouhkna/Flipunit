@@ -7,13 +7,21 @@
 <style>
 .search-btn,
 .search-btn-back {
-    background-color: #9DC7B6 !important;
-    border-color: #9DC7B6 !important;
+    background: var(--card-bg) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 1rem 2rem !important;
+    box-shadow: var(--shadow) !important;
+    transition: transform 0.2s, box-shadow 0.2s, background 0.3s ease !important;
+    color: var(--text-primary) !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
 }
 .search-btn:hover,
 .search-btn-back:hover {
-    background-color: #8ab5a3 !important;
-    border-color: #8ab5a3 !important;
+    background: var(--card-bg) !important;
+    transform: translateY(-4px) !important;
+    box-shadow: var(--shadow-lg) !important;
 }
 </style>
 {% endblock %}
