@@ -3,6 +3,10 @@ from django.http import HttpResponse
 import os
 from PIL import Image, ImageDraw, ImageFont
 import io
+import zipfile
+import tempfile
+import json
+import base64
 from typing import Tuple, Optional
 
 try:
@@ -236,17 +240,90 @@ def convert_image(request, converter_type):
             'error': f'Error processing image: {str(e)}'
         })
 
+def _convert_single_image(uploaded_file, output_format, quality=95):
+    """Helper function to convert a single image"""
+    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+    image_data = uploaded_file.read()
+    
+    # Handle SVG to raster conversion
+    if file_ext == '.svg' and output_format != 'SVG':
+        if not CAIROSVG_AVAILABLE:
+            raise ValueError('SVG conversion requires cairosvg library. Please install it: pip install cairosvg')
+        
+        # Convert SVG to PNG first, then to target format if needed
+        png_data = cairosvg.svg2png(bytestring=image_data, output_width=1920, output_height=1080)
+        
+        if output_format == 'PNG':
+            return png_data, 'png'
+        else:
+            # Convert PNG to target format
+            image = Image.open(io.BytesIO(png_data))
+    else:
+        # Open image with PIL
+        image = Image.open(io.BytesIO(image_data))
+        # Handle animated GIFs - convert to static
+        if hasattr(image, 'is_animated') and image.is_animated:
+            image.seek(0)
+            image = image.copy()
+    
+    # Convert RGBA to RGB for formats that don't support transparency
+    if output_format in ('JPEG', 'BMP') and image.mode in ('RGBA', 'LA', 'P'):
+        background = Image.new('RGB', image.size, (255, 255, 255))
+        if image.mode == 'P':
+            image = image.convert('RGBA')
+        background.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+        image = background
+    
+    # Save to memory
+    output = io.BytesIO()
+    save_kwargs = {'format': output_format}
+    if output_format in ('JPEG', 'WEBP', 'AVIF'):
+        save_kwargs['quality'] = quality
+        if output_format == 'JPEG':
+            save_kwargs['optimize'] = True
+    elif output_format == 'PNG':
+        save_kwargs['optimize'] = True
+    
+    image.save(output, **save_kwargs)
+    output.seek(0)
+    
+    # Determine file extension
+    ext_map = {
+        'PNG': 'png',
+        'JPEG': 'jpg',
+        'WEBP': 'webp',
+        'BMP': 'bmp',
+        'TIFF': 'tiff',
+        'GIF': 'gif',
+        'ICO': 'ico',
+        'AVIF': 'avif',
+    }
+    ext = ext_map.get(output_format, 'png')
+    
+    return output.read(), ext
+
+
 def universal_converter(request):
     """Universal image converter - user chooses output format"""
     if request.method != 'POST':
         return render(request, 'image_converter/universal.html')
     
-    if 'image' not in request.FILES:
+    # Check for batch mode (multiple files)
+    uploaded_files = request.FILES.getlist('image')
+    is_batch = len(uploaded_files) > 1
+    
+    if not uploaded_files:
         return render(request, 'image_converter/universal.html', {
-            'error': 'Please upload an image file.'
+            'error': 'Please upload at least one image file.'
         })
     
-    uploaded_file = request.FILES['image']
+    # Limit batch size to 15 files
+    if len(uploaded_files) > 15:
+        return render(request, 'image_converter/universal.html', {
+            'error': 'Maximum 15 files allowed for batch conversion. Please select fewer files.'
+        })
+    
+    uploaded_file = uploaded_files[0]  # For single file validation
     output_format = request.POST.get('output_format', '').strip().upper()
     
     if not output_format:
@@ -280,111 +357,160 @@ def universal_converter(request):
             'error': 'HEIC output format is not supported. PIL/Pillow does not support saving to HEIC format. Please choose a different output format like PNG, JPEG, or WebP.'
         })
     
+    # Get quality setting
+    quality = 95
+    if output_format in ('JPEG', 'WEBP', 'AVIF', 'HEIC'):
+        try:
+            quality_param = request.POST.get('quality', '95')
+            quality = int(quality_param)
+            quality = max(1, min(100, quality))
+        except (ValueError, TypeError):
+            quality = 95
+    
     try:
-        # Read image
-        image_data = uploaded_file.read()
-        
-        # Handle SVG to raster conversion
-        if file_ext == '.svg' and output_format != 'SVG':
-            if not CAIROSVG_AVAILABLE:
-                return render(request, 'image_converter/universal.html', {
-                    'error': 'SVG conversion requires cairosvg library. Please install it: pip install cairosvg'
-                })
+        # Single file conversion
+        if not is_batch:
+            # Validate image file
+            is_valid, error_response, file_ext = _validate_image_file(
+                uploaded_file, request, 'image_converter/universal.html', allow_svg=True
+            )
+            if not is_valid:
+                # Check if this is an AJAX request
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                    error_msg = 'Validation failed'
+                    if hasattr(error_response, 'context_data') and 'error' in error_response.context_data:
+                        error_msg = error_response.context_data['error']
+                    return HttpResponse(
+                        json.dumps({'error': error_msg}),
+                        content_type='application/json',
+                        status=400
+                    )
+                return error_response
             
-            try:
-                # Convert SVG to PNG first, then to target format if needed
-                png_data = cairosvg.svg2png(bytestring=image_data, output_width=1920, output_height=1080)
+            # Convert single image
+            converted_data, ext = _convert_single_image(uploaded_file, output_format, quality)
+            
+            # Determine content type
+            content_type_map = {
+                'PNG': 'image/png',
+                'JPEG': 'image/jpeg',
+                'WEBP': 'image/webp',
+                'BMP': 'image/bmp',
+                'TIFF': 'image/tiff',
+                'GIF': 'image/gif',
+                'ICO': 'image/x-icon',
+                'AVIF': 'image/avif',
+            }
+            content_type = content_type_map.get(output_format, 'image/png')
+            
+            # Generate filename
+            base_name = os.path.splitext(uploaded_file.name)[0]
+            base_name = ''.join(c for c in base_name if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+            base_name = base_name.replace(' ', '_')
+            safe_filename = f'{base_name}.{ext}' if base_name else f'converted.{ext}'
+            
+            # Check if this is an AJAX request - return JSON like audio converter
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                # Encode file as base64 to send as JSON
+                file_base64 = base64.b64encode(converted_data).decode('utf-8')
                 
-                if output_format == 'PNG':
-                    response = HttpResponse(png_data, content_type='image/png')
-                    response['Content-Disposition'] = 'attachment; filename="converted.png"'
-                    return response
-                else:
-                    # Convert PNG to target format
-                    image = Image.open(io.BytesIO(png_data))
-            except Exception as e:
+                response_data = {
+                    'file': file_base64,
+                    'filename': safe_filename,
+                    'content_type': content_type
+                }
+                
+                response = HttpResponse(
+                    json.dumps(response_data),
+                    content_type='application/json'
+                )
+                response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+                response['Pragma'] = 'no-cache'
+                response['Expires'] = '0'
+                return response
+            
+            # Legacy format - direct file download
+            response = HttpResponse(converted_data, content_type=content_type)
+            response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
+            return response
+        
+        # Batch conversion - create ZIP file
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            successful = 0
+            failed = []
+            
+            for idx, uploaded_file in enumerate(uploaded_files):
+                try:
+                    # Basic validation (file size and extension)
+                    if uploaded_file.size > MAX_IMAGE_SIZE:
+                        failed.append(f"{uploaded_file.name}: File too large")
+                        continue
+                    
+                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+                    if file_ext not in ALLOWED_IMAGE_EXTENSIONS:
+                        failed.append(f"{uploaded_file.name}: Invalid file type")
+                        continue
+                    
+                    if file_ext == '.svg' and not CAIROSVG_AVAILABLE:
+                        failed.append(f"{uploaded_file.name}: SVG requires cairosvg")
+                        continue
+                    
+                    if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
+                        failed.append(f"{uploaded_file.name}: HEIC requires pillow-heif")
+                        continue
+                    
+                    # Convert image
+                    converted_data, ext = _convert_single_image(uploaded_file, output_format, quality)
+                    
+                    # Generate filename
+                    base_name = os.path.splitext(uploaded_file.name)[0]
+                    # Sanitize filename
+                    base_name = ''.join(c for c in base_name if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+                    base_name = base_name.replace(' ', '_')
+                    filename = f"{base_name}.{ext}"
+                    
+                    # Add to ZIP
+                    zip_file.writestr(filename, converted_data)
+                    successful += 1
+                    
+                except Exception as e:
+                    failed.append(f"{uploaded_file.name}: {str(e)}")
+                    continue
+            
+            if successful == 0:
+                error_msg = "All files failed to convert. "
+                if failed:
+                    error_msg += "Errors: " + "; ".join(failed[:5])
+                # Check if this is an AJAX request
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                    return HttpResponse(
+                        json.dumps({'error': error_msg}),
+                        content_type='application/json',
+                        status=400
+                    )
                 return render(request, 'image_converter/universal.html', {
-                    'error': f'Error converting SVG: {str(e)}. Make sure Cairo is installed.'
-                })
-        else:
-            # Open image with PIL
-            try:
-                image = Image.open(io.BytesIO(image_data))
-                # Handle animated GIFs - convert to static
-                if hasattr(image, 'is_animated') and image.is_animated:
-                    image.seek(0)
-                    image = image.copy()
-            except Exception as e:
-                return render(request, 'image_converter/universal.html', {
-                    'error': f'Unable to open image file: {str(e)}. Please ensure the file is a valid image.'
+                    'error': error_msg
                 })
         
-        # Convert RGBA to RGB for formats that don't support transparency
-        if output_format in ('JPEG', 'BMP') and image.mode in ('RGBA', 'LA', 'P'):
-            background = Image.new('RGB', image.size, (255, 255, 255))
-            if image.mode == 'P':
-                image = image.convert('RGBA')
-            background.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
-            image = background
-        # Note: HEIC and AVIF support transparency, so we don't convert them
+        zip_buffer.seek(0)
         
-        # Get quality setting (for JPEG, WebP, AVIF, and HEIC)
-        quality = 95  # default
-        if output_format in ('JPEG', 'WEBP', 'AVIF', 'HEIC'):
-            try:
-                quality_param = request.POST.get('quality', '95')
-                quality = int(quality_param)
-                quality = max(1, min(100, quality))
-            except (ValueError, TypeError):
-                quality = 95
-        
-        # Save to memory
-        output = io.BytesIO()
-        save_kwargs = {'format': output_format}
-        if output_format in ('JPEG', 'WEBP', 'AVIF'):
-            save_kwargs['quality'] = quality
-            if output_format == 'JPEG':
-                save_kwargs['optimize'] = True
-        elif output_format == 'PNG':
-            save_kwargs['optimize'] = True
-        # Note: HEIC output is not supported by PIL, so it's blocked earlier in the function
-        
-        image.save(output, **save_kwargs)
-        output.seek(0)
-        
-        # Determine content type and file extension
-        content_type_map = {
-            'PNG': 'image/png',
-            'JPEG': 'image/jpeg',
-            'WEBP': 'image/webp',
-            'BMP': 'image/bmp',
-            'TIFF': 'image/tiff',
-            'GIF': 'image/gif',
-            'ICO': 'image/x-icon',
-            'AVIF': 'image/avif',
-        }
-        ext_map = {
-            'PNG': 'png',
-            'JPEG': 'jpg',
-            'WEBP': 'webp',
-            'BMP': 'bmp',
-            'TIFF': 'tiff',
-            'GIF': 'gif',
-            'ICO': 'ico',
-            'AVIF': 'avif',
-        }
-        
-        content_type = content_type_map.get(output_format, 'image/png')
-        ext = ext_map.get(output_format, 'png')
-        
-        # Create response
-        response = HttpResponse(output.read(), content_type=content_type)
-        response['Content-Disposition'] = f'attachment; filename="converted.{ext}"'
+        # Create response with ZIP file
+        response = HttpResponse(zip_buffer.read(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="converted_images.zip"'
         return response
         
     except Exception as e:
+        error_msg = f'Error processing image: {str(e)}'
+        # Check if this is an AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+            return HttpResponse(
+                json.dumps({'error': error_msg}),
+                content_type='application/json',
+                status=500
+            )
         return render(request, 'image_converter/universal.html', {
-            'error': f'Error processing image: {str(e)}'
+            'error': error_msg
         })
 
 def resize_image(request):

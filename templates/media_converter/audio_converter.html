@@ -26,10 +26,11 @@
         <div class="form-group">
             <label class="form-label" for="audio_file">Select Audio File</label>
             <div class="file-upload-area">
-                <input type="file" name="audio_file" id="audio_file" accept="audio/*" required>
+                <input type="file" name="audio_file" id="audio_file" accept="audio/*" multiple required>
                 <div style="text-align: center; padding: 2rem;">
                     <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
                     <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: MP3, WAV, OGG, FLAC, AAC, M4A, AIFF</p>
+                    <p style="color: var(--primary-color); font-size: 0.9rem; margin-top: 0.5rem; font-weight: 600;">💡 Batch Mode: Select up to 15 files for batch conversion (downloads as ZIP)</p>
                 </div>
             </div>
         </div>
@@ -262,8 +263,15 @@ if (window.audioConverterInitialized) {
                     throw new Error(errorMessage || `Server returned status ${response.status}`);
                 }
                 
-                if (contentTypeHeader?.includes('application/json')) {
-                    // JSON format - extract file data
+                // Check if this is a ZIP file (batch conversion)
+                if (contentTypeHeader?.includes('application/zip')) {
+                    // ZIP format - batch conversion
+                    blob = await response.blob();
+                    filename = 'converted_audio.zip';
+                    contentType = 'application/zip';
+                    blob = new Blob([blob], { type: contentType });
+                } else if (contentTypeHeader?.includes('application/json')) {
+                    // JSON format - single file conversion
                     const data = await response.json();
                     
                     // Check if response contains an error
@@ -279,7 +287,7 @@ if (window.audioConverterInitialized) {
                     blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
                     filename = data.filename;
                     contentType = data.content_type || 'audio/mpeg';
-            } else {
+                } else {
                     // Legacy format - direct audio file
                     blob = await response.blob();
                     filename = response.headers.get('x-filename') || 'converted.audio';
@@ -295,11 +303,14 @@ if (window.audioConverterInitialized) {
                 state.downloadTriggered = true;
                 console.log('✅ Download triggered (submit count:', state.submitCount, ')');
 
-                // Add timestamp to filename to prevent browser de-duping
-                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-                const fileExt = filename.match(/\.[^/.]+$/) || '.mp3';
-                const baseName = filename.replace(/\.[^/.]+$/, '');
-                const uniqueFilename = `${baseName}-${timestamp}${fileExt}`;
+                // Add timestamp to filename to prevent browser de-duping (only for single files, not ZIP)
+                let uniqueFilename = filename;
+                if (!filename.endsWith('.zip')) {
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+                    const fileExt = filename.match(/\.[^/.]+$/) || '.mp3';
+                    const baseName = filename.replace(/\.[^/.]+$/, '');
+                    uniqueFilename = `${baseName}-${timestamp}${fileExt}`;
+                }
 
                 const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -430,11 +441,20 @@ if (window.audioConverterInitialized) {
             
             // Update display when file is selected
             fileInput.addEventListener('change', (e) => {
-                console.log('📁 File selected:', e.target.files[0]?.name);
+                console.log('📁 Files selected:', e.target.files.length);
+                if (e.target.files.length > 15) {
+                    alert('Maximum 15 files allowed for batch conversion. Please select fewer files.');
+                    e.target.value = '';
+                    return;
+                }
                 const fileName = e.target.files[0]?.name;
                 const p = uploadArea.querySelector('p');
-                if (p && fileName) {
-                    p.textContent = 'Selected: ' + fileName;
+                if (p) {
+                    if (e.target.files.length === 1) {
+                        p.textContent = 'Selected: ' + fileName;
+                    } else {
+                        p.textContent = `${e.target.files.length} files selected (will be converted and downloaded as ZIP)`;
+                    }
                 }
             });
             

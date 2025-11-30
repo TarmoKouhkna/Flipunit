@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Hash Generator - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Hash Generator</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Hash Type</label>
+            <select name="hash_type" id="hash_type" class="form-control">
+                <option value="md5" {% if hash_type == 'md5' or not hash_type %}selected{% endif %}>MD5</option>
+                <option value="sha1" {% if hash_type == 'sha1' %}selected{% endif %}>SHA1</option>
+                <option value="sha256" {% if hash_type == 'sha256' %}selected{% endif %}>SHA256</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Enter Text</label>
+            <textarea name="text" id="text" class="form-control" rows="10" placeholder="Enter text to hash..." required>{% if text %}{{ text }}{% endif %}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Generate Hash</button>
+    </form>
+    
+    {% if result %}
+    <div style="margin-top: 2rem;">
+        <h3>Hash Result ({{ hash_type|upper }}):</h3>
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+            <input type="text" class="form-control" value="{{ result }}" readonly style="font-family: monospace; font-size: 1.1rem;">
+            <button onclick="copyToClipboard('{{ result|escapejs }}')" class="btn btn-secondary" style="margin-top: 1rem;">Copy Hash</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'developer_converter:index' %}" class="btn btn-secondary">← Back to Developer Converters</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard!');
+    }, function() {
+        alert('Failed to copy');
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}
+

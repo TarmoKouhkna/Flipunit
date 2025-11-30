@@ -24,10 +24,11 @@
         <div class="form-group">
             <label class="form-label">Select Image File</label>
             <div class="file-upload-area" id="uploadArea">
-                <input type="file" name="image" id="image" accept="image/*,.heic,.heif" required>
+                <input type="file" name="image" id="image" accept="image/*,.heic,.heif" multiple required>
                 <div id="uploadContent">
                     <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
                     <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
+                    <p style="color: var(--primary-color); font-size: 0.9rem; margin-top: 0.5rem; font-weight: 600;">💡 Batch Mode: Select up to 15 files for batch conversion (downloads as ZIP)</p>
                 </div>
                 <div id="imagePreview" style="display: none; margin-top: 1.5rem;">
                     <img id="previewImg" src="" alt="Preview" style="max-width: 100%; max-height: 400px; border-radius: 8px; box-shadow: var(--shadow-lg);">
@@ -196,7 +197,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // File input change - main.js handles the click event, we just handle file selection
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
-            handleFileSelect(e.target.files[0]);
+            if (e.target.files.length > 15) {
+                alert('Maximum 15 files allowed for batch conversion. Please select fewer files.');
+                e.target.value = '';
+                return;
+            }
+            if (e.target.files.length === 1) {
+                handleFileSelect(e.target.files[0]);
+            } else {
+                // Batch mode - show file count
+                uploadContent.innerHTML = `
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 ${e.target.files.length} file(s) selected</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Files will be converted and downloaded as a ZIP archive</p>
+                `;
+                imagePreview.style.display = 'none';
+            }
         }
     });
     
@@ -227,32 +242,208 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Form submission
-    converterForm.addEventListener('submit', function(e) {
+    // Global state for duplicate prevention
+    if (!window._imageConverterState) {
+        window._imageConverterState = {
+            isProcessing: false,
+            downloadTriggered: false,
+            abortController: null,
+            submitCount: 0
+        };
+    }
+    const state = window._imageConverterState;
+    
+    // Form submission handler
+    const submitHandler = async function(e) {
+        state.submitCount++;
+        console.log('📝 Image converter submit handler called, count:', state.submitCount);
+        
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        // Double-click protection
+        if (state.isProcessing) {
+            console.error('🚫 Submit BLOCKED: already processing');
+            return false;
+        }
+        
         if (!fileInput.files.length) {
-            e.preventDefault();
             alert('Please select an image file first.');
-            return;
+            return false;
         }
         
         if (!outputFormatSelect.value) {
-            e.preventDefault();
             alert('Please select an output format.');
-            return;
+            return false;
         }
         
-        // Show loading state
+        // Lock immediately
+        state.isProcessing = true;
+        state.downloadTriggered = false;
+        console.log('🔒 Lock set, submit count:', state.submitCount);
+        
+        // Update button state
+        convertBtn.disabled = true;
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
-        convertBtn.disabled = true;
+        converterForm.style.pointerEvents = 'none';
         
-        // Reset button after download starts (for file downloads that don't reload the page)
-        // If the page reloads (error case), the button will be reset automatically
-        setTimeout(function() {
+        // Abort any previous fetch
+        if (state.abortController) {
+            state.abortController.abort();
+        }
+        state.abortController = new AbortController();
+        
+        // Cleanup any old blob URLs
+        document.querySelectorAll('a[data-temp-download]').forEach(a => {
+            if (a.href.startsWith('blob:')) {
+                URL.revokeObjectURL(a.href);
+            }
+            a.remove();
+        });
+        
+        const formData = new FormData(converterForm);
+        
+        try {
+            console.log('📤 About to call fetch...');
+            const fetchUrl = converterForm.action || window.location.href;
+            
+            const response = await fetch(fetchUrl, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                signal: state.abortController.signal
+            });
+            
+            console.log('📥 Fetch response received:', response.status);
+            
+            let blob, filename, contentType = 'image/png';
+            const contentTypeHeader = response.headers.get('content-type');
+            
+            if (!response.ok) {
+                // Try to get error message
+                let errorMessage = 'Conversion failed';
+                try {
+                    if (contentTypeHeader?.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorData.message || errorMessage;
+                    } else {
+                        const text = await response.text();
+                        const errorMatch = text.match(/<div[^>]*class="[^"]*alert[^"]*error[^"]*"[^>]*>([^<]+)<\/div>/i);
+                        if (errorMatch) {
+                            errorMessage = errorMatch[1].trim();
+                        } else if (text.length < 500) {
+                            errorMessage = text.substring(0, 200);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error parsing error response:', e);
+                }
+                throw new Error(errorMessage || `Server returned status ${response.status}`);
+            }
+            
+            // Check if this is a ZIP file (batch conversion)
+            if (contentTypeHeader?.includes('application/zip')) {
+                // ZIP format - batch conversion
+                blob = await response.blob();
+                filename = 'converted_images.zip';
+                contentType = 'application/zip';
+                blob = new Blob([blob], { type: contentType });
+            } else if (contentTypeHeader?.includes('application/json')) {
+                // JSON format - single file conversion
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                const binary = atob(data.file);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                blob = new Blob([bytes], { type: data.content_type || 'image/png' });
+                filename = data.filename;
+                contentType = data.content_type || 'image/png';
+            } else {
+                // Legacy format - direct image file
+                blob = await response.blob();
+                filename = response.headers.get('Content-Disposition')?.match(/filename="?([^"]+)"?/)?.[1] || 'converted.png';
+                contentType = contentTypeHeader || 'image/png';
+                blob = new Blob([blob], { type: contentType });
+            }
+            
+            // Final duplicate download guard
+            if (state.downloadTriggered) {
+                console.error('🚫 Download already triggered, skipping');
+                return;
+            }
+            state.downloadTriggered = true;
+            console.log('✅ Download triggered');
+            
+            // Add timestamp to filename to prevent browser de-duping (only for single files, not ZIP)
+            let uniqueFilename = filename;
+            if (!filename.endsWith('.zip')) {
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+                const fileExt = filename.match(/\.[^/.]+$/) || '.png';
+                const baseName = filename.replace(/\.[^/.]+$/, '');
+                uniqueFilename = `${baseName}-${timestamp}${fileExt}`;
+            }
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = uniqueFilename;
+            a.dataset.tempDownload = 'true';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            setTimeout(() => {
+                if (document.body.contains(a)) {
+                    document.body.removeChild(a);
+                }
+                URL.revokeObjectURL(url);
+            }, 100);
+            
+        } catch (err) {
+            // Ignore abort errors
+            if (err.name === 'AbortError') {
+                console.log('Fetch aborted (duplicate prevented)');
+                return;
+            }
+            console.error('Conversion error:', err);
+            const errorMessage = err.message || 'Conversion failed. Please try again.';
+            alert(errorMessage);
+        } finally {
+            // Always reset
+            console.log('🔓 Releasing lock');
+            state.isProcessing = false;
+            state.abortController = null;
+            
+            convertBtn.disabled = false;
             btnText.style.display = 'inline';
             btnLoader.style.display = 'none';
-            convertBtn.disabled = false;
-        }, 2000); // Reset after 2 seconds - enough time for download to start
+            converterForm.style.pointerEvents = 'auto';
+        }
+    };
+    
+    // Prevent default form submission and use our handler
+    converterForm.addEventListener('submit', submitHandler);
+    
+    // Also change button type to prevent native submission
+    convertBtn.type = 'button';
+    convertBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (!state.isProcessing) {
+            submitHandler(new Event('submit', { bubbles: true, cancelable: true }));
+        }
     });
 });
 </script>

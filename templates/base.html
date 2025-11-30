@@ -66,11 +66,30 @@
                     <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
                     <span class="logo-text">{{ SITE_DISPLAY_NAME }}</span>
                 </a>
-                <button class="mobile-menu-toggle" aria-label="Toggle menu">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button class="dark-mode-toggle" id="dark-mode-toggle" aria-label="Toggle dark mode">
+                        <svg class="sun-icon" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="moon-icon" viewBox="0 0 24 24">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                        <span class="toggle-text">Dark Mode</span>
+                    </button>
+                    <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                </div>
                 <ul class="nav-menu">
                     <li><a href="{% url 'home' %}">Home</a></li>
                     <li><a href="{% url 'converters:index' %}">Unit Converters</a></li>
@@ -80,6 +99,9 @@
                     <li><a href="{% url 'currency_converter:index' %}">Currency & Crypto</a></li>
                     <li><a href="{% url 'color_picker:index' %}">Color Picker</a></li>
                     <li><a href="{% url 'utilities:index' %}">Utilities</a></li>
+                    <li><a href="{% url 'archive_converter:index' %}">Archive Converters</a></li>
+                    <li><a href="{% url 'text_converter:index' %}">Text & String Converters</a></li>
+                    <li><a href="{% url 'developer_converter:index' %}">Developer Converters</a></li>
                 </ul>
             </div>
         </nav>
@@ -96,12 +118,17 @@
                     {% endfor %}
                 </div>
                 <script>
-                // Hide PyMuPDF error messages since PyMuPDF is installed and working
+                // Hide stale error messages for libraries that are now installed
                 (function() {
                     const alerts = document.querySelectorAll('.alert[data-message-text]');
                     alerts.forEach(function(alert) {
                         const text = alert.getAttribute('data-message-text') || '';
-                        if (text.includes('PyMuPDF') || text.toLowerCase().includes('pymupdf')) {
+                        const lowerText = text.toLowerCase();
+                        // Hide PyMuPDF, rarfile, py7zr, pycdlib error messages if they mention installation
+                        if (lowerText.includes('pymupdf') || 
+                            (lowerText.includes('rarfile') && lowerText.includes('install')) ||
+                            (lowerText.includes('py7zr') && lowerText.includes('install')) ||
+                            (lowerText.includes('pycdlib') && lowerText.includes('install'))) {
                             alert.style.display = 'none';
                         }
                     });

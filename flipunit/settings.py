@@ -76,6 +76,9 @@ INSTALLED_APPS = [
     'currency_converter',
     'utilities',
     'color_picker',
+    'archive_converter',
+    'text_converter',
+    'developer_converter',
 ]
 
 MIDDLEWARE = [

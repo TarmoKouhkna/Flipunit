@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Word Counter - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Word Counter</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Enter Text</label>
+            <textarea name="text" id="text" class="form-control" rows="15" placeholder="Enter your text here..." required>{% if input_text %}{{ input_text }}{% endif %}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Count</button>
+    </form>
+    
+    {% if char_count is not None %}
+    <div style="margin-top: 2rem;">
+        <h3>Statistics:</h3>
+        <div style="background: var(--surface); padding: 1.5rem; border-radius: 6px; margin-top: 1rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div>
+                    <strong style="color: var(--primary-color);">Characters:</strong>
+                    <p style="font-size: 1.5rem; margin: 0.5rem 0 0 0;">{{ char_count }}</p>
+                </div>
+                <div>
+                    <strong style="color: var(--primary-color);">Characters (no spaces):</strong>
+                    <p style="font-size: 1.5rem; margin: 0.5rem 0 0 0;">{{ char_count_no_spaces }}</p>
+                </div>
+                <div>
+                    <strong style="color: var(--primary-color);">Words:</strong>
+                    <p style="font-size: 1.5rem; margin: 0.5rem 0 0 0;">{{ word_count }}</p>
+                </div>
+                <div>
+                    <strong style="color: var(--primary-color);">Lines:</strong>
+                    <p style="font-size: 1.5rem; margin: 0.5rem 0 0 0;">{{ line_count }}</p>
+                </div>
+                <div>
+                    <strong style="color: var(--primary-color);">Paragraphs:</strong>
+                    <p style="font-size: 1.5rem; margin: 0.5rem 0 0 0;">{{ paragraph_count }}</p>
+                </div>
+                <div>
+                    <strong style="color: var(--primary-color);">Sentences:</strong>
+                    <p style="font-size: 1.5rem; margin: 0.5rem 0 0 0;">{{ sentence_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'text_converter:index' %}" class="btn btn-secondary">← Back to Text Converters</a>
+{% endblock %}
+

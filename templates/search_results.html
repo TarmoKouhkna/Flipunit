@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Search Results{% if query %} - "{{ query }}"{% endif %} - {{ SITE_NAME }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.search-btn,
+.search-btn-back {
+    background-color: #9DC7B6 !important;
+    border-color: #9DC7B6 !important;
+}
+.search-btn:hover,
+.search-btn-back:hover {
+    background-color: #8ab5a3 !important;
+    border-color: #8ab5a3 !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Search Results</h1>
+    {% if query %}
+        <p>Searching for: "<strong>{{ query }}</strong>"</p>
+    {% else %}
+        <p>Enter a search query to find tools and converters</p>
+    {% endif %}
+</div>
+
+<div style="margin-bottom: 2rem;">
+    <form method="get" action="{% url 'search' %}" class="search-form" style="max-width: 800px; margin: 0 auto;">
+        <div style="display: flex; gap: 0.5rem;">
+            <input type="search" name="q" id="search-input" class="form-control" placeholder="Search for tools, converters, and utilities..." value="{{ query }}" style="flex: 1; font-size: 1.1rem; padding: 1rem;">
+            <button type="submit" class="btn btn-primary search-btn" style="padding: 1rem 2rem; font-size: 1.1rem;">Search</button>
+        </div>
+    </form>
+</div>
+
+{% if query %}
+    {% if results %}
+        <div style="margin-bottom: 2rem;">
+            <p style="color: var(--text-secondary);">Found <strong>{{ result_count }}</strong> result{{ result_count|pluralize }}</p>
+        </div>
+        
+        <div class="grid grid-3">
+            {% for result in results %}
+            <a href="{{ result.url }}" class="category-card">
+                <div style="margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.85rem; color: var(--primary-color); font-weight: 600;">{{ result.category }}</span>
+                </div>
+                <h3>{{ result.name }}</h3>
+                <p>{{ result.description }}</p>
+            </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card" style="text-align: center; padding: 3rem;">
+            <h2 style="margin-bottom: 1rem;">No results found</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Try searching with different keywords or browse categories below.</p>
+            <a href="{% url 'home' %}" class="btn btn-primary search-btn-back">Back to Home</a>
+        </div>
+    {% endif %}
+{% else %}
+    <div class="card" style="text-align: center; padding: 3rem;">
+        <h2 style="margin-bottom: 1rem;">Search All Tools</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 2rem;">Enter a search term above to find tools, converters, and utilities across all categories.</p>
+        <a href="{% url 'home' %}" class="btn btn-primary">Back to Home</a>
+    </div>
+{% endif %}
+
+{% if not query or not results %}
+<div style="margin-top: 3rem;">
+    <h2 style="margin-bottom: 1.5rem;">Browse Categories</h2>
+    <div class="grid grid-2">
+        {% for category in categories %}
+        <a href="{% url category.url %}" class="category-card">
+            <div class="category-icon">
+                {% with 'images/icons/'|add:category.icon as icon_path %}
+                <img src="{% static icon_path %}" alt="{{ category.name }}">
+                {% endwith %}
+            </div>
+            <h3>{{ category.name }}</h3>
+            <p>{{ category.description }}</p>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.focus();
+    }
+});
+</script>
+{% endblock %}
+

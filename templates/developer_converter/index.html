@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Developer Converters - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Developer tools: minify/unminify HTML/CSS/JS, CSV/JSON conversion, SQL formatter, regex tester, JWT decoder, URL encoder, hash generators, and more.{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Developer Converters</h1>
+    <p>Tools for developers: code minification, format conversion, and utilities</p>
+</div>
+
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+    <h3 style="margin-bottom: 0.75rem; color: var(--primary-color);">✨ Features</h3>
+    <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+        <li>Minify and unminify HTML, CSS, and JavaScript</li>
+        <li>Convert between CSV and JSON formats</li>
+        <li>Format SQL queries</li>
+        <li>Convert between CSS and SCSS</li>
+        <li>Test regular expressions</li>
+        <li>Decode JWT tokens</li>
+        <li>Encode and decode URLs</li>
+        <li>Generate MD5, SHA1, and SHA256 hashes</li>
+    </ul>
+</div>
+
+<div style="margin-bottom: 3rem;">
+    <h2 style="margin-bottom: 1.5rem;">Developer Tools</h2>
+    <div class="grid grid-3">
+        <a href="{% url 'developer_converter:minify' %}" class="category-card">
+            <h3>Minify Code</h3>
+            <p>Minify HTML, CSS, or JavaScript code</p>
+        </a>
+        <a href="{% url 'developer_converter:unminify' %}" class="category-card">
+            <h3>Unminify Code</h3>
+            <p>Beautify and format minified code</p>
+        </a>
+        <a href="{% url 'developer_converter:csv_to_json' %}" class="category-card">
+            <h3>CSV → JSON</h3>
+            <p>Convert CSV data to JSON format</p>
+        </a>
+        <a href="{% url 'developer_converter:json_to_csv' %}" class="category-card">
+            <h3>JSON → CSV</h3>
+            <p>Convert JSON data to CSV format</p>
+        </a>
+        <a href="{% url 'developer_converter:sql_formatter' %}" class="category-card">
+            <h3>SQL Formatter</h3>
+            <p>Format and beautify SQL queries</p>
+        </a>
+        <a href="{% url 'developer_converter:css_scss' %}" class="category-card">
+            <h3>CSS ↔ SCSS</h3>
+            <p>Convert between CSS and SCSS formats</p>
+        </a>
+        <a href="{% url 'developer_converter:regex_tester' %}" class="category-card">
+            <h3>Regex Tester</h3>
+            <p>Test and debug regular expressions</p>
+        </a>
+        <a href="{% url 'developer_converter:jwt_decoder' %}" class="category-card">
+            <h3>JWT Decoder</h3>
+            <p>Decode and view JWT token contents</p>
+        </a>
+        <a href="{% url 'developer_converter:url_encoder' %}" class="category-card">
+            <h3>URL Encoder/Decoder</h3>
+            <p>Encode or decode URL strings</p>
+        </a>
+        <a href="{% url 'developer_converter:hash_generator' %}" class="category-card">
+            <h3>Hash Generator</h3>
+            <p>Generate MD5, SHA1, and SHA256 hashes</p>
+        </a>
+    </div>
+</div>
+{% endblock %}
+

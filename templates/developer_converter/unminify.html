@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Unminify Code - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Unminify (Beautify) HTML/CSS/JS</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Code Type</label>
+            <select name="code_type" id="code_type" class="form-control">
+                <option value="html" {% if code_type == 'html' or not code_type %}selected{% endif %}>HTML</option>
+                <option value="css" {% if code_type == 'css' %}selected{% endif %}>CSS</option>
+                <option value="js" {% if code_type == 'js' %}selected{% endif %}>JavaScript</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Enter Minified Code</label>
+            <textarea name="code" id="code" class="form-control" rows="15" placeholder="Enter your minified code here..." style="font-family: monospace;" required>{% if code %}{{ code }}{% endif %}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Unminify</button>
+    </form>
+    
+    {% if result %}
+    <div style="margin-top: 2rem;">
+        <h3>Beautified Result:</h3>
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea class="form-control" rows="15" readonly style="font-family: monospace;">{{ result }}</textarea>
+            <button onclick="copyToClipboard('{{ result|escapejs }}')" class="btn btn-secondary" style="margin-top: 1rem;">Copy Result</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'developer_converter:index' %}" class="btn btn-secondary">← Back to Developer Converters</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard!');
+    }, function() {
+        alert('Failed to copy');
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}
+

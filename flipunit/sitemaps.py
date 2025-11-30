@@ -12,6 +12,7 @@ class StaticViewSitemap(Sitemap):
         return [
             # Main pages
             'home',
+            'search',
             'converters:index',
             'image_converter:index',
             'media_converter:index',
@@ -19,6 +20,9 @@ class StaticViewSitemap(Sitemap):
             'currency_converter:index',
             'utilities:index',
             'color_picker:index',
+            'archive_converter:index',
+            'text_converter:index',
+            'developer_converter:index',
             
             # Unit converters
             ('converters:tool', 'length'),
@@ -53,12 +57,43 @@ class StaticViewSitemap(Sitemap):
             
             # Utilities
             'utilities:calculator',
-            'utilities:text_tools',
-            'utilities:color_converter',
             'utilities:qr_code_generator',
             'utilities:timezone_converter',
             'utilities:roman_numeral_converter',
             'utilities:favicon_generator',
+            
+            # Archive converters
+            'archive_converter:rar_to_zip',
+            'archive_converter:zip_to_7z',
+            'archive_converter:7z_to_zip',
+            'archive_converter:targz_to_zip',
+            'archive_converter:zip_to_targz',
+            'archive_converter:extract_iso',
+            'archive_converter:create_zip',
+            
+            # Text converters
+            'text_converter:uppercase_lowercase',
+            'text_converter:camelcase_snakecase',
+            'text_converter:remove_special',
+            'text_converter:remove_duplicates',
+            'text_converter:sort_lines',
+            'text_converter:json_xml',
+            'text_converter:json_yaml',
+            'text_converter:html_markdown',
+            'text_converter:text_base64',
+            'text_converter:word_counter',
+            
+            # Developer converters
+            'developer_converter:minify',
+            'developer_converter:unminify',
+            'developer_converter:csv_to_json',
+            'developer_converter:json_to_csv',
+            'developer_converter:sql_formatter',
+            'developer_converter:css_scss',
+            'developer_converter:regex_tester',
+            'developer_converter:jwt_decoder',
+            'developer_converter:url_encoder',
+            'developer_converter:hash_generator',
         ]
 
     def location(self, item):

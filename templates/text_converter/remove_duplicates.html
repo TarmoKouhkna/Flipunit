@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Remove Duplicate Lines - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Remove Duplicate Lines</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Options</label>
+            <div style="margin-top: 0.5rem;">
+                <label style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" name="preserve_order" {% if preserve_order %}checked{% endif %} style="margin-right: 0.5rem;">
+                    Preserve line order
+                </label>
+                <label style="display: flex; align-items: center;">
+                    <input type="checkbox" name="case_sensitive" {% if case_sensitive %}checked{% endif %} style="margin-right: 0.5rem;">
+                    Case sensitive
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Enter Text (one line per item)</label>
+            <textarea name="text" id="text" class="form-control" rows="15" placeholder="Enter your text here, one line per item..." required>{% if input_text %}{{ input_text }}{% endif %}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Remove Duplicates</button>
+    </form>
+    
+    {% if result %}
+    <div style="margin-top: 2rem;">
+        <h3>Result:</h3>
+        {% if removed_count %}
+        <p style="color: var(--text-secondary);">Removed {{ removed_count }} duplicate line(s)</p>
+        {% endif %}
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea class="form-control" rows="15" readonly style="font-family: monospace;">{{ result }}</textarea>
+            <button onclick="copyToClipboard('{{ result|escapejs }}')" class="btn btn-secondary" style="margin-top: 1rem;">Copy Result</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'text_converter:index' %}" class="btn btn-secondary">← Back to Text Converters</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard!');
+    }, function() {
+        alert('Failed to copy');
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}
+

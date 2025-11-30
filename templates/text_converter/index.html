@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Text & String Converters - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Convert text between formats: uppercase/lowercase, CamelCase/snake_case, JSON/XML/YAML, HTML/Markdown, Base64, and more text utilities.{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Text & String Converters</h1>
+    <p>Convert and transform text between different formats and styles</p>
+</div>
+
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+    <h3 style="margin-bottom: 0.75rem; color: var(--primary-color);">✨ Features</h3>
+    <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+        <li>Convert between uppercase and lowercase</li>
+        <li>Convert between CamelCase and snake_case</li>
+        <li>Remove special characters from text</li>
+        <li>Remove duplicate lines</li>
+        <li>Sort lines alphabetically</li>
+        <li>Convert between JSON, XML, and YAML</li>
+        <li>Convert between HTML and Markdown</li>
+        <li>Encode/decode Base64</li>
+        <li>Count words, characters, lines, and more</li>
+    </ul>
+</div>
+
+<div style="margin-bottom: 3rem;">
+    <h2 style="margin-bottom: 1.5rem;">Text Converters</h2>
+    <div class="grid grid-3">
+        <a href="{% url 'text_converter:uppercase_lowercase' %}" class="category-card">
+            <h3>Uppercase ↔ Lowercase</h3>
+            <p>Convert text between uppercase, lowercase, title case, and sentence case</p>
+        </a>
+        <a href="{% url 'text_converter:camelcase_snakecase' %}" class="category-card">
+            <h3>CamelCase ↔ snake_case</h3>
+            <p>Convert between CamelCase, snake_case, and PascalCase</p>
+        </a>
+        <a href="{% url 'text_converter:remove_special' %}" class="category-card">
+            <h3>Remove Special Characters</h3>
+            <p>Remove special characters, keeping only letters, numbers, and spaces</p>
+        </a>
+        <a href="{% url 'text_converter:remove_duplicates' %}" class="category-card">
+            <h3>Remove Duplicate Lines</h3>
+            <p>Remove duplicate lines from text while preserving order</p>
+        </a>
+        <a href="{% url 'text_converter:sort_lines' %}" class="category-card">
+            <h3>Sort Lines</h3>
+            <p>Sort lines alphabetically in ascending or descending order</p>
+        </a>
+        <a href="{% url 'text_converter:json_xml' %}" class="category-card">
+            <h3>JSON ↔ XML</h3>
+            <p>Convert between JSON and XML formats</p>
+        </a>
+        <a href="{% url 'text_converter:json_yaml' %}" class="category-card">
+            <h3>JSON ↔ YAML</h3>
+            <p>Convert between JSON and YAML formats</p>
+        </a>
+        <a href="{% url 'text_converter:html_markdown' %}" class="category-card">
+            <h3>HTML ↔ Markdown</h3>
+            <p>Convert between HTML and Markdown formats</p>
+        </a>
+        <a href="{% url 'text_converter:text_base64' %}" class="category-card">
+            <h3>Text ↔ Base64</h3>
+            <p>Encode text to Base64 or decode Base64 to text</p>
+        </a>
+        <a href="{% url 'text_converter:word_counter' %}" class="category-card">
+            <h3>Word Counter</h3>
+            <p>Count words, characters, lines, paragraphs, and sentences</p>
+        </a>
+    </div>
+</div>
+{% endblock %}
+

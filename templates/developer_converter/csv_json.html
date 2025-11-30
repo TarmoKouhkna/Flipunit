@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if conversion_type == 'csv_to_json' %}CSV to JSON{% else %}JSON to CSV{% endif %} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">{% if conversion_type == 'csv_to_json' %}CSV → JSON{% else %}JSON → CSV{% endif %}</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        {% if conversion_type == 'csv_to_json' %}
+        <div class="form-group">
+            <label class="form-label">Options</label>
+            <label style="display: flex; align-items: center; margin-top: 0.5rem;">
+                <input type="checkbox" name="has_headers" {% if has_headers %}checked{% endif %} style="margin-right: 0.5rem;">
+                First row contains headers
+            </label>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Enter CSV Data</label>
+            <textarea name="csv_text" id="csv_text" class="form-control" rows="15" placeholder="Enter CSV data here..." style="font-family: monospace;" required>{% if csv_text %}{{ csv_text }}{% endif %}</textarea>
+        </div>
+        {% else %}
+        <div class="form-group">
+            <label class="form-label">Enter JSON Data</label>
+            <textarea name="json_text" id="json_text" class="form-control" rows="15" placeholder="Enter JSON data here..." style="font-family: monospace;" required>{% if json_text %}{{ json_text }}{% endif %}</textarea>
+        </div>
+        {% endif %}
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert</button>
+    </form>
+    
+    {% if result %}
+    <div style="margin-top: 2rem;">
+        <h3>Result:</h3>
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea class="form-control" rows="15" readonly style="font-family: monospace;">{{ result }}</textarea>
+            <button onclick="copyToClipboard('{{ result|escapejs }}')" class="btn btn-secondary" style="margin-top: 1rem;">Copy Result</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'developer_converter:index' %}" class="btn btn-secondary">← Back to Developer Converters</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard!');
+    }, function() {
+        alert('Failed to copy');
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}
+

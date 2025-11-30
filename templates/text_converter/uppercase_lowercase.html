@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Uppercase ↔ Lowercase Converter - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Uppercase ↔ Lowercase Converter</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Conversion Type</label>
+            <select name="conversion_type" id="conversion_type" class="form-control">
+                <option value="to_upper" {% if conversion_type == 'to_upper' or not conversion_type %}selected{% endif %}>To UPPERCASE</option>
+                <option value="to_lower" {% if conversion_type == 'to_lower' %}selected{% endif %}>To lowercase</option>
+                <option value="to_title" {% if conversion_type == 'to_title' %}selected{% endif %}>To Title Case</option>
+                <option value="to_sentence" {% if conversion_type == 'to_sentence' %}selected{% endif %}>To Sentence case</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Enter Text</label>
+            <textarea name="text" id="text" class="form-control" rows="10" placeholder="Enter your text here..." required>{% if input_text %}{{ input_text }}{% endif %}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert</button>
+    </form>
+    
+    {% if result %}
+    <div style="margin-top: 2rem;">
+        <h3>Result:</h3>
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea class="form-control" rows="10" readonly style="font-family: monospace;">{{ result }}</textarea>
+            <button onclick="copyToClipboard('{{ result|escapejs }}')" class="btn btn-secondary" style="margin-top: 1rem;">Copy Result</button>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Select the conversion type</li>
+            <li>Enter or paste your text</li>
+            <li>Click "Convert"</li>
+            <li>Copy the result</li>
+        </ol>
+    </div>
+</div>
+
+<a href="{% url 'text_converter:index' %}" class="btn btn-secondary">← Back to Text Converters</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard!');
+    }, function() {
+        alert('Failed to copy');
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}
+

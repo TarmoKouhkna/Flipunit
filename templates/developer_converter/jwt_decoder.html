@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}JWT Decoder - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">JWT Decoder</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    {% if not jwt_available %}
+    <div class="alert alert-warning">
+        <strong>Note:</strong> JWT decoding requires PyJWT library. Please install it to use this tool.
+    </div>
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Enter JWT Token</label>
+            <textarea name="token" id="token" class="form-control" rows="5" placeholder="Enter JWT token here..." style="font-family: monospace;" required>{% if token %}{{ token }}{% endif %}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Decode JWT</button>
+    </form>
+    
+    {% if header %}
+    <div style="margin-top: 2rem;">
+        <h3>JWT Header:</h3>
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea class="form-control" rows="5" readonly style="font-family: monospace;">{{ header }}</textarea>
+            <button onclick="copyToClipboard('{{ header|escapejs }}')" class="btn btn-secondary" style="margin-top: 1rem;">Copy Header</button>
+        </div>
+        
+        <h3 style="margin-top: 1.5rem;">JWT Payload:</h3>
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea class="form-control" rows="10" readonly style="font-family: monospace;">{{ payload }}</textarea>
+            <button onclick="copyToClipboard('{{ payload|escapejs }}')" class="btn btn-secondary" style="margin-top: 1rem;">Copy Payload</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'developer_converter:index' %}" class="btn btn-secondary">← Back to Developer Converters</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard!');
+    }, function() {
+        alert('Failed to copy');
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}
+

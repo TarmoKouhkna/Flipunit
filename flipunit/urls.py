@@ -40,6 +40,7 @@ def sitemap(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.home, name='home'),
+    path('search/', views.search, name='search'),
     path('converters/', include('converters.urls')),
     path('image-converter/', include('image_converter.urls')),
     path('media-converter/', include('media_converter.urls')),
@@ -47,6 +48,9 @@ urlpatterns = [
     path('currency/', include('currency_converter.urls')),
     path('utilities/', include('utilities.urls')),
     path('color-picker/', include('color_picker.urls')),
+    path('archive-converter/', include('archive_converter.urls')),
+    path('text-converter/', include('text_converter.urls')),
+    path('developer-converter/', include('developer_converter.urls')),
     path('sitemap.xml', sitemap, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='robots.txt', content_type='text/plain')),
 ]

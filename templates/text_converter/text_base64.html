@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Text ↔ Base64 Converter - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Text ↔ Base64 Converter</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Conversion Type</label>
+            <select name="conversion_type" id="conversion_type" class="form-control">
+                <option value="text_to_base64" {% if conversion_type == 'text_to_base64' or not conversion_type %}selected{% endif %}>Text → Base64</option>
+                <option value="base64_to_text" {% if conversion_type == 'base64_to_text' %}selected{% endif %}>Base64 → Text</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Enter Text or Base64</label>
+            <textarea name="text" id="text" class="form-control" rows="10" placeholder="Enter your text or Base64 here..." style="font-family: monospace;" required>{% if input_text %}{{ input_text }}{% endif %}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Convert</button>
+    </form>
+    
+    {% if result %}
+    <div style="margin-top: 2rem;">
+        <h3>Result:</h3>
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea class="form-control" rows="10" readonly style="font-family: monospace;">{{ result }}</textarea>
+            <button onclick="copyToClipboard('{{ result|escapejs }}')" class="btn btn-secondary" style="margin-top: 1rem;">Copy Result</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'text_converter:index' %}" class="btn btn-secondary">← Back to Text Converters</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard!');
+    }, function() {
+        alert('Failed to copy');
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}
+

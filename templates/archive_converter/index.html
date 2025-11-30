@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}Archive Converters - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Convert between ZIP, 7Z, and TAR.GZ archives. Convert RAR to ZIP. Extract ISO files and create ZIP archives from multiple files.{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Archive Converters</h1>
+    <p>Convert between different archive formats and extract files</p>
+</div>
+
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+    <h3 style="margin-bottom: 0.75rem; color: var(--primary-color);">✨ Features</h3>
+    <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+        <li>Convert between ZIP, 7Z, and TAR.GZ formats</li>
+        <li>Convert RAR archives to ZIP format</li>
+        <li>Extract ISO disk images</li>
+        <li>Create ZIP archives from multiple files</li>
+        <li>Secure processing - files are not stored on our servers</li>
+    </ul>
+</div>
+
+<div style="margin-bottom: 3rem;">
+    <h2 style="margin-bottom: 1.5rem;">Archive Converters</h2>
+    <div class="grid grid-3">
+        <a href="{% url 'archive_converter:rar_to_zip' %}" class="category-card">
+            <h3>RAR → ZIP</h3>
+            <p>Convert RAR archives to ZIP format</p>
+        </a>
+        <a href="{% url 'archive_converter:zip_to_7z' %}" class="category-card">
+            <h3>ZIP → 7Z</h3>
+            <p>Convert ZIP archives to 7Z format</p>
+        </a>
+        <a href="{% url 'archive_converter:7z_to_zip' %}" class="category-card">
+            <h3>7Z → ZIP</h3>
+            <p>Convert 7Z archives to ZIP format</p>
+        </a>
+        <a href="{% url 'archive_converter:targz_to_zip' %}" class="category-card">
+            <h3>TAR.GZ → ZIP</h3>
+            <p>Convert TAR.GZ archives to ZIP format</p>
+        </a>
+        <a href="{% url 'archive_converter:zip_to_targz' %}" class="category-card">
+            <h3>ZIP → TAR.GZ</h3>
+            <p>Convert ZIP archives to TAR.GZ format</p>
+        </a>
+        <a href="{% url 'archive_converter:extract_iso' %}" class="category-card">
+            <h3>Extract ISO</h3>
+            <p>Extract files from ISO disk images</p>
+        </a>
+        <a href="{% url 'archive_converter:create_zip' %}" class="category-card">
+            <h3>Create ZIP</h3>
+            <p>Create a ZIP archive from multiple files</p>
+        </a>
+    </div>
+</div>
+{% endblock %}
+

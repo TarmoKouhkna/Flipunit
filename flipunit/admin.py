@@ -25,3 +25,4 @@ class FeedbackAdmin(admin.ModelAdmin):
 
 
 
+

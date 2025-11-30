@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Regex Tester - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Regular Expression Tester</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Regular Expression Pattern</label>
+            <input type="text" name="pattern" id="pattern" class="form-control" placeholder="Enter regex pattern..." value="{% if pattern %}{{ pattern }}{% endif %}" required>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Test Text</label>
+            <textarea name="test_text" id="test_text" class="form-control" rows="10" placeholder="Enter text to test against the pattern..." required>{% if test_text %}{{ test_text }}{% endif %}</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Flags</label>
+            <div style="margin-top: 0.5rem;">
+                <label style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" name="flags" value="ignorecase" {% if 'ignorecase' in flags %}checked{% endif %} style="margin-right: 0.5rem;">
+                    Ignore case (i)
+                </label>
+                <label style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" name="flags" value="multiline" {% if 'multiline' in flags %}checked{% endif %} style="margin-right: 0.5rem;">
+                    Multiline (m)
+                </label>
+                <label style="display: flex; align-items: center;">
+                    <input type="checkbox" name="flags" value="dotall" {% if 'dotall' in flags %}checked{% endif %} style="margin-right: 0.5rem;">
+                    Dot all (s)
+                </label>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">Test Regex</button>
+    </form>
+    
+    {% if matches is not None %}
+    <div style="margin-top: 2rem;">
+        <h3>Results:</h3>
+        <div style="background: var(--surface); padding: 1.5rem; border-radius: 6px; margin-top: 1rem;">
+            <p><strong>Matches found:</strong> {{ match_count }}</p>
+            <p><strong>Full match:</strong> {% if full_match %}Yes{% else %}No{% endif %}</p>
+            <p><strong>Match at start:</strong> {% if match_start %}Yes{% else %}No{% endif %}</p>
+            
+            {% if matches %}
+            <div style="margin-top: 1rem;">
+                <strong>Match details:</strong>
+                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                    {% for match in matches %}
+                    <li style="margin-bottom: 0.5rem;">
+                        <code>{{ match.match }}</code> (position {{ match.start }}-{{ match.end }})
+                        {% if match.groups %}
+                        <br>Groups: {{ match.groups|join:", " }}
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'developer_converter:index' %}" class="btn btn-secondary">← Back to Developer Converters</a>
+{% endblock %}
+

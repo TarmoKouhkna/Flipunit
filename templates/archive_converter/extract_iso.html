@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Extract ISO - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Extract ISO File</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    {% if not pycdlib_available %}
+    <div class="alert alert-warning">
+        <strong>Note:</strong> ISO extraction requires pycdlib library. Please install it to use this tool.
+    </div>
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select ISO File</label>
+            <div class="file-upload-area">
+                <input type="file" name="archive_file" id="archive_file" accept=".iso,.img" required>
+                <p style="margin-top: 1rem;">Click to select or drag and drop an ISO or IMG file</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Maximum file size: 4GB</p>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Extract ISO</button>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Select an ISO or IMG disk image file</li>
+            <li>Click "Extract ISO"</li>
+            <li>Download the extracted files as a ZIP archive</li>
+        </ol>
+    </div>
+</div>
+
+<a href="{% url 'archive_converter:index' %}" class="btn btn-secondary">← Back to Archive Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('archive_file');
+    const uploadArea = document.querySelector('.file-upload-area');
+    const form = document.querySelector('.converter-tool');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadArea.querySelector('p').textContent = `Selected: ${e.target.files[0].name}`;
+        }
+    });
+    
+    const originalText = submitBtn.textContent;
+    form.addEventListener('submit', function() {
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        
+        setTimeout(function() {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }, 2000);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
+

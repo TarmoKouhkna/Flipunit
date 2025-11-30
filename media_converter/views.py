@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import json
 import base64
+import zipfile
+import io
 
 def index(request):
     """Media converters index page"""
@@ -185,49 +187,22 @@ def mp4_to_mp3(request):
             'error': f'Error processing file: {str(e)}'
         })
 
-def audio_converter(request):
-    """Convert between audio formats"""
-    if request.method != 'POST':
-        return render(request, 'media_converter/audio_converter.html')
-    
-    if 'audio_file' not in request.FILES:
-        return render(request, 'media_converter/audio_converter.html', {
-            'error': 'Please upload an audio file.'
-        })
-    
-    uploaded_file = request.FILES['audio_file']
-    output_format = request.POST.get('output_format', 'mp3').lower()
-    
+def _convert_single_audio(uploaded_file, output_format, ffmpeg_path, logger):
+    """Helper function to convert a single audio file. Returns (file_content, output_ext, safe_filename) or raises exception."""
     # Validate file size (max 700MB for audio files)
     max_size = 700 * 1024 * 1024  # 700MB
     if uploaded_file.size > max_size:
-        return render(request, 'media_converter/audio_converter.html', {
-            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
-    
-    # Debug: Log the received output format
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f'Audio converter called - uploaded_file: {uploaded_file.name}, output_format from POST: {request.POST.get("output_format")}, normalized: {output_format}')
+        raise ValueError(f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.')
     
     # Validate file type
     allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.aiff', '.aif']
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
     
     if file_ext not in allowed_extensions:
-        return render(request, 'media_converter/audio_converter.html', {
-            'error': 'Invalid file type. Please upload MP3, WAV, OGG, FLAC, AAC, M4A, or AIFF files.'
-        })
+        raise ValueError('Invalid file type. Please upload MP3, WAV, OGG, FLAC, AAC, M4A, or AIFF files.')
     
     if output_format not in ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'aiff']:
-        return render(request, 'media_converter/audio_converter.html', {
-            'error': 'Invalid output format selected.'
-        })
-    
-    # Check FFmpeg
-    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
-    if error:
-        return render(request, 'media_converter/audio_converter.html', {'error': error})
+        raise ValueError('Invalid output format selected.')
     
     temp_dir = None
     try:
@@ -259,20 +234,7 @@ def audio_converter(request):
             'aiff': 'pcm_s16be',  # AIFF uses big-endian PCM
         }
         
-        # Format map for explicit format specification
-        format_map = {
-            'mp3': 'mp3',
-            'wav': 'wav',
-            'ogg': 'ogg',
-            'flac': 'flac',
-            'aac': 'm4a',  # AAC typically uses m4a container
-            'm4a': 'mp4',  # M4A uses MP4 container
-            'aiff': 'aiff',
-        }
-        
-        # Build FFmpeg command with proper flags to force re-encoding
-        # CRITICAL: We must NEVER use stream copy (-c:a copy) - always re-encode
-        # Use multiple flags to prevent stream copy and force actual conversion
+        # Build FFmpeg command
         cmd = [
             ffmpeg_path,
             '-i', input_path,
@@ -285,39 +247,33 @@ def audio_converter(request):
         
         # Format-specific settings
         if output_format == 'wav':
-            # For WAV specifically, ensure we're creating a proper WAV file
-            cmd.extend(['-sample_fmt', 's16'])  # 16-bit signed PCM for WAV
+            cmd.extend(['-sample_fmt', 's16'])
             cmd.extend(['-f', 'wav'])
         elif output_format == 'flac':
-            # For FLAC, add compression level (0-8, higher = better compression but slower)
-            # FLAC needs explicit format and compression settings
-            cmd.extend(['-compression_level', '5'])  # Balanced compression
+            cmd.extend(['-compression_level', '5'])
             cmd.extend(['-f', 'flac'])
         elif output_format == 'aac':
-            # For AAC, use MP4 container format (M4A is just MP4 with audio)
-            cmd.extend(['-b:a', '192k'])  # Bitrate
-            cmd.extend(['-f', 'mp4'])  # Use mp4 container for AAC (works with .m4a extension)
-            cmd.extend(['-movflags', '+faststart'])  # Optimize for streaming
+            cmd.extend(['-b:a', '192k'])
+            cmd.extend(['-f', 'mp4'])
+            cmd.extend(['-movflags', '+faststart'])
         elif output_format == 'm4a':
-            # M4A uses AAC codec in MP4 container
-            cmd.extend(['-b:a', '192k'])  # Bitrate
-            cmd.extend(['-f', 'mp4'])  # M4A uses MP4 container
-            cmd.extend(['-movflags', '+faststart'])  # Optimize for streaming
+            cmd.extend(['-b:a', '192k'])
+            cmd.extend(['-f', 'mp4'])
+            cmd.extend(['-movflags', '+faststart'])
         elif output_format == 'aiff':
-            # AIFF uses big-endian PCM
-            cmd.extend(['-sample_fmt', 's16'])  # 16-bit signed PCM
+            cmd.extend(['-sample_fmt', 's16'])
             cmd.extend(['-f', 'aiff'])
         elif output_format == 'mp3':
-            cmd.extend(['-b:a', '192k'])  # Bitrate
+            cmd.extend(['-b:a', '192k'])
             cmd.extend(['-f', 'mp3'])
         elif output_format == 'ogg':
-            cmd.extend(['-b:a', '192k'])  # Bitrate
+            cmd.extend(['-b:a', '192k'])
             cmd.extend(['-f', 'ogg'])
         
-        # Add flags to prevent stream copy (but after format-specific settings)
+        # Add flags to prevent stream copy
         cmd.extend([
-            '-avoid_negative_ts', 'make_zero',  # Force re-encoding, prevent stream copy
-            '-fflags', '+genpts',  # Generate presentation timestamps (forces re-encoding)
+            '-avoid_negative_ts', 'make_zero',
+            '-fflags', '+genpts',
         ])
         
         # Add output
@@ -326,158 +282,142 @@ def audio_converter(request):
             output_path
         ])
         
-        # Debug: Log the command being run
-        logger.info(f'Complete FFmpeg command: {" ".join(cmd)}')
-        logger.info(f'Input: {input_path}, Output: {output_path}, Format: {output_format}')
-        
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         
-        # Log FFmpeg output for debugging
-        if result.stderr:
-            logger.info(f'FFmpeg stderr: {result.stderr[:500]}')
-        if result.stdout:
-            logger.info(f'FFmpeg stdout: {result.stdout[:500]}')
-        
-        # Check if FFmpeg command failed
         if result.returncode != 0:
             error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
-            logger.error(f'Audio conversion failed: {error_msg}')
-            # Extract the most relevant error message (usually the last few lines)
             error_lines = error_msg.split('\n')
             relevant_error = '\n'.join([line for line in error_lines if line.strip() and not line.startswith('frame=')][-5:])
             if not relevant_error.strip():
                 relevant_error = error_msg[:500]
-            
-            # Check if this is an AJAX request (from fetch)
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-                return HttpResponse(
-                    json.dumps({'error': f'Conversion failed: {relevant_error[:500]}'}),
-                    content_type='application/json',
-                    status=400
-                )
-            return render(request, 'media_converter/audio_converter.html', {
-                'error': f'Conversion failed: {relevant_error[:500]}'
-            })
+            raise ValueError(f'Conversion failed: {relevant_error[:500]}')
         
         if not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else 'Output file was not created'
-            return render(request, 'media_converter/audio_converter.html', {
-                'error': f'Conversion failed: {error_msg[:500]}'
-            })
-        
-        # Verify output file exists and get its size
-        output_size = os.path.getsize(output_path)
-        input_size = os.path.getsize(input_path)
-        logger.info(f'File sizes - Input: {input_size} bytes, Output: {output_size} bytes')
+            raise ValueError('Output file was not created')
         
         # Read output file
         with open(output_path, 'rb') as f:
             file_content = f.read()
         
-        # Verify the file is actually in the correct format by checking magic bytes
-        if len(file_content) < 12:
-            error_msg = 'Output file is too small or corrupted'
-            logger.error(error_msg)
-            return render(request, 'media_converter/audio_converter.html', {
-                'error': error_msg
-            })
-        
-        # Check magic bytes to verify format
-        magic_bytes = file_content[:12]
-        format_verified = False
-        
-        if output_format == 'wav':
-            # WAV files start with "RIFF" and contain "WAVE"
-            if magic_bytes[:4] == b'RIFF' and b'WAVE' in magic_bytes:
-                format_verified = True
-        elif output_format == 'mp3':
-            # MP3 files start with ID3 tag or FF FB/FA (MPEG sync)
-            if magic_bytes[:3] == b'ID3' or (magic_bytes[0] == 0xFF and (magic_bytes[1] & 0xE0) == 0xE0):
-                format_verified = True
-        elif output_format == 'ogg':
-            # OGG files start with "OggS"
-            if magic_bytes[:4] == b'OggS':
-                format_verified = True
-        elif output_format == 'flac':
-            # FLAC files start with "fLaC"
-            if magic_bytes[:4] == b'fLaC':
-                format_verified = True
-        elif output_format == 'aac' or output_format == 'm4a':
-            # AAC/M4A files can have various headers, check for common ones
-            if magic_bytes[4:8] == b'ftyp' or magic_bytes[:2] == b'\xff\xf1':
-                format_verified = True
-        elif output_format == 'aiff':
-            # AIFF files start with "FORM" and contain "AIFF"
-            if magic_bytes[:4] == b'FORM' and b'AIFF' in magic_bytes:
-                format_verified = True
-        
-        if not format_verified:
-            error_msg = f'Output file format verification failed. Expected {output_format}, but file magic bytes: {magic_bytes.hex()[:24]}'
-            logger.error(error_msg)
-            logger.error(f'FFmpeg stderr: {result.stderr[:1000] if result.stderr else "No stderr"}')
-            error_response = f'Conversion failed: Output file is not in {output_format.upper()} format. FFmpeg may have failed silently. Please check server logs.'
-            # Check if this is an AJAX request
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-                return HttpResponse(
-                    json.dumps({'error': error_response}),
-                    content_type='application/json',
-                    status=400
-                )
-            return render(request, 'media_converter/audio_converter.html', {
-                'error': error_response
-            })
-        
-        logger.info(f'Format verified: Output file is correctly formatted as {output_format}')
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Determine content type
-        content_type_map = {
-            'mp3': 'audio/mpeg',
-            'wav': 'audio/wav',
-            'ogg': 'audio/ogg',
-            'flac': 'audio/flac',
-            'aac': 'audio/aac',
-            'm4a': 'audio/mp4',
-            'aiff': 'audio/x-aiff',
-        }
-        
-        # Create response
-        # Use JSON to prevent browser auto-download - JavaScript will extract and download
-        # Ensure we use the correct output extension
+        # Generate filename
         base_name = os.path.splitext(uploaded_file.name)[0]
-        # Sanitize base name first (remove special chars but keep dots for extension)
         base_name = re.sub(r'[^\w\s.-]', '', base_name).strip()
         base_name = re.sub(r'[-\s]+', '-', base_name)
-        # Add extension after sanitization to preserve the dot
         safe_filename = f'{base_name}.{output_ext}'
         
-        # Debug: Log the filename being sent
-        logger.info(f'Generated filename: {safe_filename}, output_format: {output_format}, output_ext: {output_ext}')
+        return file_content, output_ext, safe_filename
         
-        # Encode file as base64 to send as JSON
-        file_base64 = base64.b64encode(file_content).decode('utf-8')
+    finally:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+
+
+def audio_converter(request):
+    """Convert between audio formats. Supports batch conversion (up to 15 files)."""
+    if request.method != 'POST':
+        return render(request, 'media_converter/audio_converter.html')
+    
+    # Check for batch mode (multiple files)
+    uploaded_files = request.FILES.getlist('audio_file')
+    is_batch = len(uploaded_files) > 1
+    
+    if not uploaded_files:
+        return render(request, 'media_converter/audio_converter.html', {
+            'error': 'Please upload at least one audio file.'
+        })
+    
+    # Limit batch size to 15 files
+    if len(uploaded_files) > 15:
+        return render(request, 'media_converter/audio_converter.html', {
+            'error': 'Maximum 15 files allowed for batch conversion. Please select fewer files.'
+        })
+    
+    uploaded_file = uploaded_files[0]  # For single file processing
+    output_format = request.POST.get('output_format', 'mp3').lower()
+    
+    # Debug: Log the received output format
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f'Audio converter called - is_batch: {is_batch}, file_count: {len(uploaded_files)}, output_format from POST: {request.POST.get("output_format")}, normalized: {output_format}')
+    
+    if output_format not in ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'aiff']:
+        return render(request, 'media_converter/audio_converter.html', {
+            'error': 'Invalid output format selected.'
+        })
+    
+    # Check FFmpeg
+    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
+    if error:
+        return render(request, 'media_converter/audio_converter.html', {'error': error})
+    
+    try:
+        # Single file conversion
+        if not is_batch:
+            file_content, output_ext, safe_filename = _convert_single_audio(uploaded_file, output_format, ffmpeg_path, logger)
+            
+            # Determine content type
+            content_type_map = {
+                'mp3': 'audio/mpeg',
+                'wav': 'audio/wav',
+                'ogg': 'audio/ogg',
+                'flac': 'audio/flac',
+                'aac': 'audio/aac',
+                'm4a': 'audio/mp4',
+                'aiff': 'audio/x-aiff',
+            }
+            
+            # Encode file as base64 to send as JSON
+            file_base64 = base64.b64encode(file_content).decode('utf-8')
+            
+            response_data = {
+                'file': file_base64,
+                'filename': safe_filename,
+                'content_type': content_type_map[output_format]
+            }
+            
+            response = HttpResponse(
+                json.dumps(response_data),
+                content_type='application/json'
+            )
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response['Pragma'] = 'no-cache'
+            response['Expires'] = '0'
+            return response
         
-        response_data = {
-            'file': file_base64,
-            'filename': safe_filename,
-            'content_type': content_type_map[output_format]
-        }
+        # Batch conversion - create ZIP file
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            successful = 0
+            failed = []
+            
+            for idx, uploaded_file in enumerate(uploaded_files):
+                try:
+                    file_content, output_ext, safe_filename = _convert_single_audio(uploaded_file, output_format, ffmpeg_path, logger)
+                    
+                    # Add to ZIP
+                    zip_file.writestr(safe_filename, file_content)
+                    successful += 1
+                    
+                except Exception as e:
+                    failed.append(f"{uploaded_file.name}: {str(e)}")
+                    continue
+            
+            if successful == 0:
+                error_msg = "All files failed to convert. "
+                if failed:
+                    error_msg += "Errors: " + "; ".join(failed[:5])
+                return render(request, 'media_converter/audio_converter.html', {
+                    'error': error_msg
+                })
         
-        # Debug: Log response data (without the large base64 string)
-        logger.info(f'Response filename: {response_data["filename"]}, content_type: {response_data["content_type"]}')
+        zip_buffer.seek(0)
         
-        response = HttpResponse(
-            json.dumps(response_data),
-            content_type='application/json'
-        )
-        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response['Pragma'] = 'no-cache'
-        response['Expires'] = '0'
+        # Create response with ZIP file
+        response = HttpResponse(zip_buffer.read(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="converted_audio.zip"'
         return response
         
     except Exception as e:
