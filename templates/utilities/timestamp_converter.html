@@ -100,82 +100,77 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle "Get Current" buttons - submit form programmatically
     const form = document.querySelector('.converter-tool');
     
-    // Track which button was clicked
-    let clickedGetCurrentButton = null;
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
     
+    // Handle "Get Current" buttons using fetch API to bypass all validation
     getCurrentTimestamp.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        clickedGetCurrentButton = 'timestamp';
         
-        // Remove any existing get_current inputs
-        form.querySelectorAll('input[name="get_current"]').forEach(input => input.remove());
+        // Create FormData with all form fields
+        const formData = new FormData(form);
+        formData.set('get_current', 'timestamp');
+        formData.delete('input_value'); // Remove input_value to avoid validation
         
-        // Add hidden input
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'get_current';
-        hiddenInput.value = 'timestamp';
-        form.appendChild(hiddenInput);
-        
-        // Clear input
-        inputValue.value = '';
-        inputValue.removeAttribute('required');
-        
-        // Create and click a submit button to trigger proper form submission
-        const submitBtn = document.createElement('button');
-        submitBtn.type = 'submit';
-        submitBtn.style.display = 'none';
-        form.appendChild(submitBtn);
-        submitBtn.click();
+        // Submit via fetch - completely bypasses HTML5 validation
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.ok) {
+                // Reload page to show results
+                window.location.reload();
+            } else {
+                throw new Error('Server error: ' + response.status);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error getting current timestamp. Please try again.');
+        });
     });
     
     getCurrentDate.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        clickedGetCurrentButton = 'date';
         
-        // Remove any existing get_current inputs
-        form.querySelectorAll('input[name="get_current"]').forEach(input => input.remove());
+        // Create FormData with all form fields
+        const formData = new FormData(form);
+        formData.set('get_current', 'date');
+        formData.delete('input_value'); // Remove input_value to avoid validation
         
-        // Add hidden input
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'get_current';
-        hiddenInput.value = 'date';
-        form.appendChild(hiddenInput);
-        
-        // Clear input
-        inputValue.value = '';
-        inputValue.removeAttribute('required');
-        
-        // Create and click a submit button to trigger proper form submission
-        const submitBtn = document.createElement('button');
-        submitBtn.type = 'submit';
-        submitBtn.style.display = 'none';
-        form.appendChild(submitBtn);
-        submitBtn.click();
+        // Submit via fetch - completely bypasses HTML5 validation
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.ok) {
+                // Reload page to show results
+                window.location.reload();
+            } else {
+                throw new Error('Server error: ' + response.status);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error getting current date. Please try again.');
+        });
     });
     
     // Validate input for regular "Convert" button only
     form.addEventListener('submit', function(e) {
-        // Check if "Get Current" button was clicked
-        const getCurrentInput = form.querySelector('input[name="get_current"]');
-        if (getCurrentInput && getCurrentInput.value) {
-            // Allow submission - don't validate input
-            console.log('Get Current button detected:', getCurrentInput.value);
-            clickedGetCurrentButton = null; // Reset
-            return true;
-        }
-        
-        // Also check the flag
-        if (clickedGetCurrentButton) {
-            console.log('Get Current button flag detected:', clickedGetCurrentButton);
-            clickedGetCurrentButton = null; // Reset
-            return true;
-        }
-        
-        // Validate for regular convert button
+        // Only validate for regular convert button
         if (!inputValue.value.trim()) {
             e.preventDefault();
             alert('Please enter a value');
