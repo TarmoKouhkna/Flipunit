@@ -102,16 +102,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Duplicate prevention state
+    let isProcessing = false;
+    let downloadTriggered = false;
+    
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        // Prevent duplicate submissions
+        if (isProcessing) {
+            console.log('🚫 Merge already in progress, ignoring duplicate request');
+            return false;
+        }
         
         if (!fileInput.files.length || fileInput.files.length < 2) {
             alert('Please select at least 2 audio files.');
             return;
         }
         
+        // Set lock immediately
+        isProcessing = true;
+        downloadTriggered = false;
         submitBtn.disabled = true;
         submitBtn.textContent = 'Merging...';
+        form.style.pointerEvents = 'none';
         
         const formData = new FormData(form);
         
@@ -145,6 +159,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         })
         .then(({ blob, filename }) => {
+            // Prevent duplicate downloads
+            if (downloadTriggered) {
+                console.log('🚫 Download already triggered, skipping duplicate');
+                return;
+            }
+            downloadTriggered = true;
+            
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -154,18 +175,23 @@ document.addEventListener('DOMContentLoaded', function() {
             a.click();
             
             setTimeout(() => {
+                if (document.body.contains(a)) {
+                    document.body.removeChild(a);
+                }
                 window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
             }, 100);
-            
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Merge & Download';
         })
         .catch(error => {
             console.error('Error:', error);
+            alert('Error: ' + error.message);
+        })
+        .finally(() => {
+            // Always reset state
+            isProcessing = false;
+            downloadTriggered = false;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Merge & Download';
-            alert('Error: ' + error.message);
+            form.style.pointerEvents = 'auto';
         });
     });
 });
