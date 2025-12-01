@@ -112,14 +112,14 @@ console.log('🔵🔵🔵 CODE FIX: File input handlers restored');
             isProcessing = true;
             console.log('✅ ALLOWED FETCH (lock set):', urlString);
             
-            // Clean up after request completes (with delay to catch rapid duplicates)
+            // Clean up after request completes (small delay to catch rapid duplicates)
             const fetchPromise = originalFetch.apply(this, arguments);
             fetchPromise.finally(() => {
-                // Wait 2 seconds before releasing lock to catch any rapid duplicates
+                // Release lock immediately, but with a tiny delay (100ms) to catch rapid-fire duplicates
                 setTimeout(() => {
                     isProcessing = false;
                     console.log('🔓 Lock released');
-                }, 2000);
+                }, 100);
             });
             
             return fetchPromise;

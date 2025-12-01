@@ -421,11 +421,6 @@ def audio_converter(request):
         return response
         
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
         error_response = f'Error processing file: {str(e)}'
         logger.error(f'Audio converter exception: {error_response}', exc_info=True)
         # Check if this is an AJAX request
