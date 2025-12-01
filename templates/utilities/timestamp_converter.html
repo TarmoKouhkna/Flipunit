@@ -98,16 +98,37 @@ document.addEventListener('DOMContentLoaded', function() {
     updateUI(); // Initialize on page load
     
     // Handle "Get Current" buttons - submit form programmatically
-    const form = document.querySelector('.converter-tool');
+    let form = document.querySelector('.converter-tool');
     
-    // Get CSRF token
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    // Get CSRF token (will be re-fetched after DOM updates)
+    function getCsrfToken() {
+        const tokenEl = document.querySelector('[name=csrfmiddlewaretoken]');
+        return tokenEl ? tokenEl.value : '';
+    }
     
     // Prevent duplicate submissions
     let isSubmitting = false;
     
-    // Handle "Get Current" buttons using fetch API to bypass all validation
-    getCurrentTimestamp.addEventListener('click', function(e) {
+    // Function to attach button handlers (called on init and after DOM updates)
+    function attachGetCurrentHandlers() {
+        // Re-select elements after DOM update
+        form = document.querySelector('.converter-tool');
+        const newGetCurrentTimestamp = document.getElementById('get-current-timestamp');
+        const newGetCurrentDate = document.getElementById('get-current-date');
+        const newInputValue = document.getElementById('input_value');
+        const newConversionType = document.getElementById('conversion_type');
+        
+        if (!form || !newGetCurrentTimestamp || !newGetCurrentDate) return;
+        
+        // Remove old listeners by cloning and replacing
+        const newTimestampBtn = newGetCurrentTimestamp.cloneNode(true);
+        newGetCurrentTimestamp.parentNode.replaceChild(newTimestampBtn, newGetCurrentTimestamp);
+        
+        const newDateBtn = newGetCurrentDate.cloneNode(true);
+        newGetCurrentDate.parentNode.replaceChild(newDateBtn, newGetCurrentDate);
+        
+        // Attach new listeners
+        newTimestampBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
         
@@ -117,8 +138,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         isSubmitting = true;
-        getCurrentTimestamp.disabled = true;
-        getCurrentDate.disabled = true;
+        newTimestampBtn.disabled = true;
+        newDateBtn.disabled = true;
         
         // Create FormData with all form fields
         const formData = new FormData(form);
@@ -130,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData,
             headers: {
-                'X-CSRFToken': csrfToken
+                'X-CSRFToken': getCsrfToken()
             },
             credentials: 'same-origin'
         })
@@ -187,25 +208,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Scroll to top to show results
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+                
+                // Re-attach event handlers after DOM update
+                attachGetCurrentHandlers();
             } else {
                 // Fallback: reload page
                 window.location.reload();
             }
             
             isSubmitting = false;
-            getCurrentTimestamp.disabled = false;
-            getCurrentDate.disabled = false;
         })
         .catch(error => {
             console.error('Error:', error);
             alert('Error getting current timestamp. Please try again.');
             isSubmitting = false;
-            getCurrentTimestamp.disabled = false;
-            getCurrentDate.disabled = false;
+            // Re-attach handlers in case of error
+            attachGetCurrentHandlers();
         });
     });
     
-    getCurrentDate.addEventListener('click', function(e) {
+    newDateBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
         
@@ -215,8 +237,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         isSubmitting = true;
-        getCurrentTimestamp.disabled = true;
-        getCurrentDate.disabled = true;
+        newTimestampBtn.disabled = true;
+        newDateBtn.disabled = true;
         
         // Create FormData with all form fields
         const formData = new FormData(form);
@@ -228,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData,
             headers: {
-                'X-CSRFToken': csrfToken
+                'X-CSRFToken': getCsrfToken()
             },
             credentials: 'same-origin'
         })
@@ -285,23 +307,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Scroll to top to show results
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+                
+                // Re-attach event handlers after DOM update
+                attachGetCurrentHandlers();
             } else {
                 // Fallback: reload page
                 window.location.reload();
             }
             
             isSubmitting = false;
-            getCurrentTimestamp.disabled = false;
-            getCurrentDate.disabled = false;
         })
         .catch(error => {
             console.error('Error:', error);
             alert('Error getting current date. Please try again.');
             isSubmitting = false;
-            getCurrentTimestamp.disabled = false;
-            getCurrentDate.disabled = false;
+            // Re-attach handlers in case of error
+            attachGetCurrentHandlers();
         });
     });
+    }
+    
+    // Initial attachment
+    attachGetCurrentHandlers();
     
     // Validate input for regular "Convert" button only
     form.addEventListener('submit', function(e) {
