@@ -122,8 +122,12 @@ document.addEventListener('DOMContentLoaded', function() {
         inputValue.value = '';
         inputValue.removeAttribute('required');
         
-        // Submit form
-        form.submit();
+        // Create and click a submit button to trigger proper form submission
+        const submitBtn = document.createElement('button');
+        submitBtn.type = 'submit';
+        submitBtn.style.display = 'none';
+        form.appendChild(submitBtn);
+        submitBtn.click();
     });
     
     getCurrentDate.addEventListener('click', function(e) {
@@ -145,8 +149,12 @@ document.addEventListener('DOMContentLoaded', function() {
         inputValue.value = '';
         inputValue.removeAttribute('required');
         
-        // Submit form
-        form.submit();
+        // Create and click a submit button to trigger proper form submission
+        const submitBtn = document.createElement('button');
+        submitBtn.type = 'submit';
+        submitBtn.style.display = 'none';
+        form.appendChild(submitBtn);
+        submitBtn.click();
     });
     
     // Validate input for regular "Convert" button only
