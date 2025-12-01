@@ -189,6 +189,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (newCard && currentCard) {
                 console.log('Updating card content');
+                // Remove any error messages if we have a result (safeguard)
+                const errorDiv = newCard.querySelector('.alert-error');
+                const successDiv = newCard.querySelector('.alert-success');
+                if (successDiv && errorDiv) {
+                    console.log('Removing error div since we have a success message');
+                    errorDiv.remove();
+                }
                 currentCard.innerHTML = newCard.innerHTML;
                 
                 // Re-run timezone conversion if result exists
@@ -306,6 +313,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (newCard && currentCard) {
                 console.log('Updating card content');
+                // Remove any error messages if we have a result (safeguard)
+                const errorDiv = newCard.querySelector('.alert-error');
+                const successDiv = newCard.querySelector('.alert-success');
+                if (successDiv && errorDiv) {
+                    console.log('Removing error div since we have a success message');
+                    errorDiv.remove();
+                }
                 currentCard.innerHTML = newCard.innerHTML;
                 
                 // Re-run timezone conversion if result exists
