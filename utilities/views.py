@@ -544,6 +544,7 @@ def timestamp_converter(request):
         
         # Handle "Get Current" button clicks
         if get_current:
+            error = None  # Explicitly clear any error
             now = django_timezone.now()
             if get_current == 'timestamp':
                 # Return current timestamp
