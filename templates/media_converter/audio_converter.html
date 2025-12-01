@@ -335,6 +335,11 @@ if (window.audioConverterInitialized) {
                     console.log('Fetch aborted (duplicate prevented)');
                     return;
                 }
+                // Silently ignore duplicate request errors - they're handled by the lock mechanism
+                if (err.message && err.message.includes('Duplicate request blocked')) {
+                    console.log('Duplicate request blocked (already processing)');
+                    return;
+                }
                 console.error('Conversion error:', err);
                 const errorMessage = err.message || 'Conversion failed. Please try again.';
                 alert(errorMessage);
@@ -346,6 +351,7 @@ if (window.audioConverterInitialized) {
                 // === ALWAYS RESET ===
                 console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
                 state.isProcessing = false;
+                state.downloadTriggered = false; // Reset download flag
                 state.abortController = null; // Clear controller
                 
                 // Find button again (in case form was re-rendered)
