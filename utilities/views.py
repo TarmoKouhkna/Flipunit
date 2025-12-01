@@ -628,6 +628,10 @@ def timestamp_converter(request):
             except Exception as e:
                 error = str(e)
     
+    # Final safeguard: if we have a result, clear any error
+    if result:
+        error = None
+    
     context = {
         'result': result,
         'error': error,
