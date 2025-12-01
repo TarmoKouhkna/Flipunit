@@ -48,19 +48,17 @@
         
         <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
             <button type="submit" class="btn btn-primary" style="flex: 1;">Convert</button>
-            <button type="button" id="get-current-timestamp" class="btn btn-secondary" style="display: none;" data-get-current="timestamp">Get Current Timestamp</button>
-            <button type="button" id="get-current-date" class="btn btn-secondary" style="display: none;" data-get-current="date">Get Current Date & Time</button>
         </div>
     </form>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
         <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
-            <li><strong>Timestamp → Date:</strong> Enter Unix timestamp (seconds or milliseconds) to get human-readable date, or click "Get Current Date & Time" to see the current server time</li>
-            <li><strong>Date → Timestamp:</strong> Enter date in format YYYY-MM-DD HH:MM:SS to get Unix timestamp, or click "Get Current Timestamp" to get the current server timestamp</li>
+            <li><strong>Timestamp → Date:</strong> Enter Unix timestamp (seconds or milliseconds) to get human-readable date</li>
+            <li><strong>Date → Timestamp:</strong> Enter date in format YYYY-MM-DD HH:MM:SS to get Unix timestamp</li>
         </ul>
         <p style="margin-top: 1rem; color: var(--text-secondary);">
-            <strong>Note:</strong> Timestamps are in UTC. Dates can be entered in various formats (YYYY-MM-DD, DD/MM/YYYY, etc.). The "Get Current" buttons use the server's current time.
+            <strong>Note:</strong> Timestamps are in UTC. Dates can be entered in various formats (YYYY-MM-DD, DD/MM/YYYY, etc.).
         </p>
     </div>
 </div>
@@ -75,324 +73,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputValue = document.getElementById('input_value');
     const inputHint = document.getElementById('input_hint');
     
-    const getCurrentTimestamp = document.getElementById('get-current-timestamp');
-    const getCurrentDate = document.getElementById('get-current-date');
-    
     function updateUI() {
         if (conversionType.value === 'timestamp_to_date') {
             inputLabel.textContent = 'Enter Timestamp';
             inputValue.placeholder = '1699123456';
             inputHint.textContent = 'Enter Unix timestamp (seconds or milliseconds)';
-            getCurrentTimestamp.style.display = 'none';
-            getCurrentDate.style.display = 'inline-block';
         } else {
             inputLabel.textContent = 'Enter Date';
             inputValue.placeholder = '2023-11-04 12:34:56';
             inputHint.textContent = 'Enter date in format YYYY-MM-DD HH:MM:SS or DD/MM/YYYY';
-            getCurrentTimestamp.style.display = 'inline-block';
-            getCurrentDate.style.display = 'none';
         }
     }
     
     conversionType.addEventListener('change', updateUI);
     updateUI(); // Initialize on page load
     
-    // Handle "Get Current" buttons - submit form programmatically
-    let form = document.querySelector('.converter-tool');
-    
-    // Get CSRF token (will be re-fetched after DOM updates)
-    function getCsrfToken() {
-        const tokenEl = document.querySelector('[name=csrfmiddlewaretoken]');
-        return tokenEl ? tokenEl.value : '';
-    }
-    
-    // Prevent duplicate submissions
-    let isSubmitting = false;
-    
-    // Function to attach button handlers (called on init and after DOM updates)
-    function attachGetCurrentHandlers() {
-        // Re-select elements after DOM update
-        form = document.querySelector('.converter-tool');
-        const newGetCurrentTimestamp = document.getElementById('get-current-timestamp');
-        const newGetCurrentDate = document.getElementById('get-current-date');
-        const newInputValue = document.getElementById('input_value');
-        const newConversionType = document.getElementById('conversion_type');
-        
-        if (!form || !newGetCurrentTimestamp || !newGetCurrentDate) return;
-        
-        // Remove old listeners by cloning and replacing
-        const newTimestampBtn = newGetCurrentTimestamp.cloneNode(true);
-        newGetCurrentTimestamp.parentNode.replaceChild(newTimestampBtn, newGetCurrentTimestamp);
-        
-        const newDateBtn = newGetCurrentDate.cloneNode(true);
-        newGetCurrentDate.parentNode.replaceChild(newDateBtn, newGetCurrentDate);
-        
-        // Attach new listeners
-        newTimestampBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        if (isSubmitting) {
-            console.log('Already submitting, ignoring duplicate click');
-            return;
-        }
-        
-        // Hide any existing error message immediately
-        const existingError = document.querySelector('.alert-error');
-        if (existingError) {
-            existingError.style.display = 'none';
-        }
-        
-        isSubmitting = true;
-        newTimestampBtn.disabled = true;
-        newDateBtn.disabled = true;
-        
-        // Create FormData with all form fields
-        const formData = new FormData(form);
-        formData.set('get_current', 'timestamp');
-        formData.delete('input_value'); // Remove input_value to avoid validation
-        
-        // Debug: log what we're sending
-        console.log('Sending get_current=timestamp');
-        for (let pair of formData.entries()) {
-            console.log('FormData:', pair[0], '=', pair[1]);
-        }
-        
-        // Submit via fetch - completely bypasses HTML5 validation
-        fetch(window.location.href, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': getCsrfToken()
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error('Server error: ' + response.status + ' - ' + text.substring(0, 100));
-                });
-            }
-            return response.text();
-        })
-        .then(html => {
-            console.log('Received HTML response, length:', html.length);
-            // Check if response contains error or result
-            if (html.includes('alert-error')) {
-                console.warn('Response contains error message');
-            }
-            if (html.includes('alert-success')) {
-                console.log('Response contains success message');
-            }
-            
-            // Parse the response HTML and update the page
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newCard = doc.querySelector('.card');
-            const currentCard = document.querySelector('.card');
-            
-            console.log('newCard found:', !!newCard, 'currentCard found:', !!currentCard);
-            
-            if (newCard && currentCard) {
-                console.log('Updating card content');
-                // Remove any error messages if we have a result (safeguard)
-                const errorDiv = newCard.querySelector('.alert-error');
-                const successDiv = newCard.querySelector('.alert-success');
-                if (successDiv && errorDiv) {
-                    console.log('Removing error div since we have a success message');
-                    errorDiv.remove();
-                }
-                currentCard.innerHTML = newCard.innerHTML;
-                
-                // Re-run timezone conversion if result exists
-                const resultDiv = document.querySelector('.alert-success');
-                if (resultDiv) {
-                    const isoElement = resultDiv.querySelector('p:last-child');
-                    if (isoElement && isoElement.textContent.includes('ISO:')) {
-                        const isoMatch = isoElement.textContent.match(/ISO:\s*(.+)/);
-                        if (isoMatch) {
-                            const isoString = isoMatch[1].trim();
-                            try {
-                                const date = new Date(isoString);
-                                const localTimeString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
-                                const timeZoneOffset = -date.getTimezoneOffset();
-                                const offsetHours = Math.floor(Math.abs(timeZoneOffset) / 60);
-                                const offsetMinutes = Math.abs(timeZoneOffset) % 60;
-                                const offsetSign = timeZoneOffset >= 0 ? '+' : '-';
-                                const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
-                                let timeZoneName = '';
-                                try {
-                                    timeZoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                                } catch (e) {
-                                    timeZoneName = offsetString;
-                                }
-                                const localTimeEl = document.getElementById('local-time');
-                                const localTimezoneEl = document.getElementById('local-timezone');
-                                if (localTimeEl) localTimeEl.textContent = localTimeString;
-                                if (localTimezoneEl) localTimezoneEl.textContent = timeZoneName + ' (' + offsetString + ')';
-                            } catch (e) {
-                                console.error('Error converting to local time:', e);
-                            }
-                        }
-                    }
-                }
-                
-                // Scroll to top to show results
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                
-                // Re-attach event handlers after DOM update
-                attachGetCurrentHandlers();
-            } else {
-                // Fallback: reload page
-                window.location.reload();
-            }
-            
-            isSubmitting = false;
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error getting current timestamp. Please try again.');
-            isSubmitting = false;
-            // Re-attach handlers in case of error
-            attachGetCurrentHandlers();
-        });
-    });
-    
-    newDateBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        if (isSubmitting) {
-            console.log('Already submitting, ignoring duplicate click');
-            return;
-        }
-        
-        // Hide any existing error message immediately
-        const existingError = document.querySelector('.alert-error');
-        if (existingError) {
-            existingError.style.display = 'none';
-        }
-        
-        isSubmitting = true;
-        newTimestampBtn.disabled = true;
-        newDateBtn.disabled = true;
-        
-        // Create FormData with all form fields
-        const formData = new FormData(form);
-        formData.set('get_current', 'date');
-        formData.delete('input_value'); // Remove input_value to avoid validation
-        
-        // Debug: log what we're sending
-        console.log('Sending get_current=date');
-        for (let pair of formData.entries()) {
-            console.log('FormData:', pair[0], '=', pair[1]);
-        }
-        
-        // Submit via fetch - completely bypasses HTML5 validation
-        fetch(window.location.href, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': getCsrfToken()
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error('Server error: ' + response.status + ' - ' + text.substring(0, 100));
-                });
-            }
-            return response.text();
-        })
-        .then(html => {
-            console.log('Received HTML response, length:', html.length);
-            // Check if response contains error or result
-            if (html.includes('alert-error')) {
-                console.warn('Response contains error message');
-            }
-            if (html.includes('alert-success')) {
-                console.log('Response contains success message');
-            }
-            
-            // Parse the response HTML and update the page
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newCard = doc.querySelector('.card');
-            const currentCard = document.querySelector('.card');
-            
-            console.log('newCard found:', !!newCard, 'currentCard found:', !!currentCard);
-            
-            if (newCard && currentCard) {
-                console.log('Updating card content');
-                // Remove any error messages if we have a result (safeguard)
-                const errorDiv = newCard.querySelector('.alert-error');
-                const successDiv = newCard.querySelector('.alert-success');
-                if (successDiv && errorDiv) {
-                    console.log('Removing error div since we have a success message');
-                    errorDiv.remove();
-                }
-                currentCard.innerHTML = newCard.innerHTML;
-                
-                // Re-run timezone conversion if result exists
-                const resultDiv = document.querySelector('.alert-success');
-                if (resultDiv) {
-                    const isoElement = resultDiv.querySelector('p:last-child');
-                    if (isoElement && isoElement.textContent.includes('ISO:')) {
-                        const isoMatch = isoElement.textContent.match(/ISO:\s*(.+)/);
-                        if (isoMatch) {
-                            const isoString = isoMatch[1].trim();
-                            try {
-                                const date = new Date(isoString);
-                                const localTimeString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
-                                const timeZoneOffset = -date.getTimezoneOffset();
-                                const offsetHours = Math.floor(Math.abs(timeZoneOffset) / 60);
-                                const offsetMinutes = Math.abs(timeZoneOffset) % 60;
-                                const offsetSign = timeZoneOffset >= 0 ? '+' : '-';
-                                const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
-                                let timeZoneName = '';
-                                try {
-                                    timeZoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                                } catch (e) {
-                                    timeZoneName = offsetString;
-                                }
-                                const localTimeEl = document.getElementById('local-time');
-                                const localTimezoneEl = document.getElementById('local-timezone');
-                                if (localTimeEl) localTimeEl.textContent = localTimeString;
-                                if (localTimezoneEl) localTimezoneEl.textContent = timeZoneName + ' (' + offsetString + ')';
-                            } catch (e) {
-                                console.error('Error converting to local time:', e);
-                            }
-                        }
-                    }
-                }
-                
-                // Scroll to top to show results
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                
-                // Re-attach event handlers after DOM update
-                attachGetCurrentHandlers();
-            } else {
-                // Fallback: reload page
-                window.location.reload();
-            }
-            
-            isSubmitting = false;
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error getting current date. Please try again.');
-            isSubmitting = false;
-            // Re-attach handlers in case of error
-            attachGetCurrentHandlers();
-        });
-    });
-    }
-    
-    // Initial attachment
-    attachGetCurrentHandlers();
-    
-    // Validate input for regular "Convert" button only
+    // Validate input for regular "Convert" button
+    const form = document.querySelector('.converter-tool');
     form.addEventListener('submit', function(e) {
         // Only validate for regular convert button
         if (!inputValue.value.trim()) {
