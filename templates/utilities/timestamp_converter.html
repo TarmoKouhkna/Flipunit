@@ -48,8 +48,8 @@
         
         <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
             <button type="submit" class="btn btn-primary" style="flex: 1;">Convert</button>
-            <button type="submit" name="get_current" value="timestamp" id="get-current-timestamp" class="btn btn-secondary" style="display: none;">Get Current Timestamp</button>
-            <button type="submit" name="get_current" value="date" id="get-current-date" class="btn btn-secondary" style="display: none;">Get Current Date & Time</button>
+            <button type="submit" name="get_current" value="timestamp" id="get-current-timestamp" class="btn btn-secondary" style="display: none;" formnovalidate>Get Current Timestamp</button>
+            <button type="submit" name="get_current" value="date" id="get-current-date" class="btn btn-secondary" style="display: none;" formnovalidate>Get Current Date & Time</button>
         </div>
     </form>
     
@@ -100,10 +100,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // Make input optional when using "Get Current" buttons
     getCurrentTimestamp.addEventListener('click', function(e) {
         inputValue.removeAttribute('required');
+        // Allow form to submit even if input is empty
+        if (!inputValue.value.trim()) {
+            inputValue.value = ''; // Ensure it's empty
+        }
     });
     
     getCurrentDate.addEventListener('click', function(e) {
         inputValue.removeAttribute('required');
+        // Allow form to submit even if input is empty
+        if (!inputValue.value.trim()) {
+            inputValue.value = ''; // Ensure it's empty
+        }
+    });
+    
+    // Also handle form submission to bypass validation for "Get Current" buttons
+    const form = document.querySelector('.converter-tool');
+    form.addEventListener('submit', function(e) {
+        const getCurrentBtn = document.querySelector('button[name="get_current"]:focus, button[name="get_current"]:active');
+        if (getCurrentBtn) {
+            // Remove required attribute before form validation
+            inputValue.removeAttribute('required');
+        }
     });
     
     // Convert UTC time to user's local timezone
