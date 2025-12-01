@@ -19,7 +19,7 @@
             <h3 style="margin-bottom: 0.5rem;">Result:</h3>
             {% if result.type == 'date' %}
                 <p><strong>UTC:</strong> {{ result.utc }}</p>
-                <p><strong>Local:</strong> {{ result.local }}</p>
+                <p><strong>Local:</strong> <span id="local-time">{{ result.utc }}</span> <span id="local-timezone"></span></p>
                 <p><strong>ISO:</strong> {{ result.iso }}</p>
             {% else %}
                 <p><strong>Seconds:</strong> {{ result.seconds }}</p>
@@ -82,6 +82,49 @@ document.addEventListener('DOMContentLoaded', function() {
             inputHint.textContent = 'Enter date in format YYYY-MM-DD HH:MM:SS or DD/MM/YYYY';
         }
     });
+    
+    // Convert UTC time to user's local timezone
+    {% if result and result.type == 'date' %}
+    (function() {
+        const isoString = '{{ result.iso }}';
+        if (isoString) {
+            try {
+                // Create Date object from ISO string (automatically converts to local timezone)
+                const date = new Date(isoString);
+                
+                // Format local time (get* methods return local time)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                
+                const localTimeString = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                
+                // Get timezone offset
+                const timeZoneOffset = -date.getTimezoneOffset();
+                const offsetHours = Math.floor(Math.abs(timeZoneOffset) / 60);
+                const offsetMinutes = Math.abs(timeZoneOffset) % 60;
+                const offsetSign = timeZoneOffset >= 0 ? '+' : '-';
+                const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+                
+                // Get timezone name if available
+                let timeZoneName = '';
+                try {
+                    timeZoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                } catch (e) {
+                    timeZoneName = offsetString;
+                }
+                
+                document.getElementById('local-time').textContent = localTimeString;
+                document.getElementById('local-timezone').textContent = timeZoneName + ' (' + offsetString + ')';
+            } catch (e) {
+                console.error('Error converting to local time:', e);
+            }
+        }
+    })();
+    {% endif %}
 });
 </script>
 {% endblock %}

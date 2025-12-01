@@ -551,8 +551,7 @@ def timestamp_converter(request):
                         result = {
                             'type': 'date',
                             'utc': dt.strftime('%Y-%m-%d %H:%M:%S UTC'),
-                            'local': dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z'),
-                            'iso': dt.isoformat(),
+                            'iso': dt.isoformat(),  # ISO format will be converted to local timezone in JavaScript
                         }
                     except (ValueError, OSError) as e:
                         error = f'Invalid timestamp: {str(e)}'
