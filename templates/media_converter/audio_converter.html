@@ -98,7 +98,11 @@ console.log('🔵🔵🔵 CODE FIX: File input handlers restored');
     window.fetch = function(url, options = {}) {
         const urlString = typeof url === 'string' ? url : (url?.toString() || '');
         const isPost = (options.method || 'GET').toUpperCase() === 'POST';
-        const isAudioConverter = urlString.includes('audio-converter');
+        // Only block POST requests to the audio converter endpoint (strict check)
+        // Check for the exact endpoint path to avoid blocking other requests
+        const isAudioConverter = urlString.includes('/media-converter/audio-converter') && 
+                                  !urlString.includes('google-analytics') &&
+                                  !urlString.includes('gtm');
         
         if (isPost && isAudioConverter) {
             // SYNCHRONOUS CHECK - happens before any async code
