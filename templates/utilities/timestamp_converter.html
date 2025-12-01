@@ -137,6 +137,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Hide any existing error message immediately
+        const existingError = document.querySelector('.alert-error');
+        if (existingError) {
+            existingError.style.display = 'none';
+        }
+        
         isSubmitting = true;
         newTimestampBtn.disabled = true;
         newDateBtn.disabled = true;
@@ -259,6 +265,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isSubmitting) {
             console.log('Already submitting, ignoring duplicate click');
             return;
+        }
+        
+        // Hide any existing error message immediately
+        const existingError = document.querySelector('.alert-error');
+        if (existingError) {
+            existingError.style.display = 'none';
         }
         
         isSubmitting = true;
