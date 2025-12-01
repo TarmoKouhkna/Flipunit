@@ -17,8 +17,8 @@
     {% if result %}
         <div class="alert alert-success" style="margin-bottom: 2rem;">
             <h3 style="margin-bottom: 0.5rem;">Generated Text:</h3>
-            <div style="background: white; padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color); max-height: 400px; overflow-y: auto;">
-                <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">{{ result }}</pre>
+            <div style="background: var(--card-bg); padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color); max-height: 400px; overflow-y: auto;">
+                <pre style="white-space: pre-wrap; font-family: inherit; margin: 0; color: var(--text-primary);">{{ result }}</pre>
             </div>
             <button onclick="copyToClipboard()" class="btn btn-secondary" style="margin-top: 1rem;">Copy to Clipboard</button>
         </div>
