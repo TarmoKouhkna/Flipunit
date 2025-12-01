@@ -38,3 +38,9 @@ Thumbs.db
 
 # YouTube cookies (sensitive)
 youtube_cookies.txt
+
+# VS Code extensions
+*.vsix
+
+# Generated sitemap (if auto-generated)
+sitemap.xml
