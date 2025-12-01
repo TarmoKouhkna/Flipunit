@@ -103,10 +103,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get CSRF token
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
     
+    // Prevent duplicate submissions
+    let isSubmitting = false;
+    
     // Handle "Get Current" buttons using fetch API to bypass all validation
     getCurrentTimestamp.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
+        
+        if (isSubmitting) {
+            console.log('Already submitting, ignoring duplicate click');
+            return;
+        }
+        
+        isSubmitting = true;
+        getCurrentTimestamp.disabled = true;
+        getCurrentDate.disabled = true;
         
         // Create FormData with all form fields
         const formData = new FormData(form);
@@ -123,22 +135,88 @@ document.addEventListener('DOMContentLoaded', function() {
             credentials: 'same-origin'
         })
         .then(response => {
-            if (response.ok) {
-                // Reload page to show results
-                window.location.reload();
-            } else {
-                throw new Error('Server error: ' + response.status);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error('Server error: ' + response.status + ' - ' + text.substring(0, 100));
+                });
             }
+            return response.text();
+        })
+        .then(html => {
+            // Parse the response HTML and update the page
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newCard = doc.querySelector('.card');
+            const currentCard = document.querySelector('.card');
+            
+            if (newCard && currentCard) {
+                currentCard.innerHTML = newCard.innerHTML;
+                
+                // Re-run timezone conversion if result exists
+                const resultDiv = document.querySelector('.alert-success');
+                if (resultDiv) {
+                    const isoElement = resultDiv.querySelector('p:last-child');
+                    if (isoElement && isoElement.textContent.includes('ISO:')) {
+                        const isoMatch = isoElement.textContent.match(/ISO:\s*(.+)/);
+                        if (isoMatch) {
+                            const isoString = isoMatch[1].trim();
+                            try {
+                                const date = new Date(isoString);
+                                const localTimeString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+                                const timeZoneOffset = -date.getTimezoneOffset();
+                                const offsetHours = Math.floor(Math.abs(timeZoneOffset) / 60);
+                                const offsetMinutes = Math.abs(timeZoneOffset) % 60;
+                                const offsetSign = timeZoneOffset >= 0 ? '+' : '-';
+                                const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+                                let timeZoneName = '';
+                                try {
+                                    timeZoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                                } catch (e) {
+                                    timeZoneName = offsetString;
+                                }
+                                const localTimeEl = document.getElementById('local-time');
+                                const localTimezoneEl = document.getElementById('local-timezone');
+                                if (localTimeEl) localTimeEl.textContent = localTimeString;
+                                if (localTimezoneEl) localTimezoneEl.textContent = timeZoneName + ' (' + offsetString + ')';
+                            } catch (e) {
+                                console.error('Error converting to local time:', e);
+                            }
+                        }
+                    }
+                }
+                
+                // Scroll to top to show results
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                // Fallback: reload page
+                window.location.reload();
+            }
+            
+            isSubmitting = false;
+            getCurrentTimestamp.disabled = false;
+            getCurrentDate.disabled = false;
         })
         .catch(error => {
             console.error('Error:', error);
             alert('Error getting current timestamp. Please try again.');
+            isSubmitting = false;
+            getCurrentTimestamp.disabled = false;
+            getCurrentDate.disabled = false;
         });
     });
     
     getCurrentDate.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
+        
+        if (isSubmitting) {
+            console.log('Already submitting, ignoring duplicate click');
+            return;
+        }
+        
+        isSubmitting = true;
+        getCurrentTimestamp.disabled = true;
+        getCurrentDate.disabled = true;
         
         // Create FormData with all form fields
         const formData = new FormData(form);
@@ -155,16 +233,73 @@ document.addEventListener('DOMContentLoaded', function() {
             credentials: 'same-origin'
         })
         .then(response => {
-            if (response.ok) {
-                // Reload page to show results
-                window.location.reload();
-            } else {
-                throw new Error('Server error: ' + response.status);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error('Server error: ' + response.status + ' - ' + text.substring(0, 100));
+                });
             }
+            return response.text();
+        })
+        .then(html => {
+            // Parse the response HTML and update the page
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newCard = doc.querySelector('.card');
+            const currentCard = document.querySelector('.card');
+            
+            if (newCard && currentCard) {
+                currentCard.innerHTML = newCard.innerHTML;
+                
+                // Re-run timezone conversion if result exists
+                const resultDiv = document.querySelector('.alert-success');
+                if (resultDiv) {
+                    const isoElement = resultDiv.querySelector('p:last-child');
+                    if (isoElement && isoElement.textContent.includes('ISO:')) {
+                        const isoMatch = isoElement.textContent.match(/ISO:\s*(.+)/);
+                        if (isoMatch) {
+                            const isoString = isoMatch[1].trim();
+                            try {
+                                const date = new Date(isoString);
+                                const localTimeString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+                                const timeZoneOffset = -date.getTimezoneOffset();
+                                const offsetHours = Math.floor(Math.abs(timeZoneOffset) / 60);
+                                const offsetMinutes = Math.abs(timeZoneOffset) % 60;
+                                const offsetSign = timeZoneOffset >= 0 ? '+' : '-';
+                                const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+                                let timeZoneName = '';
+                                try {
+                                    timeZoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                                } catch (e) {
+                                    timeZoneName = offsetString;
+                                }
+                                const localTimeEl = document.getElementById('local-time');
+                                const localTimezoneEl = document.getElementById('local-timezone');
+                                if (localTimeEl) localTimeEl.textContent = localTimeString;
+                                if (localTimezoneEl) localTimezoneEl.textContent = timeZoneName + ' (' + offsetString + ')';
+                            } catch (e) {
+                                console.error('Error converting to local time:', e);
+                            }
+                        }
+                    }
+                }
+                
+                // Scroll to top to show results
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                // Fallback: reload page
+                window.location.reload();
+            }
+            
+            isSubmitting = false;
+            getCurrentTimestamp.disabled = false;
+            getCurrentDate.disabled = false;
         })
         .catch(error => {
             console.error('Error:', error);
             alert('Error getting current date. Please try again.');
+            isSubmitting = false;
+            getCurrentTimestamp.disabled = false;
+            getCurrentDate.disabled = false;
         });
     });
     
