@@ -535,7 +535,12 @@ def timestamp_converter(request):
     if request.method == 'POST':
         conversion_type = request.POST.get('conversion_type', 'timestamp_to_date')
         input_value = request.POST.get('input_value', '').strip()
-        get_current = request.POST.get('get_current', '')
+        get_current = request.POST.get('get_current', '').strip()
+        
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'Timestamp converter POST - get_current: "{get_current}", input_value: "{input_value}", conversion_type: "{conversion_type}"')
         
         # Handle "Get Current" button clicks
         if get_current:

@@ -48,8 +48,8 @@
         
         <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
             <button type="submit" class="btn btn-primary" style="flex: 1;">Convert</button>
-            <button type="button" id="get-current-timestamp" class="btn btn-secondary" style="display: none;">Get Current Timestamp</button>
-            <button type="button" id="get-current-date" class="btn btn-secondary" style="display: none;">Get Current Date & Time</button>
+            <button type="button" id="get-current-timestamp" class="btn btn-secondary" style="display: none;" data-get-current="timestamp">Get Current Timestamp</button>
+            <button type="button" id="get-current-date" class="btn btn-secondary" style="display: none;" data-get-current="date">Get Current Date & Time</button>
         </div>
     </form>
     
@@ -100,13 +100,70 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle "Get Current" buttons - submit form programmatically
     const form = document.querySelector('.converter-tool');
     
-    // Validate input for regular "Convert" button only - MUST be set up FIRST
+    // Track which button was clicked
+    let clickedGetCurrentButton = null;
+    
+    getCurrentTimestamp.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        clickedGetCurrentButton = 'timestamp';
+        
+        // Remove any existing get_current inputs
+        form.querySelectorAll('input[name="get_current"]').forEach(input => input.remove());
+        
+        // Add hidden input
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'get_current';
+        hiddenInput.value = 'timestamp';
+        form.appendChild(hiddenInput);
+        
+        // Clear input
+        inputValue.value = '';
+        inputValue.removeAttribute('required');
+        
+        // Submit form
+        form.submit();
+    });
+    
+    getCurrentDate.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        clickedGetCurrentButton = 'date';
+        
+        // Remove any existing get_current inputs
+        form.querySelectorAll('input[name="get_current"]').forEach(input => input.remove());
+        
+        // Add hidden input
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'get_current';
+        hiddenInput.value = 'date';
+        form.appendChild(hiddenInput);
+        
+        // Clear input
+        inputValue.value = '';
+        inputValue.removeAttribute('required');
+        
+        // Submit form
+        form.submit();
+    });
+    
+    // Validate input for regular "Convert" button only
     form.addEventListener('submit', function(e) {
-        // Check if "Get Current" button was clicked (hidden input exists)
-        const getCurrentInput = document.querySelector('input[name="get_current"]');
+        // Check if "Get Current" button was clicked
+        const getCurrentInput = form.querySelector('input[name="get_current"]');
         if (getCurrentInput && getCurrentInput.value) {
             // Allow submission - don't validate input
-            console.log('Get Current button detected, allowing submission');
+            console.log('Get Current button detected:', getCurrentInput.value);
+            clickedGetCurrentButton = null; // Reset
+            return true;
+        }
+        
+        // Also check the flag
+        if (clickedGetCurrentButton) {
+            console.log('Get Current button flag detected:', clickedGetCurrentButton);
+            clickedGetCurrentButton = null; // Reset
             return true;
         }
         
@@ -115,82 +172,6 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             alert('Please enter a value');
             return false;
-        }
-    });
-    
-    getCurrentTimestamp.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Remove any existing get_current inputs
-        form.querySelectorAll('input[name="get_current"]').forEach(input => input.remove());
-        
-        // Add hidden input with a unique ID for verification
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'get_current';
-        hiddenInput.value = 'timestamp';
-        hiddenInput.id = 'get_current_timestamp_flag';
-        form.insertBefore(hiddenInput, form.firstChild); // Insert at beginning
-        
-        // Clear and ensure input is not required
-        inputValue.value = '';
-        inputValue.removeAttribute('required');
-        
-        // Verify the input was added before submitting
-        const verifyInput = document.getElementById('get_current_timestamp_flag');
-        if (verifyInput && verifyInput.value === 'timestamp') {
-            console.log('Submitting form with get_current=timestamp');
-            // Use a small delay to ensure DOM is ready, then submit
-            setTimeout(() => {
-                // Double-check before submitting
-                const finalCheck = form.querySelector('input[name="get_current"]');
-                if (finalCheck && finalCheck.value === 'timestamp') {
-                    form.submit();
-                } else {
-                    console.error('get_current input lost before submission');
-                }
-            }, 10);
-        } else {
-            console.error('Failed to add get_current input');
-        }
-    });
-    
-    getCurrentDate.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Remove any existing get_current inputs
-        form.querySelectorAll('input[name="get_current"]').forEach(input => input.remove());
-        
-        // Add hidden input with a unique ID for verification
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'get_current';
-        hiddenInput.value = 'date';
-        hiddenInput.id = 'get_current_date_flag';
-        form.insertBefore(hiddenInput, form.firstChild); // Insert at beginning
-        
-        // Clear and ensure input is not required
-        inputValue.value = '';
-        inputValue.removeAttribute('required');
-        
-        // Verify the input was added before submitting
-        const verifyInput = document.getElementById('get_current_date_flag');
-        if (verifyInput && verifyInput.value === 'date') {
-            console.log('Submitting form with get_current=date');
-            // Use a small delay to ensure DOM is ready, then submit
-            setTimeout(() => {
-                // Double-check before submitting
-                const finalCheck = form.querySelector('input[name="get_current"]');
-                if (finalCheck && finalCheck.value === 'date') {
-                    form.submit();
-                } else {
-                    console.error('get_current input lost before submission');
-                }
-            }, 10);
-        } else {
-            console.error('Failed to add get_current input');
         }
     });
     
