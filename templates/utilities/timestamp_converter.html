@@ -146,6 +146,12 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.set('get_current', 'timestamp');
         formData.delete('input_value'); // Remove input_value to avoid validation
         
+        // Debug: log what we're sending
+        console.log('Sending get_current=timestamp');
+        for (let pair of formData.entries()) {
+            console.log('FormData:', pair[0], '=', pair[1]);
+        }
+        
         // Submit via fetch - completely bypasses HTML5 validation
         fetch(window.location.href, {
             method: 'POST',
@@ -164,13 +170,25 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.text();
         })
         .then(html => {
+            console.log('Received HTML response, length:', html.length);
+            // Check if response contains error or result
+            if (html.includes('alert-error')) {
+                console.warn('Response contains error message');
+            }
+            if (html.includes('alert-success')) {
+                console.log('Response contains success message');
+            }
+            
             // Parse the response HTML and update the page
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const newCard = doc.querySelector('.card');
             const currentCard = document.querySelector('.card');
             
+            console.log('newCard found:', !!newCard, 'currentCard found:', !!currentCard);
+            
             if (newCard && currentCard) {
+                console.log('Updating card content');
                 currentCard.innerHTML = newCard.innerHTML;
                 
                 // Re-run timezone conversion if result exists
@@ -245,6 +263,12 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.set('get_current', 'date');
         formData.delete('input_value'); // Remove input_value to avoid validation
         
+        // Debug: log what we're sending
+        console.log('Sending get_current=date');
+        for (let pair of formData.entries()) {
+            console.log('FormData:', pair[0], '=', pair[1]);
+        }
+        
         // Submit via fetch - completely bypasses HTML5 validation
         fetch(window.location.href, {
             method: 'POST',
@@ -263,13 +287,25 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.text();
         })
         .then(html => {
+            console.log('Received HTML response, length:', html.length);
+            // Check if response contains error or result
+            if (html.includes('alert-error')) {
+                console.warn('Response contains error message');
+            }
+            if (html.includes('alert-success')) {
+                console.log('Response contains success message');
+            }
+            
             // Parse the response HTML and update the page
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const newCard = doc.querySelector('.card');
             const currentCard = document.querySelector('.card');
             
+            console.log('newCard found:', !!newCard, 'currentCard found:', !!currentCard);
+            
             if (newCard && currentCard) {
+                console.log('Updating card content');
                 currentCard.innerHTML = newCard.innerHTML;
                 
                 // Re-run timezone conversion if result exists
