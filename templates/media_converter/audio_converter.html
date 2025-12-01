@@ -99,8 +99,16 @@ console.log('🔵🔵🔵 CODE FIX: File input handlers restored');
         const urlString = typeof url === 'string' ? url : (url?.toString() || '');
         const isPost = (options.method || 'GET').toUpperCase() === 'POST';
         // Only block POST requests to the audio converter endpoint (strict check)
-        // Check for the exact endpoint path to avoid blocking other requests
-        const isAudioConverter = urlString.includes('/media-converter/audio-converter') && 
+        // Parse URL to check pathname only (not query string) to avoid false positives
+        let urlPath = urlString;
+        try {
+            const urlObj = new URL(urlString);
+            urlPath = urlObj.pathname; // Only check the path, not query parameters
+        } catch (e) {
+            // If URL parsing fails, use the original string
+            urlPath = urlString;
+        }
+        const isAudioConverter = urlPath.includes('/media-converter/audio-converter') && 
                                   !urlString.includes('google-analytics') &&
                                   !urlString.includes('gtm');
         
