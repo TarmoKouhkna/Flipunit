@@ -46,17 +46,21 @@
             </small>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block">Convert</button>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <button type="submit" class="btn btn-primary" style="flex: 1;">Convert</button>
+            <button type="submit" name="get_current" value="timestamp" id="get-current-timestamp" class="btn btn-secondary" style="display: none;">Get Current Timestamp</button>
+            <button type="submit" name="get_current" value="date" id="get-current-date" class="btn btn-secondary" style="display: none;">Get Current Date & Time</button>
+        </div>
     </form>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
         <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
-            <li><strong>Timestamp → Date:</strong> Enter Unix timestamp (seconds or milliseconds) to get human-readable date</li>
-            <li><strong>Date → Timestamp:</strong> Enter date in format YYYY-MM-DD HH:MM:SS to get Unix timestamp</li>
+            <li><strong>Timestamp → Date:</strong> Enter Unix timestamp (seconds or milliseconds) to get human-readable date, or click "Get Current Date & Time" to see the current server time</li>
+            <li><strong>Date → Timestamp:</strong> Enter date in format YYYY-MM-DD HH:MM:SS to get Unix timestamp, or click "Get Current Timestamp" to get the current server timestamp</li>
         </ul>
         <p style="margin-top: 1rem; color: var(--text-secondary);">
-            <strong>Note:</strong> Timestamps are in UTC. Dates can be entered in various formats (YYYY-MM-DD, DD/MM/YYYY, etc.)
+            <strong>Note:</strong> Timestamps are in UTC. Dates can be entered in various formats (YYYY-MM-DD, DD/MM/YYYY, etc.). The "Get Current" buttons use the server's current time.
         </p>
     </div>
 </div>
@@ -71,16 +75,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputValue = document.getElementById('input_value');
     const inputHint = document.getElementById('input_hint');
     
-    conversionType.addEventListener('change', function() {
-        if (this.value === 'timestamp_to_date') {
+    const getCurrentTimestamp = document.getElementById('get-current-timestamp');
+    const getCurrentDate = document.getElementById('get-current-date');
+    
+    function updateUI() {
+        if (conversionType.value === 'timestamp_to_date') {
             inputLabel.textContent = 'Enter Timestamp';
             inputValue.placeholder = '1699123456';
             inputHint.textContent = 'Enter Unix timestamp (seconds or milliseconds)';
+            getCurrentTimestamp.style.display = 'none';
+            getCurrentDate.style.display = 'inline-block';
         } else {
             inputLabel.textContent = 'Enter Date';
             inputValue.placeholder = '2023-11-04 12:34:56';
             inputHint.textContent = 'Enter date in format YYYY-MM-DD HH:MM:SS or DD/MM/YYYY';
+            getCurrentTimestamp.style.display = 'inline-block';
+            getCurrentDate.style.display = 'none';
         }
+    }
+    
+    conversionType.addEventListener('change', updateUI);
+    updateUI(); // Initialize on page load
+    
+    // Make input optional when using "Get Current" buttons
+    getCurrentTimestamp.addEventListener('click', function(e) {
+        inputValue.removeAttribute('required');
+    });
+    
+    getCurrentDate.addEventListener('click', function(e) {
+        inputValue.removeAttribute('required');
     });
     
     // Convert UTC time to user's local timezone

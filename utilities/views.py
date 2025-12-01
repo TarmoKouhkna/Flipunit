@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib import messages
+from django.utils import timezone as django_timezone
 import re
 import io
 import random
@@ -534,8 +535,31 @@ def timestamp_converter(request):
     if request.method == 'POST':
         conversion_type = request.POST.get('conversion_type', 'timestamp_to_date')
         input_value = request.POST.get('input_value', '').strip()
+        get_current = request.POST.get('get_current', '')
         
-        if not input_value:
+        # Handle "Get Current" button clicks
+        if get_current:
+            now = django_timezone.now()
+            if get_current == 'timestamp':
+                # Return current timestamp
+                timestamp_seconds = int(now.timestamp())
+                timestamp_milliseconds = int(now.timestamp() * 1000)
+                result = {
+                    'type': 'timestamp',
+                    'seconds': timestamp_seconds,
+                    'milliseconds': timestamp_milliseconds,
+                }
+            elif get_current == 'date':
+                # Return current date/time
+                dt = now
+                if dt.tzinfo is None:
+                    dt = pytz.UTC.localize(dt)
+                result = {
+                    'type': 'date',
+                    'utc': dt.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                    'iso': dt.isoformat(),
+                }
+        elif not input_value:
             error = 'Please enter a value'
         else:
             try:
