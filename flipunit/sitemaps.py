@@ -33,19 +33,31 @@ class StaticViewSitemap(Sitemap):
             ('converters:tool', 'speed'),
             
             # Image converters
+            'image_converter:universal',
             ('image_converter:convert', 'jpeg-to-png'),
             ('image_converter:convert', 'png-to-jpg'),
             ('image_converter:convert', 'webp'),
             ('image_converter:convert', 'svg-to-png'),
             'image_converter:resize',
+            'image_converter:rotate_flip',
+            'image_converter:remove_exif',
+            'image_converter:grayscale',
+            'image_converter:merge',
+            'image_converter:watermark',
             
             # Media converters
             'media_converter:mp4_to_mp3',
             'media_converter:audio_converter',
+            'media_converter:audio_splitter',
+            'media_converter:audio_merge',
+            'media_converter:reduce_noise',
             'media_converter:video_to_gif',
             'media_converter:video_converter',
+            'media_converter:video_compressor',
+            'media_converter:mute_video',
             
             # PDF Tools
+            'pdf_tools:universal',
             'pdf_tools:pdf_merge',
             'pdf_tools:pdf_split',
             'pdf_tools:pdf_to_images',
@@ -54,6 +66,8 @@ class StaticViewSitemap(Sitemap):
             'pdf_tools:pdf_to_text',
             'pdf_tools:pdf_compress',
             'pdf_tools:pdf_rotate',
+            'pdf_tools:pdf_ocr',
+            'pdf_tools:pdf_remove_metadata',
             
             # Utilities
             'utilities:calculator',
@@ -61,6 +75,20 @@ class StaticViewSitemap(Sitemap):
             'utilities:timezone_converter',
             'utilities:roman_numeral_converter',
             'utilities:favicon_generator',
+            'utilities:timestamp_converter',
+            'utilities:text_to_speech',
+            'utilities:random_number_generator',
+            'utilities:lorem_ipsum_generator',
+            'utilities:random_word_generator',
+            'utilities:random_name_generator',
+            'utilities:word_lottery',
+            
+            # Color Picker
+            'color_picker:picker',
+            'color_picker:from_image',
+            
+            # Currency Converter
+            'currency_converter:convert',
             
             # Archive converters
             'archive_converter:rar_to_zip',
