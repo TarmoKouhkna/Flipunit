@@ -105,9 +105,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Duplicate prevention state
     let isProcessing = false;
     let downloadTriggered = false;
+    let abortController = null;
     
-    form.addEventListener('submit', function(e) {
+    // Prevent multiple event listeners
+    if (window._audioMergeHandlerAttached) {
+        console.log('⚠️ Audio merge handler already attached, skipping');
+        return;
+    }
+    window._audioMergeHandlerAttached = true;
+    
+    const submitHandler = function(e) {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         
         // Prevent duplicate submissions
         if (isProcessing) {
@@ -127,12 +137,19 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.textContent = 'Merging...';
         form.style.pointerEvents = 'none';
         
+        // Abort any previous fetch
+        if (abortController) {
+            abortController.abort();
+        }
+        abortController = new AbortController();
+        
         const formData = new FormData(form);
         
         fetch(form.action || window.location.href, {
             method: 'POST',
             body: formData,
             credentials: 'same-origin',
+            signal: abortController.signal
         })
         .then(response => {
             const contentType = response.headers.get('content-type') || '';
@@ -182,6 +199,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 100);
         })
         .catch(error => {
+            // Ignore abort errors (expected for duplicates)
+            if (error.name === 'AbortError') {
+                console.log('Fetch aborted (duplicate prevented)');
+                return;
+            }
             console.error('Error:', error);
             alert('Error: ' + error.message);
         })
@@ -189,10 +211,25 @@ document.addEventListener('DOMContentLoaded', function() {
             // Always reset state
             isProcessing = false;
             downloadTriggered = false;
+            abortController = null;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Merge & Download';
             form.style.pointerEvents = 'auto';
         });
+    };
+    
+    // Attach submit handler (only once)
+    form.addEventListener('submit', submitHandler, { once: false });
+    
+    // Also prevent button double-click
+    submitBtn.addEventListener('click', function(e) {
+        if (isProcessing) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            console.log('🚫 Button click blocked: already processing');
+            return false;
+        }
     });
 });
 </script>
