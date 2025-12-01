@@ -99,58 +99,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle "Get Current" buttons - submit form programmatically
     const form = document.querySelector('.converter-tool');
-    let isGetCurrentClick = false; // Flag to track "Get Current" button clicks
     
-    getCurrentTimestamp.addEventListener('click', function(e) {
-        e.preventDefault();
-        isGetCurrentClick = true; // Set flag before submitting
-        
-        // Create hidden input for get_current
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'get_current';
-        hiddenInput.value = 'timestamp';
-        form.appendChild(hiddenInput);
-        
-        // Clear input value and remove required
-        inputValue.value = '';
-        inputValue.removeAttribute('required');
-        
-        // Submit form
-        form.submit();
-    });
-    
-    getCurrentDate.addEventListener('click', function(e) {
-        e.preventDefault();
-        isGetCurrentClick = true; // Set flag before submitting
-        
-        // Create hidden input for get_current
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'get_current';
-        hiddenInput.value = 'date';
-        form.appendChild(hiddenInput);
-        
-        // Clear input value and remove required
-        inputValue.value = '';
-        inputValue.removeAttribute('required');
-        
-        // Submit form
-        form.submit();
-    });
-    
-    // Validate input for regular "Convert" button only
+    // Validate input for regular "Convert" button only - MUST be set up FIRST
     form.addEventListener('submit', function(e) {
-        // Skip validation if "Get Current" button was clicked
-        if (isGetCurrentClick) {
-            isGetCurrentClick = false; // Reset flag
-            return true; // Allow submission
-        }
-        
-        // Check for hidden get_current input (backup check)
+        // Check if "Get Current" button was clicked (hidden input exists)
         const getCurrentInput = document.querySelector('input[name="get_current"]');
         if (getCurrentInput) {
-            return true; // Allow submission
+            // Allow submission - don't validate input
+            return true;
         }
         
         // Validate for regular convert button
@@ -159,6 +115,42 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Please enter a value');
             return false;
         }
+    });
+    
+    getCurrentTimestamp.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Add hidden input
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'get_current';
+        hiddenInput.value = 'timestamp';
+        form.appendChild(hiddenInput);
+        
+        // Clear input value
+        inputValue.value = '';
+        
+        // Submit form - the submit event listener will see the hidden input and allow it
+        form.requestSubmit(); // Use requestSubmit instead of submit to trigger events
+    });
+    
+    getCurrentDate.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Add hidden input
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'get_current';
+        hiddenInput.value = 'date';
+        form.appendChild(hiddenInput);
+        
+        // Clear input value
+        inputValue.value = '';
+        
+        // Submit form - the submit event listener will see the hidden input and allow it
+        form.requestSubmit(); // Use requestSubmit instead of submit to trigger events
     });
     
     // Convert UTC time to user's local timezone
