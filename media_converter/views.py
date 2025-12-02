@@ -896,7 +896,8 @@ def video_compressor(request):
             video_bitrate = None
         elif compression_level == 'high':
             # Heavy compression - more quality loss, smaller file
-            crf = '32'
+            # Use bitrate-only mode (no CRF) to avoid conflicts with some FFmpeg versions
+            crf = None  # Don't use CRF when using bitrate limits
             preset = 'ultrafast'
             video_bitrate = '500k'
         else:  # medium
@@ -912,15 +913,18 @@ def video_compressor(request):
             '-c:v', 'libx264',  # Video codec
             '-c:a', 'aac',  # Audio codec
             '-preset', preset,
-            '-crf', crf,
             '-threads', '2',  # Limit threads
         ]
         
-        # Add bitrate limit for high compression
+        # Add CRF or bitrate (not both - they conflict)
         if video_bitrate:
+            # Use bitrate mode for high compression
             cmd.extend(['-b:v', video_bitrate])
             cmd.extend(['-maxrate', video_bitrate])
             cmd.extend(['-bufsize', str(int(video_bitrate.replace('k', '')) * 2) + 'k'])
+        elif crf:
+            # Use CRF mode for medium/low compression
+            cmd.extend(['-crf', crf])
         
         # Scale down resolution for high compression
         # Note: Temporarily disabled scale filter to avoid syntax issues
