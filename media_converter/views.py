@@ -865,7 +865,7 @@ def video_compressor(request):
             'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
         })
     
-    if compression_level not in ['low', 'medium', 'high']:
+    if compression_level not in ['low', 'medium']:
         compression_level = 'medium'
     
     # Check FFmpeg
@@ -894,13 +894,7 @@ def video_compressor(request):
             crf = '23'
             preset = 'medium'
             video_bitrate = None
-        elif compression_level == 'high':
-            # Heavy compression - more quality loss, smaller file
-            # Use bitrate-only mode (no CRF) to avoid conflicts with some FFmpeg versions
-            crf = None  # Don't use CRF when using bitrate limits
-            preset = 'ultrafast'
-            video_bitrate = '500k'
-        else:  # medium
+        else:  # medium (default)
             # Balanced compression
             crf = '28'
             preset = 'fast'
