@@ -924,7 +924,8 @@ def video_compressor(request):
         
         # Scale down resolution for high compression
         if compression_level == 'high':
-            cmd.extend(['-vf', 'scale=iw*min(1280/iw\\,720/ih):ih*min(1280/iw\\,720/ih)'])
+            # Scale to max 1280x720 while maintaining aspect ratio
+            cmd.extend(['-vf', 'scale=\'min(1280,iw)\':\'min(720,ih)\':force_original_aspect_ratio=decrease'])
         
         cmd.extend(['-movflags', '+faststart', '-y', output_path])
         
@@ -953,6 +954,12 @@ def video_compressor(request):
                     continue
                 # Skip copyright lines
                 if 'copyright' in line.lower() or 'the ffmpeg developers' in line.lower():
+                    continue
+                # Skip FFmpeg configuration flags (--enable-lib, --prefix, --extra-version, etc.)
+                if line.strip().startswith('--') or '--enable-' in line.lower() or '--disable-' in line.lower():
+                    continue
+                # Skip toolchain/build info lines
+                if 'toolchain' in line.lower() or 'libdir=' in line.lower() or 'incdir=' in line.lower() or 'arch=' in line.lower():
                     continue
                 # Skip empty lines at the start
                 if not meaningful_errors and not line.strip():
