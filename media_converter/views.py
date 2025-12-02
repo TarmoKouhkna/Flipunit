@@ -910,21 +910,9 @@ def video_compressor(request):
             '-threads', '2',  # Limit threads
         ]
         
-        # Add CRF or bitrate (not both - they conflict)
-        if video_bitrate:
-            # Use bitrate mode for high compression
-            cmd.extend(['-b:v', video_bitrate])
-            cmd.extend(['-maxrate', video_bitrate])
-            cmd.extend(['-bufsize', str(int(video_bitrate.replace('k', '')) * 2) + 'k'])
-        elif crf:
-            # Use CRF mode for medium/low compression
+        # Add CRF (bitrate mode removed with high compression option)
+        if crf:
             cmd.extend(['-crf', crf])
-        
-        # Scale down resolution for high compression
-        # Note: Temporarily disabled scale filter to avoid syntax issues
-        # High compression will use lower CRF and bitrate instead
-        # if compression_level == 'high':
-        #     cmd.extend(['-vf', 'scale=1280:-2'])
         
         cmd.extend(['-movflags', '+faststart', '-y', output_path])
         
