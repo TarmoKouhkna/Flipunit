@@ -1035,11 +1035,17 @@ def video_compressor(request):
                 except (OSError, PermissionError):
                     pass
             # Final check: if full_error still contains version info, replace it
-            if full_error and 'ffmpeg version' in full_error.lower():
+            # This is a catch-all to ensure no version dump ever gets through
+            if not full_error or 'ffmpeg version' in str(full_error).lower():
                 full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
             
+            # Double-check the final error message one more time before returning
+            final_error_msg = f'Compression failed: {full_error}'
+            if 'ffmpeg version' in final_error_msg.lower():
+                final_error_msg = 'Compression failed: Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
+            
             return render(request, 'media_converter/video_compressor.html', {
-                'error': f'Compression failed: {full_error}'
+                'error': final_error_msg
             })
         
         if not os.path.exists(output_path):
@@ -1071,6 +1077,10 @@ def video_compressor(request):
                     error_msg = 'Output file was not created. The video file may be corrupted or in an unsupported format.'
             else:
                 error_msg = error_msg_raw[:500] if len(error_msg_raw) > 500 else error_msg_raw
+            
+            # Final safety check: if error_msg contains version info, replace it
+            if error_msg and 'ffmpeg version' in error_msg.lower():
+                error_msg = 'Output file was not created. The video file may be corrupted or in an unsupported format.'
             
             if temp_dir:
                 try:
