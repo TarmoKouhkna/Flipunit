@@ -950,11 +950,38 @@ def video_compressor(request):
             
             # First, check if the entire error is just FFmpeg version/config info
             error_lower = error_msg.lower()
-            # Simple check: if error starts with "ffmpeg version" and contains "configuration:", it's likely just version dump
-            if error_msg.strip().startswith('ffmpeg version') or ('ffmpeg version' in error_lower and 'configuration:' in error_lower and len([l for l in error_msg.split('\n') if l.strip() and not l.strip().startswith('--') and 'ffmpeg' not in l.lower() and 'configuration' not in l.lower() and 'built with' not in l.lower() and 'copyright' not in l.lower()]) < 3):
-                # This is likely just version info, use generic message
-                full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
+            error_stripped = error_msg.strip()
+            
+            # Simple and direct check: if error contains "ffmpeg version" and "configuration:", it's likely a version dump
+            # Also check if most lines are config flags (--enable-*, --disable-*, etc.)
+            has_version = 'ffmpeg version' in error_lower
+            has_config = 'configuration:' in error_lower or '--enable-' in error_lower or '--disable-' in error_lower
+            
+            if has_version and has_config:
+                # Count meaningful (non-version/config) lines
+                meaningful_line_count = 0
+                for line in error_msg.split('\n'):
+                    line_lower = line.lower().strip()
+                    if not line_lower:
+                        continue
+                    # Skip version/config lines
+                    if any(x in line_lower for x in ['ffmpeg version', 'configuration:', 'built with', 'copyright', 'the ffmpeg developers']):
+                        continue
+                    if line.strip().startswith('--'):
+                        continue
+                    meaningful_line_count += 1
+                
+                # If we have very few meaningful lines, it's just a version dump
+                if meaningful_line_count < 3:
+                    full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
+                else:
+                    # Has some meaningful content, continue with filtering
+                    full_error = None  # Will be set in else block
             else:
+                full_error = None  # Will be set in else block
+            
+            # Only do detailed filtering if we didn't already set full_error
+            if full_error is None:
                 # Filter out version information and extract actual error
                 error_lines = error_msg.split('\n')
                 meaningful_errors = []
