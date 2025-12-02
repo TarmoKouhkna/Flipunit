@@ -1023,14 +1023,42 @@ def video_compressor(request):
             })
         
         if not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else 'Output file was not created'
+            error_msg_raw = result.stderr if result.stderr else 'Output file was not created'
+            
+            # Apply same filtering as above
+            if isinstance(error_msg_raw, str) and 'ffmpeg version' in error_msg_raw.lower():
+                # Filter out version info
+                error_lines = error_msg_raw.split('\n')
+                meaningful_errors = []
+                skip_patterns = [
+                    'ffmpeg version', 'built with', 'configuration:', 'copyright',
+                    'the ffmpeg developers', 'toolchain', 'libdir=', 'incdir=', 'arch=',
+                    '--prefix=', '--extra-version=', '--enable-', '--disable-', 'gcc',
+                    'debian', 'hardened', 'x86_64-linux-gnu'
+                ]
+                
+                for line in error_lines:
+                    line_lower = line.lower().strip()
+                    if not line_lower:
+                        continue
+                    should_skip = any(pattern in line_lower for pattern in skip_patterns) or line.strip().startswith('--')
+                    if not should_skip:
+                        meaningful_errors.append(line.strip())
+                
+                if meaningful_errors:
+                    error_msg = '\n'.join(meaningful_errors[-3:])[:500]
+                else:
+                    error_msg = 'Output file was not created. The video file may be corrupted or in an unsupported format.'
+            else:
+                error_msg = error_msg_raw[:500] if len(error_msg_raw) > 500 else error_msg_raw
+            
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
                 except (OSError, PermissionError):
                     pass
             return render(request, 'media_converter/video_compressor.html', {
-                'error': f'Compression failed: {error_msg[:500]}'
+                'error': f'Compression failed: {error_msg}'
             })
         
         # Read output file
