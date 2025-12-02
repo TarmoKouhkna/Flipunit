@@ -939,8 +939,46 @@ def video_compressor(request):
         
         # Check if compression failed
         if result.returncode != 0:
+            # Extract meaningful error message from ffmpeg output
             error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
+            
+            # Filter out version information and extract actual error
+            error_lines = error_msg.split('\n')
+            meaningful_errors = []
+            skip_next = False
+            
+            for i, line in enumerate(error_lines):
+                # Skip version lines
+                if 'ffmpeg version' in line.lower() or 'built with' in line.lower() or 'configuration:' in line.lower():
+                    continue
+                # Skip copyright lines
+                if 'copyright' in line.lower() or 'the ffmpeg developers' in line.lower():
+                    continue
+                # Skip empty lines at the start
+                if not meaningful_errors and not line.strip():
+                    continue
+                # Collect actual error messages
+                if line.strip():
+                    meaningful_errors.append(line.strip())
+            
+            # Use meaningful errors or fallback to original
+            if meaningful_errors:
+                # Take last few meaningful error lines (usually contain the actual error)
+                error_text = '\n'.join(meaningful_errors[-5:])
+                # Limit length
+                full_error = error_text[:500] if len(error_text) > 500 else error_text
+            else:
+                # Fallback: try to find error-like patterns
+                if 'error' in error_msg.lower():
+                    # Extract lines containing "error"
+                    error_lines_filtered = [line for line in error_lines if 'error' in line.lower()]
+                    if error_lines_filtered:
+                        full_error = error_lines_filtered[-1][:500]
+                    else:
+                        full_error = 'Video compression failed. Please check the file format and try again.'
+                else:
+                    full_error = 'Video compression failed. Please check the file format and try again.'
+            
             if temp_dir:
                 try:
                     shutil.rmtree(temp_dir)
