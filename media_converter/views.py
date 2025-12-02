@@ -925,8 +925,8 @@ def video_compressor(request):
         # Scale down resolution for high compression
         if compression_level == 'high':
             # Scale to max 1280x720 while maintaining aspect ratio
-            # Use simpler syntax that's more compatible
-            cmd.extend(['-vf', 'scale=1280:720:force_original_aspect_ratio=decrease'])
+            # Use scale filter that only scales down (not up) if video is larger
+            cmd.extend(['-vf', 'scale=\'if(gt(iw,1280),1280,-1)\':\'if(gt(ih,720),720,-1)\''])
         
         cmd.extend(['-movflags', '+faststart', '-y', output_path])
         
