@@ -925,8 +925,9 @@ def video_compressor(request):
         # Scale down resolution for high compression
         if compression_level == 'high':
             # Scale to max 1280x720 while maintaining aspect ratio
-            # Use scale filter that only scales down (not up) if video is larger
-            cmd.extend(['-vf', 'scale=\'if(gt(iw,1280),1280,-1)\':\'if(gt(ih,720),720,-1)\''])
+            # Use simple scale filter - FFmpeg will maintain aspect ratio automatically
+            # Scale width to 1280, height will be calculated to maintain aspect
+            cmd.extend(['-vf', 'scale=1280:-2'])
         
         cmd.extend(['-movflags', '+faststart', '-y', output_path])
         
@@ -946,26 +947,15 @@ def video_compressor(request):
             
             # First, check if the entire error is just FFmpeg version/config info
             error_lower = error_msg.lower()
-            if 'ffmpeg version' in error_lower and ('configuration:' in error_lower or 'built with' in error_lower):
-                # This is likely just version info, try to find actual error or use generic message
-                # Check if there's any actual error content after the version info
-                lines_after_version = []
-                found_version_section = False
-                for line in error_msg.split('\n'):
-                    line_lower = line.lower().strip()
-                    if 'ffmpeg version' in line_lower or 'configuration:' in line_lower:
-                        found_version_section = True
-                        continue
-                    if found_version_section and line_lower:
-                        # Skip config flags and build info
-                        if not (line.strip().startswith('--') or 
-                                any(x in line_lower for x in ['built with', 'copyright', 'toolchain', 'libdir', 'incdir', 'arch=', 'gcc', 'debian'])):
-                            lines_after_version.append(line.strip())
-                
-                if lines_after_version:
-                    full_error = '\n'.join(lines_after_version[-3:])[:500]
-                else:
-                    full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
+            # Check if error is mostly just version/config info (more than 50% of content)
+            version_keywords = ['ffmpeg version', 'configuration:', 'built with', 'copyright', 'the ffmpeg developers']
+            version_line_count = sum(1 for line in error_msg.split('\n') 
+                                   if any(keyword in line.lower() for keyword in version_keywords) or line.strip().startswith('--'))
+            total_lines = len([l for l in error_msg.split('\n') if l.strip()])
+            
+            if version_line_count > total_lines * 0.5 or ('ffmpeg version' in error_lower and 'configuration:' in error_lower and total_lines < 10):
+                # This is likely just version info, use generic message
+                full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
             else:
                 # Filter out version information and extract actual error
                 error_lines = error_msg.split('\n')
