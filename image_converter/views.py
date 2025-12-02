@@ -525,7 +525,8 @@ def resize_image(request):
     
     # Check for batch mode (multiple files)
     uploaded_files = request.FILES.getlist('image')
-    is_batch = len(uploaded_files) > 1
+    file_count = len(uploaded_files)
+    is_batch = file_count > 1
     
     if not uploaded_files:
         return render(request, 'image_converter/resize.html', {
@@ -533,7 +534,7 @@ def resize_image(request):
         })
     
     # Limit batch size to 15 files
-    if len(uploaded_files) > 15:
+    if file_count > 15:
         return render(request, 'image_converter/resize.html', {
             'error': 'Maximum 15 files allowed for batch conversion. Please select fewer files.'
         })
@@ -685,6 +686,7 @@ def resize_image(request):
         
         # Single file conversion
         if not is_batch:
+            uploaded_file = uploaded_files[0]  # Ensure uploaded_file is defined
             try:
                 resized_data, output_ext, final_format = _resize_single_image(
                     uploaded_file, width, height, maintain_aspect, output_format, quality_param
@@ -699,7 +701,22 @@ def resize_image(request):
                     'error': str(e)
                 })
         
-        # Batch conversion - create ZIP file
+        # Batch conversion - create ZIP file (file_count > 1)
+        # Ensure we're definitely in batch mode
+        if file_count <= 1:
+            # Fallback to single file if somehow we got here with one file
+            uploaded_file = uploaded_files[0]
+            try:
+                resized_data, output_ext, final_format = _resize_single_image(
+                    uploaded_file, width, height, maintain_aspect, output_format, quality_param
+                )
+                response = HttpResponse(resized_data, content_type=f'image/{output_ext}')
+                response['Content-Disposition'] = f'attachment; filename="resized.{output_ext}"'
+                return response
+            except ValueError as e:
+                return render(request, 'image_converter/resize.html', {
+                    'error': str(e)
+                })
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             successful = 0
@@ -767,9 +784,16 @@ def resize_image(request):
                 })
         
         zip_buffer.seek(0)
+        zip_data = zip_buffer.read()
+        
+        # Ensure we have ZIP data before returning
+        if len(zip_data) == 0:
+            return render(request, 'image_converter/resize.html', {
+                'error': 'Failed to create ZIP file. Please try again.'
+            })
         
         # Create response with ZIP file
-        response = HttpResponse(zip_buffer.read(), content_type='application/zip')
+        response = HttpResponse(zip_data, content_type='application/zip')
         response['Content-Disposition'] = 'attachment; filename="resized_images.zip"'
         return response
         
