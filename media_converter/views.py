@@ -952,33 +952,28 @@ def video_compressor(request):
             error_lower = error_msg.lower()
             error_stripped = error_msg.strip()
             
-            # Simple and direct check: if error contains "ffmpeg version" and "configuration:", it's likely a version dump
-            # Also check if most lines are config flags (--enable-*, --disable-*, etc.)
-            has_version = 'ffmpeg version' in error_lower
-            has_config = 'configuration:' in error_lower or '--enable-' in error_lower or '--disable-' in error_lower
+            # Aggressive check: if error starts with "ffmpeg version", it's almost certainly a version dump
+            # Also check if it contains version + config info with mostly config lines
+            is_version_dump = False
             
-            if has_version and has_config:
-                # Count meaningful (non-version/config) lines
-                meaningful_line_count = 0
-                for line in error_msg.split('\n'):
-                    line_lower = line.lower().strip()
-                    if not line_lower:
-                        continue
-                    # Skip version/config lines
-                    if any(x in line_lower for x in ['ffmpeg version', 'configuration:', 'built with', 'copyright', 'the ffmpeg developers']):
-                        continue
-                    if line.strip().startswith('--'):
-                        continue
-                    meaningful_line_count += 1
+            if error_stripped.startswith('ffmpeg version'):
+                is_version_dump = True
+            elif 'ffmpeg version' in error_lower and 'configuration:' in error_lower:
+                # Count config flag lines vs total lines
+                lines = [l.strip() for l in error_msg.split('\n') if l.strip()]
+                config_lines = sum(1 for l in lines if l.startswith('--') or 'configuration:' in l.lower())
+                version_lines = sum(1 for l in lines if any(x in l.lower() for x in ['ffmpeg version', 'built with', 'copyright', 'the ffmpeg developers']))
+                total_special_lines = config_lines + version_lines
                 
-                # If we have very few meaningful lines, it's just a version dump
-                if meaningful_line_count < 3:
-                    full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
-                else:
-                    # Has some meaningful content, continue with filtering
-                    full_error = None  # Will be set in else block
+                # If more than 70% of lines are version/config, it's a version dump
+                if total_special_lines > len(lines) * 0.7 or len(lines) < 5:
+                    is_version_dump = True
+            
+            if is_version_dump:
+                # This is a version dump, use friendly message
+                full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
             else:
-                full_error = None  # Will be set in else block
+                full_error = None  # Will be set in filtering block below
             
             # Only do detailed filtering if we didn't already set full_error
             if full_error is None:
