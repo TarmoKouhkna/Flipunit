@@ -923,11 +923,10 @@ def video_compressor(request):
             cmd.extend(['-bufsize', str(int(video_bitrate.replace('k', '')) * 2) + 'k'])
         
         # Scale down resolution for high compression
-        if compression_level == 'high':
-            # Scale to max 1280x720 while maintaining aspect ratio
-            # Use simple scale filter - FFmpeg will maintain aspect ratio automatically
-            # Scale width to 1280, height will be calculated to maintain aspect
-            cmd.extend(['-vf', 'scale=1280:-2'])
+        # Note: Temporarily disabled scale filter to avoid syntax issues
+        # High compression will use lower CRF and bitrate instead
+        # if compression_level == 'high':
+        #     cmd.extend(['-vf', 'scale=1280:-2'])
         
         cmd.extend(['-movflags', '+faststart', '-y', output_path])
         
@@ -947,13 +946,8 @@ def video_compressor(request):
             
             # First, check if the entire error is just FFmpeg version/config info
             error_lower = error_msg.lower()
-            # Check if error is mostly just version/config info (more than 50% of content)
-            version_keywords = ['ffmpeg version', 'configuration:', 'built with', 'copyright', 'the ffmpeg developers']
-            version_line_count = sum(1 for line in error_msg.split('\n') 
-                                   if any(keyword in line.lower() for keyword in version_keywords) or line.strip().startswith('--'))
-            total_lines = len([l for l in error_msg.split('\n') if l.strip()])
-            
-            if version_line_count > total_lines * 0.5 or ('ffmpeg version' in error_lower and 'configuration:' in error_lower and total_lines < 10):
+            # Simple check: if error starts with "ffmpeg version" and contains "configuration:", it's likely just version dump
+            if error_msg.strip().startswith('ffmpeg version') or ('ffmpeg version' in error_lower and 'configuration:' in error_lower and len([l for l in error_msg.split('\n') if l.strip() and not l.strip().startswith('--') and 'ffmpeg' not in l.lower() and 'configuration' not in l.lower() and 'built with' not in l.lower() and 'copyright' not in l.lower()]) < 3):
                 # This is likely just version info, use generic message
                 full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
             else:
