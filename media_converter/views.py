@@ -948,25 +948,31 @@ def video_compressor(request):
             # Extract meaningful error message from ffmpeg output
             error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
             
-            # First, check if the entire error is just FFmpeg version/config info
+            # Check if this is just a FFmpeg version dump
+            # If error starts with "ffmpeg version" or contains version + mostly config lines, it's a dump
             error_lower = error_msg.lower()
             error_stripped = error_msg.strip()
             
-            # Aggressive check: if error starts with "ffmpeg version", it's almost certainly a version dump
-            # Also check if it contains version + config info with mostly config lines
+            # Simple, direct check
             is_version_dump = False
-            
             if error_stripped.startswith('ffmpeg version'):
                 is_version_dump = True
-            elif 'ffmpeg version' in error_lower and 'configuration:' in error_lower:
-                # Count config flag lines vs total lines
-                lines = [l.strip() for l in error_msg.split('\n') if l.strip()]
-                config_lines = sum(1 for l in lines if l.startswith('--') or 'configuration:' in l.lower())
-                version_lines = sum(1 for l in lines if any(x in l.lower() for x in ['ffmpeg version', 'built with', 'copyright', 'the ffmpeg developers']))
-                total_special_lines = config_lines + version_lines
+            elif 'ffmpeg version' in error_lower:
+                # Count how many lines are version/config vs meaningful
+                all_lines = error_msg.split('\n')
+                version_config_count = 0
+                for line in all_lines:
+                    line_lower = line.lower().strip()
+                    if not line_lower:
+                        continue
+                    if ('ffmpeg version' in line_lower or 'configuration:' in line_lower or 
+                        'built with' in line_lower or 'copyright' in line_lower or 
+                        line.strip().startswith('--')):
+                        version_config_count += 1
                 
-                # If more than 70% of lines are version/config, it's a version dump
-                if total_special_lines > len(lines) * 0.7 or len(lines) < 5:
+                # If more than 80% are version/config lines, it's a dump
+                non_empty_lines = len([l for l in all_lines if l.strip()])
+                if non_empty_lines > 0 and version_config_count / non_empty_lines > 0.8:
                     is_version_dump = True
             
             if is_version_dump:
@@ -1028,6 +1034,10 @@ def video_compressor(request):
                     shutil.rmtree(temp_dir)
                 except (OSError, PermissionError):
                     pass
+            # Final check: if full_error still contains version info, replace it
+            if full_error and 'ffmpeg version' in full_error.lower():
+                full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
+            
             return render(request, 'media_converter/video_compressor.html', {
                 'error': f'Compression failed: {full_error}'
             })
