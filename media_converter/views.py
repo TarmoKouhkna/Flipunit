@@ -944,59 +944,71 @@ def video_compressor(request):
             # Extract meaningful error message from ffmpeg output
             error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
             
-            # Filter out version information and extract actual error
-            error_lines = error_msg.split('\n')
-            meaningful_errors = []
-            
-            # Skip patterns that indicate FFmpeg info/version output
-            skip_patterns = [
-                'ffmpeg version', 'built with', 'configuration:', 'copyright',
-                'the ffmpeg developers', 'toolchain', 'libdir=', 'incdir=', 'arch=',
-                '--prefix=', '--extra-version=', '--enable-', '--disable-', 'gcc',
-                'debian', 'hardened', 'x86_64-linux-gnu'
-            ]
-            
-            for line in error_lines:
-                line_lower = line.lower().strip()
+            # First, check if the entire error is just FFmpeg version/config info
+            error_lower = error_msg.lower()
+            if 'ffmpeg version' in error_lower and ('configuration:' in error_lower or 'built with' in error_lower):
+                # This is likely just version info, try to find actual error or use generic message
+                # Check if there's any actual error content after the version info
+                lines_after_version = []
+                found_version_section = False
+                for line in error_msg.split('\n'):
+                    line_lower = line.lower().strip()
+                    if 'ffmpeg version' in line_lower or 'configuration:' in line_lower:
+                        found_version_section = True
+                        continue
+                    if found_version_section and line_lower:
+                        # Skip config flags and build info
+                        if not (line.strip().startswith('--') or 
+                                any(x in line_lower for x in ['built with', 'copyright', 'toolchain', 'libdir', 'incdir', 'arch=', 'gcc', 'debian'])):
+                            lines_after_version.append(line.strip())
                 
-                # Skip empty lines at the start
-                if not meaningful_errors and not line_lower:
-                    continue
-                
-                # Skip if line matches any skip pattern
-                should_skip = False
-                for pattern in skip_patterns:
-                    if pattern in line_lower:
-                        should_skip = True
-                        break
-                
-                # Also skip lines that start with -- (configuration flags)
-                if line.strip().startswith('--'):
-                    should_skip = True
-                
-                if not should_skip and line_lower:
-                    meaningful_errors.append(line.strip())
-            
-            # Use meaningful errors or fallback
-            if meaningful_errors:
-                # Take last few meaningful error lines (usually contain the actual error)
-                error_text = '\n'.join(meaningful_errors[-5:])
-                # Limit length and ensure it's not just whitespace
-                full_error = error_text[:500].strip() if len(error_text) > 500 else error_text.strip()
-                
-                # If after filtering we only have whitespace or very short text, use fallback
-                if not full_error or len(full_error) < 10:
+                if lines_after_version:
+                    full_error = '\n'.join(lines_after_version[-3:])[:500]
+                else:
                     full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
             else:
-                # Fallback: try to find error-like patterns
-                if 'error' in error_msg.lower():
-                    # Extract lines containing "error" but not version info
-                    error_lines_filtered = [line.strip() for line in error_lines 
-                                          if 'error' in line.lower() 
-                                          and not any(p in line.lower() for p in ['version', 'configuration', 'built with'])]
-                    if error_lines_filtered:
-                        full_error = error_lines_filtered[-1][:500]
-                    else:
+                # Filter out version information and extract actual error
+                error_lines = error_msg.split('\n')
+                meaningful_errors = []
+                
+                # Skip patterns that indicate FFmpeg info/version output
+                skip_patterns = [
+                    'ffmpeg version', 'built with', 'configuration:', 'copyright',
+                    'the ffmpeg developers', 'toolchain', 'libdir=', 'incdir=', 'arch=',
+                    '--prefix=', '--extra-version=', '--enable-', '--disable-', 'gcc',
+                    'debian', 'hardened', 'x86_64-linux-gnu'
+                ]
+                
+                for line in error_lines:
+                    line_lower = line.lower().strip()
+                    
+                    # Skip empty lines at the start
+                    if not meaningful_errors and not line_lower:
+                        continue
+                    
+                    # Skip if line matches any skip pattern
+                    should_skip = False
+                    for pattern in skip_patterns:
+                        if pattern in line_lower:
+                            should_skip = True
+                            break
+                    
+                    # Also skip lines that start with -- (configuration flags)
+                    if line.strip().startswith('--'):
+                        should_skip = True
+                    
+                    if not should_skip and line_lower:
+                        meaningful_errors.append(line.strip())
+                
+                # Use meaningful errors or fallback
+                if meaningful_errors:
+                    # Take last few meaningful error lines (usually contain the actual error)
+                    error_text = '\n'.join(meaningful_errors[-5:])
+                    # Limit length and ensure it's not just whitespace
+                    full_error = error_text[:500].strip() if len(error_text) > 500 else error_text.strip()
+                    
+                    # If after filtering we only have whitespace or very short text, use fallback
+                    if not full_error or len(full_error) < 10:
                         full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
                 else:
                     full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
