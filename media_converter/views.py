@@ -1001,7 +1001,7 @@ def video_compressor(request):
         
         # Create response
         safe_filename = os.path.splitext(uploaded_file.name)[0] + '_compressed' + file_ext
-        safe_filename = re.sub(r'[^\w\s-.]', '', safe_filename).strip()
+        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename).strip()
         safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
         
         response = HttpResponse(file_content, content_type=content_type)
@@ -1156,7 +1156,7 @@ def mute_video(request):
         
         # Create response
         safe_filename = os.path.splitext(uploaded_file.name)[0] + '_muted' + file_ext
-        safe_filename = re.sub(r'[^\w\s-.]', '', safe_filename).strip()
+        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename).strip()
         safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
         
         response = HttpResponse(file_content, content_type=content_type)
@@ -1384,7 +1384,7 @@ def audio_splitter(request):
         
         # Create response
         safe_filename = os.path.splitext(uploaded_file.name)[0] + f'_split_{int(start_seconds)}s-{int(end_seconds)}s{file_ext}'
-        safe_filename = re.sub(r'[^\w\s-.]', '', safe_filename).strip()
+        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename).strip()
         safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
         
         response = HttpResponse(file_content, content_type=content_type)
@@ -1775,7 +1775,7 @@ def reduce_noise(request):
         
         # Create response
         safe_filename = os.path.splitext(uploaded_file.name)[0] + '_denoised' + file_ext
-        safe_filename = re.sub(r'[^\w\s-.]', '', safe_filename).strip()
+        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename).strip()
         safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
         
         response = HttpResponse(file_content, content_type=content_type)

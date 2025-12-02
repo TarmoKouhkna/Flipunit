@@ -23,15 +23,22 @@
         <div class="form-group">
             <label class="form-label">Select Image File</label>
             <div class="file-upload-area" id="uploadArea">
-                <input type="file" name="image" id="image" accept="image/*,.heic,.heif,image/heic,image/heif" required>
+                <input type="file" name="image" id="image" accept="image/*,.heic,.heif,image/heic,image/heif" multiple required>
                 <div id="uploadContent">
                     <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
                     <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
+                    <p style="color: var(--primary-color); font-size: 0.9rem; margin-top: 0.5rem; font-weight: 600;">💡 Batch Mode: Select up to 15 files for batch conversion (downloads as ZIP)</p>
                 </div>
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">Convert to Grayscale & Download</button>
+        <button type="submit" class="btn btn-primary btn-block" id="grayscaleBtn" style="margin-top: 1.5rem;">
+            <span id="btnText">Convert to Grayscale & Download</span>
+            <span id="btnLoader" style="display: none;">⏳ Processing...</span>
+        </button>
+        <p id="batchInfo" style="display: none; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem; text-align: center;">
+            <span id="fileCount"></span> file(s) selected - will be downloaded as a ZIP archive
+        </p>
     </form>
 </div>
 
@@ -44,9 +51,34 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadArea = document.getElementById('uploadArea');
     const uploadContent = document.getElementById('uploadContent');
     
+    const batchInfo = document.getElementById('batchInfo');
+    const fileCount = document.getElementById('fileCount');
+    
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
-            uploadContent.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+            if (e.target.files.length > 15) {
+                alert('Maximum 15 files allowed for batch conversion. Please select fewer files.');
+                e.target.value = '';
+                return;
+            }
+            
+            if (e.target.files.length === 1) {
+                // Single file mode
+                uploadContent.innerHTML = `
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Selected: ${e.target.files[0].name}</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
+                    <p style="color: var(--primary-color); font-size: 0.9rem; margin-top: 0.5rem; font-weight: 600;">💡 Batch Mode: Select up to 15 files for batch conversion (downloads as ZIP)</p>
+                `;
+                batchInfo.style.display = 'none';
+            } else {
+                // Batch mode
+                uploadContent.innerHTML = `
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 ${e.target.files.length} file(s) selected</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Files will be converted and downloaded as a ZIP archive</p>
+                `;
+                fileCount.textContent = e.target.files.length;
+                batchInfo.style.display = 'block';
+            }
         }
     });
     
@@ -61,8 +93,37 @@ document.addEventListener('DOMContentLoaded', function() {
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             fileInput.files = files;
-            uploadContent.querySelector('p').textContent = 'Selected: ' + files[0].name;
+            // Trigger change event to update preview
+            const changeEvent = new Event('change', { bubbles: true });
+            fileInput.dispatchEvent(changeEvent);
         }
+    });
+    
+    // Form submission
+    const grayscaleForm = document.getElementById('grayscaleForm');
+    const grayscaleBtn = document.getElementById('grayscaleBtn');
+    const btnText = document.getElementById('btnText');
+    const btnLoader = document.getElementById('btnLoader');
+    
+    grayscaleForm.addEventListener('submit', function(e) {
+        if (!fileInput.files.length) {
+            e.preventDefault();
+            alert('Please select an image file first.');
+            return;
+        }
+        
+        // Show loading state
+        btnText.style.display = 'none';
+        btnLoader.style.display = 'inline';
+        grayscaleBtn.disabled = true;
+        
+        // Reset button after download starts (for file downloads that don't reload the page)
+        // If the page reloads (error case), the button will be reset automatically
+        setTimeout(function() {
+            btnText.style.display = 'inline';
+            btnLoader.style.display = 'none';
+            grayscaleBtn.disabled = false;
+        }, 2000); // Reset after 2 seconds - enough time for download to start
     });
 });
 </script>

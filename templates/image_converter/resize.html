@@ -25,11 +25,12 @@
         {% csrf_token %}
         <div class="form-group">
             <label class="form-label">Select Image File</label>
-            <div class="file-upload-area">
-                <input type="file" name="image" id="image" accept="image/*,.heic,.heif,image/heic,image/heif" required>
-                <div style="text-align: center; padding: 2rem;">
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="image" id="image" accept="image/*,.heic,.heif,image/heic,image/heif" multiple required>
+                <div id="uploadContent" style="text-align: center; padding: 2rem;">
                     <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
                     <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: JPG, JPEG, PNG, WebP, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
+                    <p style="color: var(--primary-color); font-size: 0.9rem; margin-top: 0.5rem; font-weight: 600;">💡 Batch Mode: Select up to 15 files for batch resizing (downloads as ZIP)</p>
                 </div>
             </div>
         </div>
@@ -91,6 +92,9 @@
             <span id="btnText">Resize & Download</span>
             <span id="btnLoader" style="display: none;">⏳ Processing...</span>
         </button>
+        <p id="batchInfo" style="display: none; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem; text-align: center;">
+            <span id="fileCount"></span> file(s) selected - will be downloaded as a ZIP archive
+        </p>
     </form>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
@@ -119,32 +123,58 @@ document.addEventListener('DOMContentLoaded', function() {
     const heightInput = document.getElementById('height');
     const maintainAspectCheckbox = document.getElementById('maintain_aspect');
     
+    const uploadContent = document.getElementById('uploadContent');
+    const batchInfo = document.getElementById('batchInfo');
+    const fileCount = document.getElementById('fileCount');
+    
     // Update UI when file is selected
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
-            const fileName = e.target.files[0].name;
-            uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
+            if (e.target.files.length > 15) {
+                alert('Maximum 15 files allowed for batch conversion. Please select fewer files.');
+                e.target.value = '';
+                return;
+            }
             
-            // Show image dimensions if possible
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = new Image();
-                img.onload = function() {
-                    const info = document.createElement('p');
-                    info.style.cssText = 'color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;';
-                    info.textContent = `Original size: ${img.width} × ${img.height} pixels`;
-                    
-                    // Remove previous info if exists
-                    const existingInfo = uploadArea.querySelector('p:last-of-type');
-                    if (existingInfo && existingInfo.textContent.includes('Original size')) {
-                        existingInfo.remove();
-                    }
-                    
-                    uploadArea.appendChild(info);
+            if (e.target.files.length === 1) {
+                // Single file mode
+                const fileName = e.target.files[0].name;
+                uploadContent.innerHTML = `
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">Selected: ${fileName}</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Supports: JPG, JPEG, PNG, WebP, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
+                    <p style="color: var(--primary-color); font-size: 0.9rem; margin-top: 0.5rem; font-weight: 600;">💡 Batch Mode: Select up to 15 files for batch resizing (downloads as ZIP)</p>
+                `;
+                batchInfo.style.display = 'none';
+                
+                // Show image dimensions if possible
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const info = document.createElement('p');
+                        info.style.cssText = 'color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;';
+                        info.textContent = `Original size: ${img.width} × ${img.height} pixels`;
+                        
+                        // Remove previous info if exists
+                        const existingInfo = uploadArea.querySelector('p:last-of-type');
+                        if (existingInfo && existingInfo.textContent.includes('Original size')) {
+                            existingInfo.remove();
+                        }
+                        
+                        uploadArea.appendChild(info);
+                    };
+                    img.src = event.target.result;
                 };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(e.target.files[0]);
+                reader.readAsDataURL(e.target.files[0]);
+            } else {
+                // Batch mode
+                uploadContent.innerHTML = `
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">📁 ${e.target.files.length} file(s) selected</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Files will be resized and downloaded as a ZIP archive</p>
+                `;
+                fileCount.textContent = e.target.files.length;
+                batchInfo.style.display = 'block';
+            }
         }
     });
     

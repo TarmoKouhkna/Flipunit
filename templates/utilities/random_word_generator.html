@@ -28,6 +28,7 @@
                     <p style="color: var(--text-secondary);"><em>{{ result.note }}</em></p>
                 {% endif %}
             </div>
+            <button onclick="copyToClipboard()" class="btn btn-secondary" style="margin-top: 1rem;">Copy Words to Clipboard</button>
         </div>
     {% endif %}
     
@@ -83,6 +84,23 @@
 </div>
 
 <a href="{% url 'utilities:index' %}" class="btn btn-secondary">← Back to Utilities</a>
+
+{% block extra_js %}
+<script>
+function copyToClipboard() {
+    const words = [];
+    document.querySelectorAll('.alert-success p span').forEach(function(el) {
+        words.push(el.textContent.trim());
+    });
+    const text = words.join('\n');
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Words copied to clipboard!');
+    }, function() {
+        alert('Failed to copy words');
+    });
+}
+</script>
+{% endblock %}
 {% endblock %}
 
 

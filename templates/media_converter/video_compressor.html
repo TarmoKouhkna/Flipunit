@@ -104,87 +104,164 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Form submission
-    form.addEventListener('submit', function(e) {
+    // Global state for duplicate prevention
+    if (!window._videoCompressorState) {
+        window._videoCompressorState = {
+            isProcessing: false,
+            downloadTriggered: false,
+            abortController: null,
+            submitCount: 0
+        };
+    }
+    const state = window._videoCompressorState;
+    
+    // Form submission handler
+    const submitHandler = async function(e) {
+        state.submitCount++;
+        console.log('📝 Video compressor submit handler called, count:', state.submitCount);
+        
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        // Double-click protection
+        if (state.isProcessing) {
+            console.error('🚫 Submit BLOCKED: already processing');
+            return false;
+        }
         
         if (!fileInput.files.length) {
             alert('Please select a video file.');
-            return;
+            return false;
         }
         
-        // Show processing indicator
+        // Lock immediately
+        state.isProcessing = true;
+        state.downloadTriggered = false;
+        console.log('🔒 Lock set, submit count:', state.submitCount);
+        
         submitBtn.disabled = true;
         submitBtn.textContent = 'Compressing...';
         if (processingIndicator) {
             processingIndicator.style.display = 'block';
         }
+        form.style.pointerEvents = 'none';
         
-        const formData = new FormData(form);
+        // Abort any previous fetch
+        if (state.abortController) {
+            state.abortController.abort();
+        }
+        state.abortController = new AbortController();
         
-        fetch(form.action || window.location.href, {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin',
-        })
-        .then(response => {
+        // Cleanup any old blob URLs
+        document.querySelectorAll('a[data-temp-download]').forEach(a => {
+            if (a.href.startsWith('blob:')) {
+                URL.revokeObjectURL(a.href);
+            }
+            a.remove();
+        });
+        
+        try {
+            const formData = new FormData(form);
+            
+            const response = await fetch(form.action || window.location.href, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                signal: state.abortController.signal
+            });
+            
             const contentType = response.headers.get('content-type') || '';
             
             if (contentType.includes('video/')) {
-                return response.blob().then(blob => {
-                    const filename = response.headers.get('x-filename') || 'compressed_video.mp4';
-                    const compressionRatio = response.headers.get('x-compression-ratio') || '';
-                    return { blob, filename, compressionRatio };
-                });
-            }
-            
-            if (contentType.includes('text/html')) {
-                return response.text().then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const errorDiv = doc.querySelector('.alert-error') || doc.querySelector('.error');
-                    const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Compression failed.';
-                    throw new Error(errorMessage);
-                });
-            }
-            
-            return response.text().then(text => {
+                const blob = await response.blob();
+                const filename = response.headers.get('x-filename') || 'compressed_video.mp4';
+                const compressionRatio = response.headers.get('x-compression-ratio') || '';
+                
+                // Prevent duplicate download
+                if (state.downloadTriggered) {
+                    console.log('🚫 Download already triggered, skipping');
+                    return;
+                }
+                state.downloadTriggered = true;
+                
+                // Create download link only once
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.dataset.tempDownload = 'true';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                
+                // Trigger download
+                a.click();
+                
+                // Clean up after a delay
+                setTimeout(() => {
+                    if (document.body.contains(a)) {
+                        document.body.removeChild(a);
+                    }
+                    URL.revokeObjectURL(url);
+                }, 100);
+                
+                // Show compression ratio alert
+                if (compressionRatio) {
+                    alert(`Compression complete! File size reduced by ${compressionRatio}.`);
+                }
+            } else if (contentType.includes('text/html')) {
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const errorDiv = doc.querySelector('.alert-error') || doc.querySelector('.error');
+                const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Compression failed.';
+                throw new Error(errorMessage);
+            } else {
+                const text = await response.text();
                 throw new Error('Unexpected response: ' + text.substring(0, 200));
-            });
-        })
-        .then(({ blob, filename, compressionRatio }) => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            
-            setTimeout(() => {
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            }, 100);
+            }
+        } catch (err) {
+            // Ignore abort errors (expected for duplicates)
+            if (err.name === 'AbortError') {
+                console.log('Fetch aborted (duplicate prevented)');
+                return;
+            }
+            console.error('Error:', err);
+            const errorMessage = err.message || 'Compression failed.';
+            alert('Error: ' + errorMessage);
+        } finally {
+            // Always reset
+            console.log('🔓 Releasing lock');
+            state.isProcessing = false;
+            state.downloadTriggered = false;
+            state.abortController = null;
             
             if (processingIndicator) {
                 processingIndicator.style.display = 'none';
             }
             submitBtn.disabled = false;
             submitBtn.textContent = 'Compress & Download';
-            
-            if (compressionRatio) {
-                alert(`Compression complete! File size reduced by ${compressionRatio}.`);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            if (processingIndicator) {
-                processingIndicator.style.display = 'none';
-            }
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Compress & Download';
-            alert('Error: ' + error.message);
-        });
+            form.style.pointerEvents = 'auto';
+        }
+    };
+    
+    // Attach submit handler
+    form.addEventListener('submit', submitHandler);
+    
+    // Change button type to prevent native form submission
+    submitBtn.type = 'button';
+    
+    // Also prevent button double-click
+    submitBtn.addEventListener('click', function(e) {
+        if (state.isProcessing) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            console.log('🚫 Button click blocked: already processing');
+            return false;
+        }
+        // Trigger form submit programmatically
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
 });
 </script>

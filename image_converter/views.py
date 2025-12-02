@@ -523,7 +523,22 @@ def resize_image(request):
             'error': 'Please upload an image file.'
         })
     
-    uploaded_file = request.FILES['image']
+    # Check for batch mode (multiple files)
+    uploaded_files = request.FILES.getlist('image')
+    is_batch = len(uploaded_files) > 1
+    
+    if not uploaded_files:
+        return render(request, 'image_converter/resize.html', {
+            'error': 'Please upload at least one image file.'
+        })
+    
+    # Limit batch size to 15 files
+    if len(uploaded_files) > 15:
+        return render(request, 'image_converter/resize.html', {
+            'error': 'Maximum 15 files allowed for batch conversion. Please select fewer files.'
+        })
+    
+    uploaded_file = uploaded_files[0]  # For single file validation
     
     # Validate image file
     is_valid, error_response, file_ext = _validate_image_file(
@@ -568,106 +583,179 @@ def resize_image(request):
                 'error': 'Height cannot exceed 10000 pixels.'
             })
         
-        # Read and open image
-        image_data = uploaded_file.read()
-        try:
-            image = Image.open(io.BytesIO(image_data))
-            # Handle animated GIFs - convert to static
-            if hasattr(image, 'is_animated') and image.is_animated:
-                # Get first frame
-                image.seek(0)
-                image = image.copy()
-        except Exception as e:
-            return render(request, 'image_converter/resize.html', {
-                'error': f'Unable to open image file: {str(e)}. Please ensure the file is a valid image.'
-            })
-        
-        original_width, original_height = image.size
-        
-        # Calculate new dimensions
-        if maintain_aspect:
-            if width and height:
-                # Calculate aspect ratio to fit both dimensions
-                aspect_ratio = min(width / original_width, height / original_height)
-                new_width = int(original_width * aspect_ratio)
-                new_height = int(original_height * aspect_ratio)
-            elif width:
-                aspect_ratio = width / original_width
-                new_width = width
-                new_height = int(original_height * aspect_ratio)
-            elif height:
-                aspect_ratio = height / original_height
-                new_width = int(original_width * aspect_ratio)
-                new_height = height
-        else:
-            # Use exact dimensions (may distort image)
-            new_width = width if width else original_width
-            new_height = height if height else original_height
-        
-        # Resize image
-        resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        
-        # Determine output format
-        if output_format == 'same':
-            output_format = image.format or 'PNG'
-        else:
-            output_format = output_format.upper()
-        
-        # Block HEIC output (PIL doesn't support saving to HEIC)
-        if output_format == 'HEIC':
-            return render(request, 'image_converter/resize.html', {
-                'error': 'HEIC output format is not supported. PIL/Pillow does not support saving to HEIC format. Please choose a different output format like PNG, JPEG, or WebP.'
-            })
-        
-        # Convert RGBA to RGB for formats that don't support transparency
-        if output_format in ('JPEG', 'BMP') and resized_image.mode in ('RGBA', 'LA', 'P'):
-            background = Image.new('RGB', resized_image.size, (255, 255, 255))
-            if resized_image.mode == 'P':
-                resized_image = resized_image.convert('RGBA')
-            background.paste(resized_image, mask=resized_image.split()[-1] if resized_image.mode == 'RGBA' else None)
-            resized_image = background
-        
-        # Get quality setting (for JPEG, WebP, and AVIF)
-        quality = 95  # default
-        if output_format in ('JPEG', 'WEBP', 'AVIF'):
+        # Helper function to resize a single image
+        def _resize_single_image(uploaded_file, width, height, maintain_aspect, output_format, quality_param):
+            """Resize a single image and return the processed image data and extension"""
+            image_data = uploaded_file.read()
             try:
-                quality_param = request.POST.get('quality', '95')
-                quality = int(quality_param)
-                # Clamp quality between 1 and 100
-                quality = max(1, min(100, quality))
-            except (ValueError, TypeError):
-                quality = 95
-        
-        # Save to memory
-        output = io.BytesIO()
-        save_kwargs = {'format': output_format}
-        if output_format in ('JPEG', 'WEBP', 'AVIF'):
-            save_kwargs['quality'] = quality
-            if output_format == 'JPEG':
+                image = Image.open(io.BytesIO(image_data))
+                # Handle animated GIFs - convert to static
+                if hasattr(image, 'is_animated') and image.is_animated:
+                    # Get first frame
+                    image.seek(0)
+                    image = image.copy()
+            except Exception as e:
+                raise ValueError(f'Unable to open image file: {str(e)}. Please ensure the file is a valid image.')
+            
+            original_width, original_height = image.size
+            
+            # Calculate new dimensions
+            if maintain_aspect:
+                if width and height:
+                    # Calculate aspect ratio to fit both dimensions
+                    aspect_ratio = min(width / original_width, height / original_height)
+                    new_width = int(original_width * aspect_ratio)
+                    new_height = int(original_height * aspect_ratio)
+                elif width:
+                    aspect_ratio = width / original_width
+                    new_width = width
+                    new_height = int(original_height * aspect_ratio)
+                elif height:
+                    aspect_ratio = height / original_height
+                    new_width = int(original_width * aspect_ratio)
+                    new_height = height
+            else:
+                # Use exact dimensions (may distort image)
+                new_width = width if width else original_width
+                new_height = height if height else original_height
+            
+            # Resize image
+            resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # Determine output format
+            if output_format == 'same':
+                final_output_format = image.format or 'PNG'
+            else:
+                final_output_format = output_format.upper()
+            
+            # Block HEIC output (PIL doesn't support saving to HEIC)
+            if final_output_format == 'HEIC':
+                raise ValueError('HEIC output format is not supported. PIL/Pillow does not support saving to HEIC format. Please choose a different output format like PNG, JPEG, or WebP.')
+            
+            # Convert RGBA to RGB for formats that don't support transparency
+            if final_output_format in ('JPEG', 'BMP') and resized_image.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', resized_image.size, (255, 255, 255))
+                if resized_image.mode == 'P':
+                    resized_image = resized_image.convert('RGBA')
+                background.paste(resized_image, mask=resized_image.split()[-1] if resized_image.mode == 'RGBA' else None)
+                resized_image = background
+            
+            # Get quality setting (for JPEG, WebP, and AVIF)
+            quality = 95  # default
+            if final_output_format in ('JPEG', 'WEBP', 'AVIF'):
+                try:
+                    quality = int(quality_param)
+                    # Clamp quality between 1 and 100
+                    quality = max(1, min(100, quality))
+                except (ValueError, TypeError):
+                    quality = 95
+            
+            # Save to memory
+            output = io.BytesIO()
+            save_kwargs = {'format': final_output_format}
+            if final_output_format in ('JPEG', 'WEBP', 'AVIF'):
+                save_kwargs['quality'] = quality
+                if final_output_format == 'JPEG':
+                    save_kwargs['optimize'] = True
+            elif final_output_format == 'PNG':
                 save_kwargs['optimize'] = True
-        elif output_format == 'PNG':
-            save_kwargs['optimize'] = True
-        # Note: HEIC output is blocked earlier in the function
+            
+            resized_image.save(output, **save_kwargs)
+            output.seek(0)
+            
+            # Determine file extension
+            format_ext_map = {
+                'JPEG': 'jpg',
+                'PNG': 'png',
+                'WEBP': 'webp',
+                'BMP': 'bmp',
+                'TIFF': 'tiff',
+                'GIF': 'gif',
+                'ICO': 'ico',
+                'AVIF': 'avif',
+            }
+            output_ext = format_ext_map.get(final_output_format, 'png')
+            
+            return output.read(), output_ext, final_output_format
         
-        resized_image.save(output, **save_kwargs)
-        output.seek(0)
+        # Get quality parameter from request
+        quality_param = request.POST.get('quality', '95')
         
-        # Determine file extension
-        format_ext_map = {
-            'JPEG': 'jpg',
-            'PNG': 'png',
-            'WEBP': 'webp',
-            'BMP': 'bmp',
-            'TIFF': 'tiff',
-            'GIF': 'gif',
-            'ICO': 'ico',
-            'AVIF': 'avif',
-        }
-        output_ext = format_ext_map.get(output_format, 'png')
+        # Single file conversion
+        if not is_batch:
+            try:
+                resized_data, output_ext, final_format = _resize_single_image(
+                    uploaded_file, width, height, maintain_aspect, output_format, quality_param
+                )
+                
+                # Create response
+                response = HttpResponse(resized_data, content_type=f'image/{output_ext}')
+                response['Content-Disposition'] = f'attachment; filename="resized.{output_ext}"'
+                return response
+            except ValueError as e:
+                return render(request, 'image_converter/resize.html', {
+                    'error': str(e)
+                })
         
-        # Create response
-        response = HttpResponse(output.read(), content_type=f'image/{output_ext}')
-        response['Content-Disposition'] = f'attachment; filename="resized.{output_ext}"'
+        # Batch conversion - create ZIP file
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            successful = 0
+            failed = []
+            
+            for idx, uploaded_file in enumerate(uploaded_files):
+                try:
+                    # Basic validation (file size and extension)
+                    if uploaded_file.size > MAX_IMAGE_SIZE:
+                        failed.append(f"{uploaded_file.name}: File too large")
+                        continue
+                    
+                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+                    if file_ext not in ALLOWED_IMAGE_EXTENSIONS:
+                        failed.append(f"{uploaded_file.name}: Invalid file type")
+                        continue
+                    
+                    if file_ext == '.svg' and not CAIROSVG_AVAILABLE:
+                        failed.append(f"{uploaded_file.name}: SVG requires cairosvg")
+                        continue
+                    
+                    if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
+                        failed.append(f"{uploaded_file.name}: HEIC requires pillow-heif")
+                        continue
+                    
+                    # Resize image
+                    resized_data, output_ext, final_format = _resize_single_image(
+                        uploaded_file, width, height, maintain_aspect, output_format, quality_param
+                    )
+                    
+                    # Generate filename
+                    base_name = os.path.splitext(uploaded_file.name)[0]
+                    # Sanitize filename
+                    base_name = ''.join(c for c in base_name if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+                    base_name = base_name.replace(' ', '_')
+                    filename = f"{base_name}_resized.{output_ext}"
+                    
+                    # Add to ZIP
+                    zip_file.writestr(filename, resized_data)
+                    successful += 1
+                    
+                except Exception as e:
+                    failed.append(f"{uploaded_file.name}: {str(e)}")
+                    continue
+            
+            if successful == 0:
+                error_msg = "All files failed to resize. "
+                if failed:
+                    error_msg += "Errors: " + "; ".join(failed[:5])
+                return render(request, 'image_converter/resize.html', {
+                    'error': error_msg
+                })
+        
+        zip_buffer.seek(0)
+        
+        # Create response with ZIP file
+        response = HttpResponse(zip_buffer.read(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="resized_images.zip"'
         return response
         
     except ValueError:
@@ -846,7 +934,22 @@ def convert_grayscale(request):
             'error': 'Please upload an image file.'
         })
     
-    uploaded_file = request.FILES['image']
+    # Check for batch mode (multiple files)
+    uploaded_files = request.FILES.getlist('image')
+    is_batch = len(uploaded_files) > 1
+    
+    if not uploaded_files:
+        return render(request, 'image_converter/grayscale.html', {
+            'error': 'Please upload at least one image file.'
+        })
+    
+    # Limit batch size to 15 files
+    if len(uploaded_files) > 15:
+        return render(request, 'image_converter/grayscale.html', {
+            'error': 'Maximum 15 files allowed for batch conversion. Please select fewer files.'
+        })
+    
+    uploaded_file = uploaded_files[0]  # For single file validation
     
     # Validate image file
     is_valid, error_response, file_ext = _validate_image_file(
@@ -856,50 +959,123 @@ def convert_grayscale(request):
         return error_response
     
     try:
-        image_data = uploaded_file.read()
-        
-        image = Image.open(io.BytesIO(image_data))
-        
-        # Handle animated GIFs
-        if hasattr(image, 'is_animated') and image.is_animated:
-            image.seek(0)
-            image = image.copy()
-        
-        # Convert to grayscale
-        if image.mode != 'L':
-            image = image.convert('L')
-        
-        # Save to memory
-        output = io.BytesIO()
-        original_format = image.format or 'PNG'
-        save_kwargs = {'format': original_format}
-        if original_format in ('JPEG', 'WEBP', 'AVIF'):
-            save_kwargs['quality'] = 95
-            if original_format == 'JPEG':
+        # Helper function to convert a single image to grayscale
+        def _convert_single_to_grayscale(uploaded_file):
+            """Convert a single image to grayscale and return the processed image data and extension"""
+            image_data = uploaded_file.read()
+            
+            image = Image.open(io.BytesIO(image_data))
+            
+            # Handle animated GIFs
+            if hasattr(image, 'is_animated') and image.is_animated:
+                image.seek(0)
+                image = image.copy()
+            
+            # Convert to grayscale
+            if image.mode != 'L':
+                image = image.convert('L')
+            
+            # Save to memory
+            output = io.BytesIO()
+            original_format = image.format or 'PNG'
+            save_kwargs = {'format': original_format}
+            if original_format in ('JPEG', 'WEBP', 'AVIF'):
+                save_kwargs['quality'] = 95
+                if original_format == 'JPEG':
+                    save_kwargs['optimize'] = True
+            elif original_format == 'PNG':
                 save_kwargs['optimize'] = True
-        elif original_format == 'PNG':
-            save_kwargs['optimize'] = True
+            
+            image.save(output, **save_kwargs)
+            output.seek(0)
+            
+            # Determine content type and extension
+            content_type_map = {
+                'PNG': 'image/png',
+                'JPEG': 'image/jpeg',
+                'WEBP': 'image/webp',
+                'BMP': 'image/bmp',
+                'TIFF': 'image/tiff',
+                'GIF': 'image/gif',
+                'ICO': 'image/x-icon',
+                'AVIF': 'image/avif',
+                'HEIC': 'image/heic',
+            }
+            content_type = content_type_map.get(original_format, 'image/png')
+            ext = original_format.lower() if original_format else 'png'
+            
+            return output.read(), content_type, ext
         
-        image.save(output, **save_kwargs)
-        output.seek(0)
+        # Single file conversion
+        if not is_batch:
+            try:
+                grayscale_data, content_type, ext = _convert_single_to_grayscale(uploaded_file)
+                
+                response = HttpResponse(grayscale_data, content_type=content_type)
+                response['Content-Disposition'] = f'attachment; filename="grayscale.{ext}"'
+                return response
+            except Exception as e:
+                return render(request, 'image_converter/grayscale.html', {
+                    'error': f'Error processing image: {str(e)}'
+                })
         
-        # Determine content type
-        content_type_map = {
-            'PNG': 'image/png',
-            'JPEG': 'image/jpeg',
-            'WEBP': 'image/webp',
-            'BMP': 'image/bmp',
-            'TIFF': 'image/tiff',
-            'GIF': 'image/gif',
-            'ICO': 'image/x-icon',
-            'AVIF': 'image/avif',
-            'HEIC': 'image/heic',
-        }
-        content_type = content_type_map.get(original_format, 'image/png')
-        ext = original_format.lower() if original_format else 'png'
+        # Batch conversion - create ZIP file
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            successful = 0
+            failed = []
+            
+            for idx, uploaded_file in enumerate(uploaded_files):
+                try:
+                    # Basic validation (file size and extension)
+                    if uploaded_file.size > MAX_IMAGE_SIZE:
+                        failed.append(f"{uploaded_file.name}: File too large")
+                        continue
+                    
+                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+                    if file_ext not in ALLOWED_IMAGE_EXTENSIONS:
+                        failed.append(f"{uploaded_file.name}: Invalid file type")
+                        continue
+                    
+                    if file_ext == '.svg' and not CAIROSVG_AVAILABLE:
+                        failed.append(f"{uploaded_file.name}: SVG requires cairosvg")
+                        continue
+                    
+                    if file_ext in ['.heic', '.heif'] and not HEIC_AVAILABLE:
+                        failed.append(f"{uploaded_file.name}: HEIC requires pillow-heif")
+                        continue
+                    
+                    # Convert to grayscale
+                    grayscale_data, content_type, ext = _convert_single_to_grayscale(uploaded_file)
+                    
+                    # Generate filename
+                    base_name = os.path.splitext(uploaded_file.name)[0]
+                    # Sanitize filename
+                    base_name = ''.join(c for c in base_name if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+                    base_name = base_name.replace(' ', '_')
+                    filename = f"{base_name}_grayscale.{ext}"
+                    
+                    # Add to ZIP
+                    zip_file.writestr(filename, grayscale_data)
+                    successful += 1
+                    
+                except Exception as e:
+                    failed.append(f"{uploaded_file.name}: {str(e)}")
+                    continue
+            
+            if successful == 0:
+                error_msg = "All files failed to convert. "
+                if failed:
+                    error_msg += "Errors: " + "; ".join(failed[:5])
+                return render(request, 'image_converter/grayscale.html', {
+                    'error': error_msg
+                })
         
-        response = HttpResponse(output.read(), content_type=content_type)
-        response['Content-Disposition'] = f'attachment; filename="grayscale.{ext}"'
+        zip_buffer.seek(0)
+        
+        # Create response with ZIP file
+        response = HttpResponse(zip_buffer.read(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="grayscale_images.zip"'
         return response
         
     except Exception as e:

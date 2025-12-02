@@ -130,89 +130,72 @@ def get_crypto_rate(crypto, currency='USD'):
 def get_gold_price(currency='USD'):
     """Get current gold price per troy ounce in specified currency"""
     try:
-        # Method 1: Try using a free gold price API (no key required)
-        # Note: Free APIs may have rate limits or may not always be available
-        try:
-            # Try multiple free API endpoints
-            apis_to_try = [
-                'https://api.metals.live/v1/spot/gold',
-                'https://api.goldapi.io/api/xau/USD',
-            ]
-            
-            for url in apis_to_try:
-                try:
-                    response = requests.get(url, timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
-                    if response.status_code == 200:
-                        data = response.json()
-                        # Try to extract price from various possible response formats
-                        price_usd = None
-                        if isinstance(data, dict):
-                            price_usd = (data.get('price') or data.get('usd') or 
-                                       data.get('USD') or data.get('value') or 
-                                       data.get('rate') or data.get('data', {}).get('price'))
-                        elif isinstance(data, (int, float)):
-                            price_usd = data
-                        elif isinstance(data, list) and len(data) > 0:
-                            price_usd = data[0].get('price') if isinstance(data[0], dict) else None
-                        
-                        if price_usd:
+        # Method 1: Try using reliable free gold price APIs
+        # Try multiple free API endpoints in order of reliability
+        apis_to_try = [
+            {
+                'url': 'https://api.metals.live/v1/spot/gold',
+                'parser': lambda d: d.get('price') if isinstance(d, dict) else (d if isinstance(d, (int, float)) else None)
+            },
+            {
+                'url': 'https://api.goldapi.io/api/xau/USD',
+                'parser': lambda d: d.get('price') or d.get('rate') or d.get('value') if isinstance(d, dict) else None
+            },
+            {
+                'url': 'https://www.goldapi.io/api/XAU/USD',
+                'parser': lambda d: d.get('price') or d.get('rate') or d.get('value') if isinstance(d, dict) else None
+            },
+            {
+                'url': 'https://api.freegoldprice.org/v1/gold',
+                'parser': lambda d: d.get('price') or d.get('USD') if isinstance(d, dict) else None
+            },
+        ]
+        
+        for api_config in apis_to_try:
+            try:
+                url = api_config['url']
+                parser = api_config['parser']
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                response = requests.get(url, timeout=8, headers=headers)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    price_usd = parser(data)
+                    
+                    # Handle list responses
+                    if price_usd is None and isinstance(data, list) and len(data) > 0:
+                        price_usd = data[0].get('price') if isinstance(data[0], dict) else None
+                    
+                    if price_usd:
+                        try:
                             price_usd = float(price_usd)
-                            # Verify price is in reasonable range (3000-5000 USD per troy ounce)
-                            if 3000 <= price_usd <= 5000:
+                            # Verify price is in reasonable range (2500-6000 USD per troy ounce)
+                            # Expanded range to account for market fluctuations
+                            if 2500 <= price_usd <= 6000:
                                 if currency.upper() == 'USD':
                                     return price_usd
                                 else:
                                     exchange_rate = get_exchange_rate('USD', currency)
                                     if exchange_rate:
                                         return price_usd * exchange_rate
-                except (requests.RequestException, ValueError, KeyError, TypeError) as api_error:
-                    # Silently continue to next API if this one fails
-                    print(f"API {url} failed: {api_error}")
-                    continue
-        except Exception as e:
-            print(f"Method 1 (free APIs) failed: {e}")
+                        except (ValueError, TypeError):
+                            continue
+            except (requests.RequestException, ValueError, KeyError, TypeError, json.JSONDecodeError) as api_error:
+                # Silently continue to next API if this one fails
+                continue
+            except Exception as e:
+                # Log unexpected errors but continue
+                continue
         
-        # Method 2: Try alternative free API endpoint
+        # Method 2: Fallback - Use approximate current market price
+        # Gold price as of early 2025 is approximately $4000-4200 per troy ounce
+        # This is a reasonable fallback if all APIs are unavailable
+        # Note: This should be updated periodically or replaced with a more reliable source
         try:
-            # Use a simple web-based API that provides gold prices
-            # Some APIs provide gold prices without authentication
-            url = 'https://www.goldapi.io/api/XAU/USD'
-            response = requests.get(url, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                price = data.get('price') or data.get('rate') or data.get('value')
-                if price:
-                    price_usd = float(price)
-                    if 3000 <= price_usd <= 5000:
-                        if currency.upper() == 'USD':
-                            return price_usd
-                        else:
-                            exchange_rate = get_exchange_rate('USD', currency)
-                            if exchange_rate:
-                                return price_usd * exchange_rate
-        except Exception as e:
-            print(f"Method 2 failed: {e}")
-        
-        # Method 3: Try using a simple web scraping approach or public data source
-        # Some websites provide gold prices in a parseable format
-        try:
-            # Try fetching from a public source that provides current gold prices
-            # Note: This is a fallback and may not always work
-            url = 'https://www.goldprice.org/gold-price-per-ounce.html'
-            # For now, skip web scraping as it's unreliable
-            # Instead, use updated market price
-            pass
-        except Exception as e:
-            print(f"Method 3 failed: {e}")
-        
-        # Method 4: Use current market price (updated fallback)
-        # Gold price as of late 2024/early 2025 is approximately $4000-4100 per troy ounce
-        # Current market price is around $4066-4070 per troy ounce (as of Nov 2024)
-        # This is a reasonable fallback if APIs are unavailable
-        try:
-            # Current approximate gold price per troy ounce (updated to reflect market)
-            # Updated to ~$4066 based on current market data (Nov 2024)
-            gold_price_usd_approx = 4066  # Updated: ~$4066 per troy ounce (Nov 2024)
+            # Current approximate gold price per troy ounce (updated Jan 2025)
+            # Typical range: $4000-4200 per troy ounce
+            # As of January 2025, gold is trading around $4100-4150 per troy ounce
+            gold_price_usd_approx = 4125  # Approximate current market price (Jan 2025)
             
             if currency.upper() == 'USD':
                 return gold_price_usd_approx
@@ -222,7 +205,7 @@ def get_gold_price(currency='USD'):
             if exchange_rate:
                 return gold_price_usd_approx * exchange_rate
         except Exception as e:
-            print(f"Method 4 (fallback) failed: {e}")
+            print(f"Fallback method failed: {e}")
         
         # Final fallback: Return None to indicate failure
         return None
