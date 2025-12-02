@@ -925,7 +925,8 @@ def video_compressor(request):
         # Scale down resolution for high compression
         if compression_level == 'high':
             # Scale to max 1280x720 while maintaining aspect ratio
-            cmd.extend(['-vf', 'scale=\'min(1280,iw)\':\'min(720,ih)\':force_original_aspect_ratio=decrease'])
+            # Use simpler syntax that's more compatible
+            cmd.extend(['-vf', 'scale=1280:720:force_original_aspect_ratio=decrease'])
         
         cmd.extend(['-movflags', '+faststart', '-y', output_path])
         
@@ -946,45 +947,59 @@ def video_compressor(request):
             # Filter out version information and extract actual error
             error_lines = error_msg.split('\n')
             meaningful_errors = []
-            skip_next = False
             
-            for i, line in enumerate(error_lines):
-                # Skip version lines
-                if 'ffmpeg version' in line.lower() or 'built with' in line.lower() or 'configuration:' in line.lower():
-                    continue
-                # Skip copyright lines
-                if 'copyright' in line.lower() or 'the ffmpeg developers' in line.lower():
-                    continue
-                # Skip FFmpeg configuration flags (--enable-lib, --prefix, --extra-version, etc.)
-                if line.strip().startswith('--') or '--enable-' in line.lower() or '--disable-' in line.lower():
-                    continue
-                # Skip toolchain/build info lines
-                if 'toolchain' in line.lower() or 'libdir=' in line.lower() or 'incdir=' in line.lower() or 'arch=' in line.lower():
-                    continue
+            # Skip patterns that indicate FFmpeg info/version output
+            skip_patterns = [
+                'ffmpeg version', 'built with', 'configuration:', 'copyright',
+                'the ffmpeg developers', 'toolchain', 'libdir=', 'incdir=', 'arch=',
+                '--prefix=', '--extra-version=', '--enable-', '--disable-', 'gcc',
+                'debian', 'hardened', 'x86_64-linux-gnu'
+            ]
+            
+            for line in error_lines:
+                line_lower = line.lower().strip()
+                
                 # Skip empty lines at the start
-                if not meaningful_errors and not line.strip():
+                if not meaningful_errors and not line_lower:
                     continue
-                # Collect actual error messages
-                if line.strip():
+                
+                # Skip if line matches any skip pattern
+                should_skip = False
+                for pattern in skip_patterns:
+                    if pattern in line_lower:
+                        should_skip = True
+                        break
+                
+                # Also skip lines that start with -- (configuration flags)
+                if line.strip().startswith('--'):
+                    should_skip = True
+                
+                if not should_skip and line_lower:
                     meaningful_errors.append(line.strip())
             
-            # Use meaningful errors or fallback to original
+            # Use meaningful errors or fallback
             if meaningful_errors:
                 # Take last few meaningful error lines (usually contain the actual error)
                 error_text = '\n'.join(meaningful_errors[-5:])
-                # Limit length
-                full_error = error_text[:500] if len(error_text) > 500 else error_text
+                # Limit length and ensure it's not just whitespace
+                full_error = error_text[:500].strip() if len(error_text) > 500 else error_text.strip()
+                
+                # If after filtering we only have whitespace or very short text, use fallback
+                if not full_error or len(full_error) < 10:
+                    full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
             else:
                 # Fallback: try to find error-like patterns
                 if 'error' in error_msg.lower():
-                    # Extract lines containing "error"
-                    error_lines_filtered = [line for line in error_lines if 'error' in line.lower()]
+                    # Extract lines containing "error" but not version info
+                    error_lines_filtered = [line.strip() for line in error_lines 
+                                          if 'error' in line.lower() 
+                                          and not any(p in line.lower() for p in ['version', 'configuration', 'built with'])]
                     if error_lines_filtered:
                         full_error = error_lines_filtered[-1][:500]
                     else:
-                        full_error = 'Video compression failed. Please check the file format and try again.'
+                        full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
                 else:
-                    full_error = 'Video compression failed. Please check the file format and try again.'
+                    full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
             
             if temp_dir:
                 try:
