@@ -323,7 +323,6 @@ def universal_converter(request):
             'error': 'Maximum 15 files allowed for batch conversion. Please select fewer files.'
         })
     
-    uploaded_file = uploaded_files[0]  # For single file validation
     output_format = request.POST.get('output_format', '').strip().upper()
     
     if not output_format:
@@ -331,12 +330,16 @@ def universal_converter(request):
             'error': 'Please select an output format.'
         })
     
-    # Validate image file
-    is_valid, error_response, file_ext = _validate_image_file(
-        uploaded_file, request, 'image_converter/universal.html', allow_svg=True
-    )
-    if not is_valid:
-        return error_response
+    # Only validate first file for single file mode
+    # In batch mode, validate all files in the loop
+    if not is_batch:
+        uploaded_file = uploaded_files[0]
+        # Validate image file
+        is_valid, error_response, file_ext = _validate_image_file(
+            uploaded_file, request, 'image_converter/universal.html', allow_svg=True
+        )
+        if not is_valid:
+            return error_response
     
     # Validate output format
     # Note: HEIC is removed from valid formats as PIL doesn't support saving to HEIC
@@ -370,23 +373,7 @@ def universal_converter(request):
     try:
         # Single file conversion
         if not is_batch:
-            # Validate image file
-            is_valid, error_response, file_ext = _validate_image_file(
-                uploaded_file, request, 'image_converter/universal.html', allow_svg=True
-            )
-            if not is_valid:
-                # Check if this is an AJAX request
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-                    error_msg = 'Validation failed'
-                    if hasattr(error_response, 'context_data') and 'error' in error_response.context_data:
-                        error_msg = error_response.context_data['error']
-                    return HttpResponse(
-                        json.dumps({'error': error_msg}),
-                        content_type='application/json',
-                        status=400
-                    )
-                return error_response
-            
+            uploaded_file = uploaded_files[0]
             # Convert single image
             converted_data, ext = _convert_single_image(uploaded_file, output_format, quality)
             
@@ -442,8 +429,17 @@ def universal_converter(request):
             
             for idx, uploaded_file in enumerate(uploaded_files):
                 try:
+                    # Read file data into memory first - Django file objects can only be read once
+                    # Reset file pointer if possible
+                    if hasattr(uploaded_file, 'seek'):
+                        uploaded_file.seek(0)
+                    
+                    # Read file data before any validation or processing
+                    file_data = uploaded_file.read()
+                    file_size = len(file_data)
+                    
                     # Basic validation (file size and extension)
-                    if uploaded_file.size > MAX_IMAGE_SIZE:
+                    if file_size > MAX_IMAGE_SIZE:
                         failed.append(f"{uploaded_file.name}: File too large")
                         continue
                     
@@ -460,8 +456,12 @@ def universal_converter(request):
                         failed.append(f"{uploaded_file.name}: HEIC requires pillow-heif")
                         continue
                     
+                    # Create a BytesIO object from the file data for processing
+                    file_obj = io.BytesIO(file_data)
+                    file_obj.name = uploaded_file.name  # Preserve filename for helper function
+                    
                     # Convert image
-                    converted_data, ext = _convert_single_image(uploaded_file, output_format, quality)
+                    converted_data, ext = _convert_single_image(file_obj, output_format, quality)
                     
                     # Generate filename
                     base_name = os.path.splitext(uploaded_file.name)[0]
@@ -538,14 +538,16 @@ def resize_image(request):
             'error': 'Maximum 15 files allowed for batch conversion. Please select fewer files.'
         })
     
-    uploaded_file = uploaded_files[0]  # For single file validation
-    
-    # Validate image file
-    is_valid, error_response, file_ext = _validate_image_file(
-        uploaded_file, request, 'image_converter/resize.html'
-    )
-    if not is_valid:
-        return error_response
+    # Only validate first file for single file mode
+    # In batch mode, validate all files in the loop
+    if not is_batch:
+        uploaded_file = uploaded_files[0]
+        # Validate image file
+        is_valid, error_response, file_ext = _validate_image_file(
+            uploaded_file, request, 'image_converter/resize.html'
+        )
+        if not is_valid:
+            return error_response
     
     try:
         # Get resize parameters
@@ -705,8 +707,17 @@ def resize_image(request):
             
             for idx, uploaded_file in enumerate(uploaded_files):
                 try:
+                    # Read file data into memory first - Django file objects can only be read once
+                    # Reset file pointer if possible
+                    if hasattr(uploaded_file, 'seek'):
+                        uploaded_file.seek(0)
+                    
+                    # Read file data before any validation or processing
+                    file_data = uploaded_file.read()
+                    file_size = len(file_data)
+                    
                     # Basic validation (file size and extension)
-                    if uploaded_file.size > MAX_IMAGE_SIZE:
+                    if file_size > MAX_IMAGE_SIZE:
                         failed.append(f"{uploaded_file.name}: File too large")
                         continue
                     
@@ -723,9 +734,13 @@ def resize_image(request):
                         failed.append(f"{uploaded_file.name}: HEIC requires pillow-heif")
                         continue
                     
+                    # Create a BytesIO object from the file data for processing
+                    file_obj = io.BytesIO(file_data)
+                    file_obj.name = uploaded_file.name  # Preserve filename for helper function
+                    
                     # Resize image
                     resized_data, output_ext, final_format = _resize_single_image(
-                        uploaded_file, width, height, maintain_aspect, output_format, quality_param
+                        file_obj, width, height, maintain_aspect, output_format, quality_param
                     )
                     
                     # Generate filename
@@ -949,14 +964,16 @@ def convert_grayscale(request):
             'error': 'Maximum 15 files allowed for batch conversion. Please select fewer files.'
         })
     
-    uploaded_file = uploaded_files[0]  # For single file validation
-    
-    # Validate image file
-    is_valid, error_response, file_ext = _validate_image_file(
-        uploaded_file, request, 'image_converter/grayscale.html'
-    )
-    if not is_valid:
-        return error_response
+    # Only validate first file for single file mode
+    # In batch mode, validate all files in the loop
+    if not is_batch:
+        uploaded_file = uploaded_files[0]
+        # Validate image file
+        is_valid, error_response, file_ext = _validate_image_file(
+            uploaded_file, request, 'image_converter/grayscale.html'
+        )
+        if not is_valid:
+            return error_response
     
     try:
         # Helper function to convert a single image to grayscale
@@ -1027,8 +1044,17 @@ def convert_grayscale(request):
             
             for idx, uploaded_file in enumerate(uploaded_files):
                 try:
+                    # Read file data into memory first - Django file objects can only be read once
+                    # Reset file pointer if possible
+                    if hasattr(uploaded_file, 'seek'):
+                        uploaded_file.seek(0)
+                    
+                    # Read file data before any validation or processing
+                    file_data = uploaded_file.read()
+                    file_size = len(file_data)
+                    
                     # Basic validation (file size and extension)
-                    if uploaded_file.size > MAX_IMAGE_SIZE:
+                    if file_size > MAX_IMAGE_SIZE:
                         failed.append(f"{uploaded_file.name}: File too large")
                         continue
                     
@@ -1045,8 +1071,12 @@ def convert_grayscale(request):
                         failed.append(f"{uploaded_file.name}: HEIC requires pillow-heif")
                         continue
                     
+                    # Create a BytesIO object from the file data for processing
+                    file_obj = io.BytesIO(file_data)
+                    file_obj.name = uploaded_file.name  # Preserve filename for helper function
+                    
                     # Convert to grayscale
-                    grayscale_data, content_type, ext = _convert_single_to_grayscale(uploaded_file)
+                    grayscale_data, content_type, ext = _convert_single_to_grayscale(file_obj)
                     
                     # Generate filename
                     base_name = os.path.splitext(uploaded_file.name)[0]
