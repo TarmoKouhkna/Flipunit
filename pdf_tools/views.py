@@ -1416,7 +1416,7 @@ def pdf_ocr(request):
         })
     
     if not PYTESSERACT_AVAILABLE or not PDF2IMAGE_AVAILABLE:
-        messages.error(request, 'OCR requires pytesseract and pdf2image. Install with: pip install pytesseract pdf2image && install tesseract-ocr (brew install tesseract on macOS)')
+        messages.error(request, 'OCR requires pytesseract and pdf2image. Install with: pip install pytesseract pdf2image && install tesseract-ocr (brew install tesseract on macOS or apt-get install tesseract-ocr on Linux). Also install poppler: brew install poppler (macOS) or apt-get install poppler-utils (Linux)')
         return render(request, 'pdf_tools/pdf_ocr.html', {
             'pytesseract_available': PYTESSERACT_AVAILABLE,
             'pdf2image_available': PDF2IMAGE_AVAILABLE,

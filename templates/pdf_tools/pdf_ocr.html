@@ -39,7 +39,10 @@
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Make PDF Searchable</button>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">
+            <span id="btnText">Make PDF Searchable</span>
+            <span id="btnLoader" style="display: none;">⏳ Processing...</span>
+        </button>
     </form>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
@@ -59,20 +62,78 @@
 <a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
 
 {% block extra_js %}
+<style>
+/* Override CSS to make file input visible and clickable */
+.file-upload-area input[type="file"] {
+    display: block !important;
+    opacity: 0;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    z-index: 2;
+}
+</style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('.converter-tool');
+    const fileInput = document.getElementById('pdf_file');
+    const uploadArea = document.querySelector('.file-upload-area');
     const submitBtn = document.getElementById('submit-btn');
     
-    const originalText = submitBtn.textContent;
-    form.addEventListener('submit', function() {
-        submitBtn.textContent = 'Processing OCR...';
+    // Style file input to overlay the upload area (like other PDF tools)
+    if (fileInput && uploadArea) {
+        // Ensure upload area is clickable
+        uploadArea.style.cursor = 'pointer';
+        uploadArea.style.position = 'relative';
+        
+        // Backup click handler in case main.js doesn't work
+        uploadArea.addEventListener('click', function(e) {
+            // Only trigger file input if click is not directly on the input itself
+            if (e.target !== fileInput && !fileInput.contains(e.target)) {
+                e.preventDefault();
+                fileInput.click();
+            }
+        }, { capture: false });
+    }
+    
+    // Handle file selection
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            uploadArea.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+        }
+    });
+    
+    // Prevent click event from bubbling to the upload area
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Handle form submission
+    const btnText = document.getElementById('btnText');
+    const btnLoader = document.getElementById('btnLoader');
+    
+    form.addEventListener('submit', function(e) {
+        if (!fileInput.files.length) {
+            e.preventDefault();
+            alert('Please select a PDF file first.');
+            return;
+        }
+        
+        // Show loading state
+        btnText.style.display = 'none';
+        btnLoader.style.display = 'inline';
         submitBtn.disabled = true;
         
+        // Reset button after download starts (for file downloads that don't reload the page)
+        // If the page reloads (error case), the button will be reset automatically
         setTimeout(function() {
-            submitBtn.textContent = originalText;
+            btnText.style.display = 'inline';
+            btnLoader.style.display = 'none';
             submitBtn.disabled = false;
-        }, 2000);
+        }, 2000); // Reset after 2 seconds - enough time for download to start
     });
 });
 </script>
