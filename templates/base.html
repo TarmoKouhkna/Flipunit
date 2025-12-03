@@ -174,7 +174,7 @@
                     }
                 } else {
                     retryCount++;
-                    if (retryCount < maxRetries) {
+                    if (retryCount <= maxRetries) {
                         // Retry after a short delay if script hasn't loaded yet
                         setTimeout(initKoFiWidget, 100);
                     } else {
