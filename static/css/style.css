@@ -352,7 +352,7 @@ header {
 .grid-2,
 .grid-3,
 .grid-4 {
-    padding-bottom: 1rem; /* Extra spacing for floating widgets */
+    padding-bottom: 5rem; /* Extra spacing for floating widgets - match homepage */
 }
 
 .grid-2 {
@@ -733,6 +733,12 @@ footer p {
     }
     
     .tool-categories {
+        padding-bottom: 6rem; /* Extra space on mobile for Ko-fi button */
+    }
+    
+    .grid-2,
+    .grid-3,
+    .grid-4 {
         padding-bottom: 6rem; /* Extra space on mobile for Ko-fi button */
     }
 }
