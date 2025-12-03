@@ -734,12 +734,27 @@ footer p {
     }
 }
 
-/* Ko-fi Widget Positioning */
+/* Ko-fi Widget Positioning - Target all possible widget containers */
 #kofi-widget-container,
+iframe[src*="ko-fi.com"],
 iframe[id*="kofi"],
 div[id*="kofi"],
+div[class*="kofi"],
+[data-kofi],
 .kofi-widget-container {
     z-index: 999 !important; /* Ensure it's above content but below modals */
+}
+
+/* Move Ko-fi button to bottom-right on all screens to avoid category cards */
+#kofi-widget-container,
+iframe[src*="ko-fi.com"],
+iframe[id*="kofi"],
+div[id*="kofi"],
+div[class*="kofi"],
+[data-kofi] {
+    bottom: 20px !important;
+    right: 20px !important;
+    left: auto !important;
 }
 
 /* Adjust Ko-fi floating button position to avoid overlap */
@@ -747,21 +762,20 @@ div[id*="kofi"],
     .tool-categories {
         padding-bottom: 6rem;
     }
-    
-    /* Move Ko-fi button higher on smaller screens */
-    #kofi-widget-container,
-    iframe[id*="kofi"],
-    div[id*="kofi"] {
-        bottom: 80px !important;
-        left: 20px !important;
-    }
 }
 
-/* On very small screens, move button to bottom-right to avoid cards */
+/* On mobile, ensure extra spacing */
 @media (max-width: 768px) {
+    .tool-categories {
+        padding-bottom: 6rem;
+    }
+    
     #kofi-widget-container,
+    iframe[src*="ko-fi.com"],
     iframe[id*="kofi"],
-    div[id*="kofi"] {
+    div[id*="kofi"],
+    div[class*="kofi"],
+    [data-kofi] {
         bottom: 20px !important;
         right: 20px !important;
         left: auto !important;

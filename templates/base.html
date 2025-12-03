@@ -191,6 +191,55 @@
                 // DOM already loaded, try immediately
                 initKoFiWidget();
             }
+            
+            // Adjust Ko-fi widget position after it loads to prevent overlap
+            function adjustKoFiPosition() {
+                // Try multiple selectors to find the Ko-fi widget
+                var widgetSelectors = [
+                    'iframe[src*="ko-fi.com"]',
+                    'div[id*="kofi"]',
+                    'div[class*="kofi"]',
+                    '#kofi-widget-container',
+                    '.kofi-widget-container',
+                    '[data-kofi]'
+                ];
+                
+                var widget = null;
+                for (var i = 0; i < widgetSelectors.length; i++) {
+                    widget = document.querySelector(widgetSelectors[i]);
+                    if (widget) break;
+                }
+                
+                if (widget) {
+                    // Get computed style to check current position
+                    var style = window.getComputedStyle(widget);
+                    var position = style.position;
+                    
+                    // Only adjust if it's fixed or absolute positioned
+                    if (position === 'fixed' || position === 'absolute') {
+                        // Move widget to bottom-right on all screens to avoid category cards
+                        widget.style.bottom = '20px';
+                        widget.style.right = '20px';
+                        widget.style.left = 'auto';
+                        widget.style.zIndex = '999';
+                    }
+                }
+            }
+            
+            // Try to adjust position after widget loads
+            setTimeout(adjustKoFiPosition, 1000);
+            setTimeout(adjustKoFiPosition, 2000);
+            setTimeout(adjustKoFiPosition, 3000);
+            
+            // Use MutationObserver to catch when widget is added
+            var observer = new MutationObserver(function(mutations) {
+                adjustKoFiPosition();
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
         })();
     </script>
     
