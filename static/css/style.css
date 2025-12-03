@@ -486,6 +486,11 @@ footer p {
     width: 3rem;
     height: 3rem;
     object-fit: contain;
+    transition: filter 0.3s ease;
+}
+
+[data-theme="dark"] .category-card .category-icon img {
+    filter: brightness(1.5);
 }
 
 .category-card h3 {
