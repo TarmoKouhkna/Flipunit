@@ -345,6 +345,14 @@ header {
 .grid {
     display: grid;
     gap: 2rem;
+    position: relative;
+}
+
+/* Ensure category cards grid has proper spacing for floating elements */
+.grid-2,
+.grid-3,
+.grid-4 {
+    padding-bottom: 1rem; /* Extra spacing for floating widgets */
 }
 
 .grid-2 {
@@ -456,6 +464,7 @@ footer p {
 
 .tool-categories {
     margin-top: 3rem;
+    padding-bottom: 5rem; /* Add space for Ko-fi floating button */
 }
 
 .category-card {
@@ -718,6 +727,44 @@ footer p {
     
     .dark-mode-toggle span {
         display: none;
+    }
+    
+    .tool-categories {
+        padding-bottom: 6rem; /* Extra space on mobile for Ko-fi button */
+    }
+}
+
+/* Ko-fi Widget Positioning */
+#kofi-widget-container,
+iframe[id*="kofi"],
+div[id*="kofi"],
+.kofi-widget-container {
+    z-index: 999 !important; /* Ensure it's above content but below modals */
+}
+
+/* Adjust Ko-fi floating button position to avoid overlap */
+@media (max-width: 1024px) {
+    .tool-categories {
+        padding-bottom: 6rem;
+    }
+    
+    /* Move Ko-fi button higher on smaller screens */
+    #kofi-widget-container,
+    iframe[id*="kofi"],
+    div[id*="kofi"] {
+        bottom: 80px !important;
+        left: 20px !important;
+    }
+}
+
+/* On very small screens, move button to bottom-right to avoid cards */
+@media (max-width: 768px) {
+    #kofi-widget-container,
+    iframe[id*="kofi"],
+    div[id*="kofi"] {
+        bottom: 20px !important;
+        right: 20px !important;
+        left: auto !important;
     }
 }
 
