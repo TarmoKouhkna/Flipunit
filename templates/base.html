@@ -156,12 +156,42 @@
     <!-- Ko-fi Floating Chat Widget -->
     <script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
     <script>
-        kofiWidgetOverlay.draw('flipunit0711', {
-            'type': 'floating-chat',
-            'floating-chat.donateButton.text': 'Support Us',
-            'floating-chat.donateButton.background-color': '#ffffff',
-            'floating-chat.donateButton.text-color': '#323842'
-        });
+        (function() {
+            var maxRetries = 50; // Maximum 5 seconds (50 * 100ms)
+            var retryCount = 0;
+            
+            function initKoFiWidget() {
+                if (typeof kofiWidgetOverlay !== 'undefined' && kofiWidgetOverlay && typeof kofiWidgetOverlay.draw === 'function') {
+                    try {
+                        kofiWidgetOverlay.draw('flipunit0711', {
+                            'type': 'floating-chat',
+                            'floating-chat.donateButton.text': 'Support Us',
+                            'floating-chat.donateButton.background-color': '#ffffff',
+                            'floating-chat.donateButton.text-color': '#323842'
+                        });
+                    } catch (error) {
+                        console.warn('Ko-fi widget initialization failed:', error);
+                    }
+                } else {
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        // Retry after a short delay if script hasn't loaded yet
+                        setTimeout(initKoFiWidget, 100);
+                    } else {
+                        // Stop retrying after max attempts
+                        console.warn('Ko-fi widget script failed to load after ' + maxRetries + ' attempts');
+                    }
+                }
+            }
+            
+            // Start initialization when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initKoFiWidget);
+            } else {
+                // DOM already loaded, try immediately
+                initKoFiWidget();
+            }
+        })();
     </script>
     
     <!-- JSON-LD Structured Data -->
