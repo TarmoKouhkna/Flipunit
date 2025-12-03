@@ -207,7 +207,7 @@ header {
 /* Main Content */
 .main-content {
     flex: 1;
-    padding: 2rem 0;
+    padding: 2rem 0 7rem 0; /* Add bottom padding for Ko-fi widget */
 }
 
 /* Cards */
@@ -352,7 +352,7 @@ header {
 .grid-2,
 .grid-3,
 .grid-4 {
-    padding-bottom: 5rem; /* Extra spacing for floating widgets - match homepage */
+    padding-bottom: 7rem; /* Extra spacing for floating widgets - increased */
 }
 
 .grid-2 {
@@ -739,7 +739,7 @@ footer p {
     .grid-2,
     .grid-3,
     .grid-4 {
-        padding-bottom: 6rem; /* Extra space on mobile for Ko-fi button */
+        padding-bottom: 8rem; /* Extra space on mobile for Ko-fi button - increased */
     }
 }
 
