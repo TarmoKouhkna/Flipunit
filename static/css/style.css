@@ -465,6 +465,9 @@ footer p {
 .tool-categories {
     margin-top: 3rem;
     padding-bottom: 5rem; /* Add space for Ko-fi floating button */
+    max-width: 1000px; /* Limit width to keep cards compact */
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .category-card {
