@@ -738,14 +738,20 @@ footer p {
 }
 
 /* Ko-fi Widget - Simple padding to prevent overlap with category cards */
-/* Reduce Ko-fi button size to 85% */
-#kofi-widget-container,
-iframe[src*="ko-fi.com"],
-div[id*="kofi"],
-div[class*="kofi"],
-[data-kofi] {
+/* Reduce Ko-fi button size to 85% - wrap in container to preserve positioning */
+#kofi-widget-container {
     transform: scale(0.85) !important;
     transform-origin: bottom right !important;
+}
+
+/* Ensure the widget container maintains fixed positioning */
+#kofi-widget-container,
+div[id*="kofi-widget"] {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    left: auto !important;
+    z-index: 999 !important;
 }
 
 /* Adjust Ko-fi floating button position to avoid overlap */
