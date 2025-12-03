@@ -167,8 +167,7 @@
                             'type': 'floating-chat',
                             'floating-chat.donateButton.text': 'Support Us',
                             'floating-chat.donateButton.background-color': '#ffffff',
-                            'floating-chat.donateButton.text-color': '#323842',
-                            'floating-chat.position': 'right'
+                            'floating-chat.donateButton.text-color': '#323842'
                         });
                     } catch (error) {
                         console.warn('Ko-fi widget initialization failed:', error);
@@ -192,100 +191,6 @@
                 // DOM already loaded, try immediately
                 initKoFiWidget();
             }
-            
-            // Adjust Ko-fi widget position after it loads to prevent overlap
-            function adjustKoFiPosition() {
-                // Try multiple selectors to find the Ko-fi widget button
-                var widgetSelectors = [
-                    'iframe[src*="ko-fi.com"]',
-                    'div[id*="kofi"]',
-                    'div[class*="kofi"]',
-                    '#kofi-widget-container',
-                    '.kofi-widget-container',
-                    '[data-kofi]',
-                    'div[style*="position: fixed"][style*="bottom"]',
-                    'div[style*="position: fixed"][style*="left"]'
-                ];
-                
-                var widget = null;
-                for (var i = 0; i < widgetSelectors.length; i++) {
-                    widget = document.querySelector(widgetSelectors[i]);
-                    if (widget) {
-                        // Check if it's the button (small) or the panel (large)
-                        var rect = widget.getBoundingClientRect();
-                        // If it's a large panel (width > 300px), it's the donation panel, not the button
-                        if (rect.width > 300) {
-                            // This is the donation panel - close it or hide it
-                            widget.style.display = 'none';
-                            continue;
-                        }
-                        break;
-                    }
-                }
-                
-                if (widget) {
-                    // Get computed style to check current position
-                    var style = window.getComputedStyle(widget);
-                    var position = style.position;
-                    
-                    // Only adjust if it's fixed or absolute positioned
-                    if (position === 'fixed' || position === 'absolute') {
-                        // Move widget button to bottom-right on all screens to avoid category cards
-                        widget.style.bottom = '20px';
-                        widget.style.right = '20px';
-                        widget.style.left = 'auto';
-                        widget.style.zIndex = '999';
-                    }
-                }
-                
-                // Find and position the donation panel if it's open
-                var allWidgets = document.querySelectorAll('iframe[src*="ko-fi.com"], div[id*="kofi"], div[class*="kofi"]');
-                allWidgets.forEach(function(el) {
-                    var rect = el.getBoundingClientRect();
-                    var style = window.getComputedStyle(el);
-                    
-                    // If it's a large panel (donation overlay), position it to not overlap content
-                    if ((rect.width > 300 || rect.height > 400) && (style.position === 'fixed' || style.position === 'absolute')) {
-                        // Position panel on the right side, away from category cards
-                        el.style.right = '20px';
-                        el.style.left = 'auto';
-                        el.style.bottom = '20px';
-                        el.style.top = 'auto';
-                        el.style.zIndex = '1000';
-                        el.style.maxWidth = '400px';
-                    }
-                });
-                
-                // Close the panel if it auto-opened on page load (after a short delay)
-                setTimeout(function() {
-                    var panels = document.querySelectorAll('iframe[src*="ko-fi.com"], div[id*="kofi"]');
-                    panels.forEach(function(panel) {
-                        var rect = panel.getBoundingClientRect();
-                        if (rect.width > 300) {
-                            // Try to find and click close button
-                            var closeBtn = panel.querySelector('button[aria-label*="close"], button[aria-label*="Close"], .close, [class*="close"]');
-                            if (closeBtn) {
-                                closeBtn.click();
-                            }
-                        }
-                    });
-                }, 500);
-            }
-            
-            // Try to adjust position after widget loads
-            setTimeout(adjustKoFiPosition, 1000);
-            setTimeout(adjustKoFiPosition, 2000);
-            setTimeout(adjustKoFiPosition, 3000);
-            
-            // Use MutationObserver to catch when widget is added
-            var observer = new MutationObserver(function(mutations) {
-                adjustKoFiPosition();
-            });
-            
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
         })();
     </script>
     

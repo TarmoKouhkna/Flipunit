@@ -734,48 +734,7 @@ footer p {
     }
 }
 
-/* Ko-fi Widget Positioning - Target all possible widget containers */
-#kofi-widget-container,
-iframe[src*="ko-fi.com"],
-iframe[id*="kofi"],
-div[id*="kofi"],
-div[class*="kofi"],
-[data-kofi],
-.kofi-widget-container {
-    z-index: 999 !important; /* Ensure it's above content but below modals */
-}
-
-/* Move Ko-fi button to bottom-right on all screens to avoid category cards */
-#kofi-widget-container,
-iframe[src*="ko-fi.com"],
-iframe[id*="kofi"],
-div[id*="kofi"],
-div[class*="kofi"],
-[data-kofi] {
-    bottom: 20px !important;
-    right: 20px !important;
-    left: auto !important;
-}
-
-/* Ensure Ko-fi donation panel (when open) doesn't overlap category cards */
-iframe[src*="ko-fi.com"][width],
-div[id*="kofi"][style*="width"],
-div[class*="kofi"][style*="width"] {
-    max-width: 400px !important;
-    right: 20px !important;
-    left: auto !important;
-    bottom: 20px !important;
-    top: auto !important;
-}
-
-/* On larger screens, position panel to the right edge */
-@media (min-width: 1024px) {
-    iframe[src*="ko-fi.com"][width],
-    div[id*="kofi"][style*="width"] {
-        right: 20px !important;
-        left: auto !important;
-    }
-}
+/* Ko-fi Widget - Simple padding to prevent overlap with category cards */
 
 /* Adjust Ko-fi floating button position to avoid overlap */
 @media (max-width: 1024px) {
