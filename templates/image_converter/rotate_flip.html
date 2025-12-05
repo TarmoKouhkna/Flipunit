@@ -12,7 +12,7 @@
     {% endif %}
     
     <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
-        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center;" class="gap-xs">
             <span style="font-size: 1.2rem;">🔒</span>
             <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers.</span>
         </p>
@@ -28,40 +28,50 @@
                     <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
                     <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
                 </div>
+                <div id="imagePreview" style="display: none; margin-top: 1.5rem;">
+                    <img id="previewImg" src="" alt="Preview" style="max-width: 100%; max-height: 400px; border-radius: 8px; box-shadow: var(--shadow-lg);">
+                    <div id="imageInfo" style="margin-top: 1rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+                        <p style="margin: 0.25rem 0; font-size: 0.9rem;"><strong>File:</strong> <span id="fileName"></span></p>
+                        <p style="margin: 0.25rem 0; font-size: 0.9rem;"><strong>Size:</strong> <span id="fileSize"></span></p>
+                        <p style="margin: 0.25rem 0; font-size: 0.9rem;"><strong>Dimensions:</strong> <span id="imageDimensions"></span></p>
+                        <p style="margin: 0.25rem 0; font-size: 0.9rem;"><strong>Format:</strong> <span id="imageFormat"></span></p>
+                    </div>
+                </div>
             </div>
         </div>
         
         <div class="form-group" style="margin-top: 1.5rem;">
             <label class="form-label">Action</label>
-            <div class="grid grid-2" style="gap: 1rem;">
-                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+            <div class="grid grid-2 gap-md">
+                <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="rotate_90" required>
                     <span>↻ Rotate 90° Clockwise</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="rotate_180" required>
                     <span>↻ Rotate 180°</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="rotate_270" required>
                     <span>↺ Rotate 90° Counter-clockwise</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="flip_horizontal" required>
                     <span>↔ Flip Horizontal</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="flip_vertical" required>
                     <span>↕ Flip Vertical</span>
                 </label>
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">Apply & Download</button>
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn" style="margin-top: 1.5rem;">Apply & Download</button>
     </form>
 </div>
 
 <a href="{% url 'image_converter:index' %}" class="btn btn-secondary">← Back to Image Conversion & Editing</a>
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -69,10 +79,110 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('image');
     const uploadArea = document.getElementById('uploadArea');
     const uploadContent = document.getElementById('uploadContent');
+    const imagePreview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const imageDimensions = document.getElementById('imageDimensions');
+    const imageFormat = document.getElementById('imageFormat');
+    const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('rotateFlipForm');
+    const actionRadios = document.querySelectorAll('input[name="action"]');
     
+    // Format file size
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    // Get file extension
+    function getFileExtension(filename) {
+        return filename.split('.').pop().toUpperCase();
+    }
+    
+    // Apply transform to preview image
+    function applyPreviewTransform(action) {
+        if (!previewImg.src) return; // No image loaded yet
+        
+        // Reset transform first
+        previewImg.style.transform = '';
+        
+        // Apply transform based on action
+        switch(action) {
+            case 'rotate_90':
+                previewImg.style.transform = 'rotate(90deg)';
+                break;
+            case 'rotate_180':
+                previewImg.style.transform = 'rotate(180deg)';
+                break;
+            case 'rotate_270':
+                previewImg.style.transform = 'rotate(-90deg)';
+                break;
+            case 'flip_horizontal':
+                previewImg.style.transform = 'scaleX(-1)';
+                break;
+            case 'flip_vertical':
+                previewImg.style.transform = 'scaleY(-1)';
+                break;
+            default:
+                previewImg.style.transform = '';
+        }
+    }
+    
+    // Handle file selection
+    function handleFileSelect(file) {
+        if (!file) return;
+        
+        // Reset transform when new file is selected
+        previewImg.style.transform = '';
+        
+        // Update file name
+        fileName.textContent = file.name;
+        fileSize.textContent = formatFileSize(file.size);
+        imageFormat.textContent = getFileExtension(file.name);
+        
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            
+            // Get image dimensions
+            const img = new Image();
+            img.onload = function() {
+                imageDimensions.textContent = img.width + ' × ' + img.height + ' pixels';
+                imagePreview.style.display = 'block';
+                uploadContent.style.display = 'none';
+                
+                // Apply transform if an action is already selected
+                const selectedAction = document.querySelector('input[name="action"]:checked');
+                if (selectedAction) {
+                    applyPreviewTransform(selectedAction.value);
+                }
+            };
+            img.onerror = function() {
+                // If image fails to load, still show file info
+                imageDimensions.textContent = 'Unable to load preview';
+                imagePreview.style.display = 'block';
+                uploadContent.style.display = 'none';
+            };
+            img.src = e.target.result;
+        };
+        reader.onerror = function() {
+            // If file read fails, still show file info
+            imageDimensions.textContent = 'File selected - preview unavailable';
+            imagePreview.style.display = 'block';
+            uploadContent.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    // File input change
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
-            uploadContent.querySelector('p').textContent = 'Selected: ' + e.target.files[0].name;
+            handleFileSelect(e.target.files[0]);
         }
     });
     
@@ -80,19 +190,64 @@ document.addEventListener('DOMContentLoaded', function() {
     uploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
         uploadArea.style.borderColor = 'var(--primary-color)';
+        uploadArea.style.backgroundColor = 'var(--surface)';
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border-color)';
+        uploadArea.style.backgroundColor = 'transparent';
     });
     
     uploadArea.addEventListener('drop', function(e) {
         e.preventDefault();
         uploadArea.style.borderColor = 'var(--border-color)';
+        uploadArea.style.backgroundColor = 'transparent';
+        
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             fileInput.files = files;
-            uploadContent.querySelector('p').textContent = 'Selected: ' + files[0].name;
+            handleFileSelect(files[0]);
         }
+    });
+    
+    // Add event listeners to radio buttons for live preview
+    actionRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            if (this.checked && previewImg.src) {
+                applyPreviewTransform(this.value);
+            }
+        });
+    });
+    
+    // Form submit handler for loading state
+    form.addEventListener('submit', function(e) {
+        // Check if form is valid
+        if (!fileInput.files.length) {
+            e.preventDefault();
+            alert('Please select an image file first.');
+            return false;
+        }
+        
+        const selectedAction = document.querySelector('input[name="action"]:checked');
+        if (!selectedAction) {
+            e.preventDefault();
+            alert('Please select an action (rotate or flip).');
+            return false;
+        }
+        
+        // Disable button and show loading state
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        
+        // Prevent double submission
+        if (submitBtn.dataset.processing === 'true') {
+            e.preventDefault();
+            return false;
+        }
+        submitBtn.dataset.processing = 'true';
     });
 });
 </script>
-{% endblock %}
 {% endblock %}
 
