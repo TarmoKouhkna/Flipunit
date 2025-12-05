@@ -626,7 +626,8 @@ footer p {
     .container,
     .container-medium,
     .container-narrow,
-    .container-extra-narrow {
+    .container-extra-narrow,
+    .tool-categories {
         padding: 0 0.75rem;
     }
 
