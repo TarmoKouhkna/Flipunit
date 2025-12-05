@@ -58,7 +58,7 @@
             {% if matches %}
             <div style="margin-top: 1rem;">
                 <strong>Match details:</strong>
-                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                <ul class="list-indent" style="margin-top: 0.5rem;">
                     {% for match in matches %}
                     <li style="margin-bottom: 0.5rem;">
                         <code>{{ match.match }}</code> (position {{ match.start }}-{{ match.end }})

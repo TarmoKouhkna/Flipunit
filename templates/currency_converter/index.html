@@ -8,13 +8,13 @@
     <p>Convert between major world currencies, cryptocurrencies, and gold with real-time exchange rates</p>
 </div>
 
-<div class="card" style="max-width: 800px; margin: 2rem auto;">
+<div class="card container-narrow" style="margin-top: 2rem; margin-bottom: 2rem;">
     <form id="converter-form" class="converter-tool">
         {% csrf_token %}
-        <div style="display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 1rem; align-items: end;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 2fr; align-items: end;" class="gap-md">
             <div class="form-group">
                 <label class="form-label">From</label>
-                <div style="display: flex; gap: 0.5rem;">
+                <div style="display: flex;" class="gap-xs">
                     <input type="number" id="amount" name="amount" class="form-control" placeholder="Amount" step="0.01" min="0" value="1" required>
                     <select id="from_currency" name="from_currency" class="form-control" required>
                         <optgroup label="Fiat Currencies">
@@ -90,12 +90,12 @@
     <div id="error" style="margin-top: 1rem; display: none;" class="alert alert-error"></div>
 </div>
 
-<div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px; max-width: 800px; margin-left: auto; margin-right: auto;">
+<div class="container-narrow" style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
     <h3>Supported Currencies</h3>
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-top: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-top: 1rem;" class="gap-xs">
         <div>
             <strong>Fiat Currencies:</strong>
-            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+            <ul class="list-indent" style="margin-top: 0.5rem;">
                 {% for code, info in currencies.items %}
                 <li>{{ info.flag }} {{ code }} - {{ info.name }}</li>
                 {% endfor %}
@@ -103,7 +103,7 @@
         </div>
         <div>
             <strong>Cryptocurrencies:</strong>
-            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+            <ul class="list-indent" style="margin-top: 0.5rem;">
                 {% for code, info in cryptocurrencies.items %}
                 <li>{{ info.symbol }} {{ code }} - {{ info.name }}</li>
                 {% endfor %}
@@ -111,7 +111,7 @@
         </div>
         <div>
             <strong>Gold:</strong>
-            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+            <ul class="list-indent" style="margin-top: 0.5rem;">
                 {% for code, info in gold_units.items %}
                 <li>{{ info.icon }} {{ info.symbol }} - {{ info.name }}</li>
                 {% endfor %}

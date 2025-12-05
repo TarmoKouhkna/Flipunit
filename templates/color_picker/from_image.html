@@ -6,11 +6,6 @@
 
 {% block extra_css %}
 <style>
-    .image-picker-container {
-        max-width: 1200px;
-        margin: 0 auto;
-    }
-    
     .upload-section {
         background: var(--surface);
         border-radius: 12px;
@@ -103,7 +98,7 @@
     .color-formats-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
+        gap: var(--gap-md, 1rem);
     }
     
     .format-item {
@@ -146,6 +141,8 @@
         border-color: var(--primary-color);
     }
     
+    
+    
     @media (max-width: 768px) {
         .color-formats-grid {
             grid-template-columns: 1fr;
@@ -155,8 +152,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="image-picker-container">
-    <div class="card">
+<div class="card">
         <h1 class="card-title">Pick Color from Image</h1>
         <p>Upload an image and click on it to pick colors</p>
         
@@ -183,10 +179,9 @@
                 <!-- Populated by JavaScript -->
             </div>
         </div>
-    </div>
 </div>
 
-<a href="{% url 'color_picker:index' %}" class="btn btn-secondary" style="margin-top: 2rem;">← Back to Color Picker</a>
+<a href="{% url 'color_picker:index' %}" class="btn btn-secondary">← Back to Color Picker</a>
 {% endblock %}
 
 {% block extra_js %}

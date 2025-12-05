@@ -6,11 +6,6 @@
 
 {% block extra_css %}
 <style>
-    .color-picker-container {
-        max-width: 1200px;
-        margin: 0 auto;
-    }
-    
     .color-conversion-card {
         background: var(--surface);
         border-radius: 12px;
@@ -18,13 +13,13 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 2rem;
+        gap: var(--gap-xl, 2rem);
     }
     
     .color-picker-section {
         display: flex;
         flex-direction: column;
-        gap: 1.5rem;
+        gap: var(--gap-lg, 1.5rem);
     }
     
     .color-square-container {
@@ -86,7 +81,7 @@
     
     .hex-input-group {
         display: flex;
-        gap: 0.5rem;
+        gap: var(--gap-xs, 0.5rem);
         align-items: center;
     }
     
@@ -118,7 +113,7 @@
     .color-display-section {
         display: flex;
         flex-direction: column;
-        gap: 1.5rem;
+        gap: var(--gap-lg, 1.5rem);
     }
     
     .selected-color-display {
@@ -153,7 +148,7 @@
     .color-formats-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
+        gap: var(--gap-md, 1rem);
     }
     
     .format-item {
@@ -196,6 +191,8 @@
         border-color: var(--primary-color);
     }
     
+    
+    
     @media (max-width: 768px) {
         .color-conversion-card {
             grid-template-columns: 1fr;
@@ -209,9 +206,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="color-picker-container">
-    
-    <div class="card">
+<div class="card">
         <h1 class="card-title">Color Conversion</h1>
         
         <div class="color-conversion-card">
@@ -245,10 +240,9 @@
                 </div>
             </div>
         </div>
-    </div>
 </div>
 
-<a href="{% url 'color_picker:index' %}" class="btn btn-secondary" style="margin-top: 2rem;">← Back to Color Picker</a>
+<a href="{% url 'color_picker:index' %}" class="btn btn-secondary">← Back to Color Picker</a>
 {% endblock %}
 
 {% block extra_js %}

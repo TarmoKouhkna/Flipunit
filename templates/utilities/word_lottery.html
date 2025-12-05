@@ -28,7 +28,7 @@
             <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
                 <details style="text-align: left;">
                     <summary style="cursor: pointer; font-weight: bold; margin-bottom: 0.5rem;">View all entries ({{ result.total_entries }})</summary>
-                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem;">
+                    <div style="display: flex; flex-wrap: wrap; margin-top: 1rem;" class="gap-xs">
                         {% for entry in result.all_entries %}
                             <span style="display: inline-block; padding: 0.5rem 1rem; background: {% if entry == result.winner %}var(--primary); color: white; font-weight: bold;{% else %}var(--surface);{% endif %} border-radius: 4px; border: {% if entry == result.winner %}3px{% else %}1px{% endif %} solid {% if entry == result.winner %}var(--primary){% else %}var(--border-color){% endif %};">
                                 {{ entry }}
@@ -73,7 +73,7 @@
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
-        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+        <ol class="list-indent" style="margin-top: 0.5rem;">
             <li>Enter your words or names (up to 100 entries)</li>
             <li>Choose input format: one per line (recommended) or comma-separated</li>
             <li>Click "Pick Random Winner" to randomly select one entry</li>
@@ -157,6 +157,10 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 {% endblock %}
 {% endblock %}
+
+
+
+
 
 
 

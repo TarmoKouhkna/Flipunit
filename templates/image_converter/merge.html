@@ -12,7 +12,7 @@
     {% endif %}
     
     <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
-        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center;" class="gap-xs">
             <span style="font-size: 1.2rem;">🔒</span>
             <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers.</span>
         </p>
@@ -37,12 +37,12 @@
         
         <div class="form-group" style="margin-top: 1.5rem;">
             <label class="form-label">Merge Direction</label>
-            <div class="grid grid-2" style="gap: 1rem;">
-                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer;">
+            <div class="grid grid-2 gap-md">
+                <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer;" class="gap-xs">
                     <input type="radio" name="direction" value="horizontal" checked required>
                     <span>↔ Horizontal (side by side)</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer;">
+                <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer;" class="gap-xs">
                     <input type="radio" name="direction" value="vertical" required>
                     <span>↕ Vertical (stacked)</span>
                 </label>
