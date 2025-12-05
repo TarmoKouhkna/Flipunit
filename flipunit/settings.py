@@ -40,7 +40,7 @@ else:
     # Default hosts: domain names and server IP address
     # Include localhost and 127.0.0.1 for local development
     if DEBUG:
-        ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
+        ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.1.135', 'flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
     else:
         ALLOWED_HOSTS = ['flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
 
