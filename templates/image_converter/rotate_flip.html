@@ -260,32 +260,95 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Store original button text
+    const originalButtonText = submitBtn.textContent;
+    
     // Form submit handler for loading state
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
         // Check if form is valid
         if (!fileInput.files.length) {
-            e.preventDefault();
             alert('Please select an image file first.');
             return false;
         }
         
         const selectedAction = document.querySelector('input[name="action"]:checked');
         if (!selectedAction) {
-            e.preventDefault();
             alert('Please select an action (rotate or flip).');
             return false;
         }
+        
+        // Prevent double submission
+        if (submitBtn.dataset.processing === 'true') {
+            return false;
+        }
+        submitBtn.dataset.processing = 'true';
         
         // Disable button and show loading state
         submitBtn.disabled = true;
         submitBtn.textContent = 'Processing...';
         
-        // Prevent double submission
-        if (submitBtn.dataset.processing === 'true') {
-            e.preventDefault();
-            return false;
+        try {
+            // Create FormData
+            const formData = new FormData(form);
+            
+            // Submit via fetch - use current URL explicitly
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+            
+            // Check if response is an image file
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.startsWith('image/')) {
+                // Get the blob
+                const blob = await response.blob();
+                
+                // Extract filename from Content-Disposition header or use default
+                const contentDisposition = response.headers.get('content-disposition') || '';
+                let filename = 'edited.png';
+                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+                
+                // Create download link
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                
+                // Trigger download
+                a.click();
+                
+                // Clean up
+                setTimeout(() => {
+                    if (document.body.contains(a)) {
+                        document.body.removeChild(a);
+                    }
+                    URL.revokeObjectURL(url);
+                }, 100);
+            } else {
+                // If response is HTML (error page), reload to show error
+                const html = await response.text();
+                document.open();
+                document.write(html);
+                document.close();
+                return;
+            }
+        } catch (error) {
+            console.error('Error processing image:', error);
+            alert('An error occurred while processing the image. Please try again.');
+        } finally {
+            // Reset button state immediately after download is triggered
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalButtonText;
+            submitBtn.dataset.processing = 'false';
         }
-        submitBtn.dataset.processing = 'true';
     });
 });
 </script>
