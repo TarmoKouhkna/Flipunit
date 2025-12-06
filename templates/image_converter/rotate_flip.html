@@ -2,6 +2,46 @@
 
 {% block title %}Rotate & Flip Image - {{ SITE_NAME }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Force consistent text rendering for arrow icons on mobile */
+.action-icon {
+    font-family: 'Varela Round', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-variant-emoji: text;
+    -webkit-font-feature-settings: "liga" off;
+    font-feature-settings: "liga" off;
+    text-rendering: optimizeLegibility;
+    display: inline-block;
+    unicode-bidi: bidi-override;
+    direction: ltr;
+}
+
+/* Create vertical double arrow using CSS to match horizontal arrow style */
+.action-icon.flip-vertical {
+    position: relative;
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    vertical-align: middle;
+    font-size: 1em;
+}
+
+.action-icon.flip-vertical::before {
+    content: '↔';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(90deg);
+    font-family: 'Varela Round', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-variant-emoji: text;
+    -webkit-font-feature-settings: "liga" off;
+    font-feature-settings: "liga" off;
+    display: block;
+    line-height: 1;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card">
     <h1 class="card-title">Rotate & Flip Image</h1>
@@ -45,23 +85,23 @@
             <div class="grid grid-2 gap-md">
                 <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="rotate_90" required>
-                    <span>↻ Rotate 90° Clockwise</span>
+                    <span><span class="action-icon">↻</span> Rotate 90° Clockwise</span>
                 </label>
                 <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="rotate_180" required>
-                    <span>↻ Rotate 180°</span>
+                    <span><span class="action-icon">↻</span> Rotate 180°</span>
                 </label>
                 <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="rotate_270" required>
-                    <span>↺ Rotate 90° Counter-clockwise</span>
+                    <span><span class="action-icon">↺</span> Rotate 90° Counter-clockwise</span>
                 </label>
                 <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="flip_horizontal" required>
-                    <span>↔ Flip Horizontal</span>
+                    <span><span class="action-icon">↔</span> Flip Horizontal</span>
                 </label>
                 <label style="display: flex; align-items: center; padding: 1rem; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                     <input type="radio" name="action" value="flip_vertical" required>
-                    <span>↕ Flip Vertical</span>
+                    <span><span class="action-icon flip-vertical"></span> Flip Vertical</span>
                 </label>
             </div>
         </div>
