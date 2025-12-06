@@ -54,6 +54,7 @@
     }
 })();
 
+
 // File upload drag and drop
 document.addEventListener('DOMContentLoaded', function() {
     const fileUploadAreas = document.querySelectorAll('.file-upload-area');

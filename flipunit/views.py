@@ -1,6 +1,9 @@
 from django.shortcuts import render
 from django.contrib import messages
 from django.urls import reverse
+from django.http import HttpResponse
+from django.conf import settings
+import os
 from .models import Feedback
 
 def get_client_ip(request):
@@ -337,4 +340,27 @@ def search(request):
         'result_count': len(results),
         'categories': categories,
     })
+
+
+def favicon_view(request):
+    """Serve favicon.ico at root level for Google Search"""
+    # Try STATICFILES_DIRS first (development), then STATIC_ROOT (production)
+    favicon_path = None
+    
+    if settings.STATICFILES_DIRS:
+        favicon_path = os.path.join(settings.STATICFILES_DIRS[0], 'images', 'favicon.ico')
+        if not os.path.exists(favicon_path):
+            favicon_path = None
+    
+    if not favicon_path or not os.path.exists(favicon_path):
+        # Try STATIC_ROOT (production with collected static files)
+        favicon_path = os.path.join(settings.STATIC_ROOT, 'images', 'favicon.ico')
+    
+    if favicon_path and os.path.exists(favicon_path):
+        with open(favicon_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='image/x-icon')
+            # Cache for 1 year
+            response['Cache-Control'] = 'public, max-age=31536000'
+            return response
+    return HttpResponse(status=404)
 

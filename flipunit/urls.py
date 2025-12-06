@@ -39,6 +39,7 @@ def sitemap(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('favicon.ico', views.favicon_view, name='favicon'),
     path('', views.home, name='home'),
     path('search/', views.search, name='search'),
     path('converters/', include('converters.urls')),
