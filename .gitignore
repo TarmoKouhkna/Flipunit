@@ -44,3 +44,13 @@ youtube_cookies.txt
 
 # Generated sitemap (if auto-generated)
 sitemap.xml
+
+# Deployment and testing scripts
+deploy.sh
+test_favicon_sitemap.py
+test_sitemap.sh
+test_sitemap_google.sh
+verify_nginx_sitemap.sh
+
+# Screenshot assets
+assets/
