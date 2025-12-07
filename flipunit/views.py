@@ -31,7 +31,8 @@ def home(request):
                     ip_address=get_client_ip(request)
                 )
                 # Redirect with success parameter instead of using messages to avoid persistence
-                return redirect('home' + '?feedback_sent=1')
+                home_url = reverse('home')
+                return redirect(f"{home_url}?feedback_sent=1")
         else:
             messages.error(request, 'Please enter your feedback.')
             return redirect('home')
