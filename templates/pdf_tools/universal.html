@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block title %}Universal PDF Converter - {{ SITE_NAME }}{% endblock %}
-{% block meta_description %}Convert PDF to images (PNG, JPG), HTML, or text. Convert HTML to PDF. Universal PDF converter supporting multiple formats.{% endblock %}
+{% block meta_description %}Convert PDF to images (PNG, JPG, JPEG), HTML, or text. Convert HTML to PDF. Universal PDF converter supporting multiple formats.{% endblock %}
 
 {% block content %}
 <div class="card">
@@ -18,6 +18,7 @@
                 <optgroup label="From PDF">
                     <option value="png">PDF to PNG (Images)</option>
                     <option value="jpg">PDF to JPG (Images)</option>
+                    <option value="jpg">PDF to JPEG (Images)</option>
                     <option value="html">PDF to HTML</option>
                     <option value="txt">PDF to Text</option>
                     <option value="svg">PDF to SVG</option>
@@ -26,6 +27,7 @@
                 <optgroup label="To PDF">
                     <option value="pdf">PNG to PDF</option>
                     <option value="pdf">JPG to PDF</option>
+                    <option value="pdf">JPEG to PDF</option>
                     <option value="pdf">HTML to PDF</option>
                     <option value="pdf">Text to PDF</option>
                     <option value="pdf">SVG to PDF</option>
@@ -40,7 +42,7 @@
                 <input type="file" name="input_file" id="input_file" accept=".pdf,.html,.htm,.svg,.svgz,.rtf,.png,.jpg,.jpeg,.txt">
                 <div id="upload-content">
                     <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop a file</p>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;" id="file-info">Supports: PDF, HTML, SVG, RTF, PNG, JPG, TXT</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;" id="file-info">Supports: PDF, HTML, SVG, RTF, PNG, JPG, JPEG, TXT</p>
                 </div>
             </div>
         </div>
@@ -56,8 +58,8 @@
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>Supported Conversions:</h3>
         <ul class="list-indent" style="margin-top: 0.5rem;">
-            <li><strong>PDF to PNG/JPG:</strong> Convert PDF pages to image files</li>
-            <li><strong>PNG/JPG to PDF:</strong> Convert image files to PDF</li>
+            <li><strong>PDF to PNG/JPG/JPEG:</strong> Convert PDF pages to image files</li>
+            <li><strong>PNG/JPG/JPEG to PDF:</strong> Convert image files to PDF</li>
             <li><strong>PDF to HTML:</strong> Convert PDF to HTML with preserved formatting and tables</li>
             <li><strong>HTML to PDF:</strong> Convert HTML files or content to PDF</li>
             <li><strong>PDF to Text:</strong> Extract plain text from PDF documents</li>
@@ -143,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else {
             if (fileInfo) {
-                fileInfo.textContent = 'Supports: PDF, HTML, SVG, RTF, PNG, JPG, TXT';
+                fileInfo.textContent = 'Supports: PDF, HTML, SVG, RTF, PNG, JPG, JPEG, TXT';
             }
         }
     });

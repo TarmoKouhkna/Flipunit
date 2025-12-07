@@ -92,6 +92,8 @@
         border-radius: 8px;
         font-size: 1rem;
         font-family: monospace;
+        background: var(--surface);
+        color: var(--text-primary);
     }
     
     .refresh-btn {
@@ -101,6 +103,13 @@
         border-radius: 8px;
         cursor: pointer;
         transition: all 0.2s;
+        font-size: 1.25rem;
+        line-height: 1;
+        color: var(--text-primary);
+    }
+    
+    [data-theme="dark"] .refresh-btn {
+        color: white;
     }
     
     .refresh-btn:hover {
@@ -152,7 +161,7 @@
     }
     
     .format-item {
-        background: white;
+        background: var(--surface);
         border-radius: 8px;
         padding: 1rem;
         display: flex;
