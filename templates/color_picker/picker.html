@@ -14,12 +14,16 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: var(--gap-xl, 2rem);
+        max-width: 100%;
+        box-sizing: border-box;
     }
     
     .color-picker-section {
         display: flex;
         flex-direction: column;
         gap: var(--gap-lg, 1.5rem);
+        min-width: 0;
+        max-width: 100%;
     }
     
     .color-square-container {
@@ -123,10 +127,13 @@
         display: flex;
         flex-direction: column;
         gap: var(--gap-lg, 1.5rem);
+        min-width: 0;
+        max-width: 100%;
     }
     
     .selected-color-display {
         width: 100%;
+        max-width: 100%;
         aspect-ratio: 2;
         border-radius: 12px;
         display: flex;
@@ -137,6 +144,8 @@
         font-weight: 600;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         position: relative;
+        box-sizing: border-box;
+        overflow: hidden;
     }
     
     .selected-color-display.light {
@@ -147,6 +156,9 @@
         font-size: 2rem;
         font-family: monospace;
         margin-bottom: 0.5rem;
+        word-break: break-all;
+        text-align: center;
+        padding: 0 0.5rem;
     }
     
     .color-name {
@@ -168,6 +180,9 @@
         justify-content: space-between;
         align-items: center;
         border: 1px solid var(--border-color);
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
     }
     
     .format-label {
@@ -180,6 +195,8 @@
         font-family: monospace;
         color: var(--text-primary);
         font-size: 0.95rem;
+        word-break: break-all;
+        overflow-wrap: break-word;
     }
     
     .copy-btn {
@@ -205,10 +222,25 @@
     @media (max-width: 768px) {
         .color-conversion-card {
             grid-template-columns: 1fr;
+            padding: 1rem;
+            gap: 1rem;
         }
         
         .color-formats-grid {
             grid-template-columns: 1fr;
+        }
+        
+        .color-hex-large {
+            font-size: 1.5rem;
+        }
+        
+        .selected-color-display {
+            min-width: 0;
+            overflow: hidden;
+        }
+        
+        .card {
+            padding: 1rem;
         }
     }
 </style>
