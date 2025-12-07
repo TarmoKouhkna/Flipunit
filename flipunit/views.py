@@ -23,20 +23,15 @@ def home(request):
             # Validate length (1000 characters max)
             if len(feedback_text) > 1000:
                 messages.error(request, 'Feedback is too long. Maximum 1000 characters allowed.')
-                return HttpResponseRedirect(reverse('home'))
             else:
                 # Save feedback to database
                 Feedback.objects.create(
                     message=feedback_text,
                     ip_address=get_client_ip(request)
                 )
-                # Redirect with success parameter instead of using messages to avoid persistence
-                # Use HttpResponseRedirect to ensure proper redirect (PRG pattern)
-                home_url = reverse('home')
-                return HttpResponseRedirect(f"{home_url}?feedback_sent=1")
-        else:
-            messages.error(request, 'Please enter your feedback.')
-            return HttpResponseRedirect(reverse('home'))
+                # No success message - just redirect to prevent form resubmission
+        # Always redirect after POST to prevent form resubmission on refresh (PRG pattern)
+        return HttpResponseRedirect(reverse('home'))
     
     context = {
         'categories': [
