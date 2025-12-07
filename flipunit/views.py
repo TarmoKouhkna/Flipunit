@@ -31,7 +31,7 @@ def home(request):
                 )
                 # No success message - just redirect to prevent form resubmission
         # Always redirect after POST to prevent form resubmission on refresh (PRG pattern)
-        return HttpResponseRedirect(reverse('home'))
+        return HttpResponseRedirect('/')
     
     context = {
         'categories': [
