@@ -71,5 +71,40 @@
         </div>
     </form>
 </div>
+
+{% if request.GET.feedback_sent %}
+<div class="messages" id="feedback-success-message">
+    <div class="alert alert-success">
+        Thank you for your feedback!
+    </div>
+</div>
+<script>
+// Show success message and remove URL parameter to prevent it from showing on refresh
+(function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('feedback_sent')) {
+        // Remove the parameter from URL without page reload
+        urlParams.delete('feedback_sent');
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, '', newUrl);
+        
+        // Auto-hide the message after 7 seconds
+        const successMessage = document.getElementById('feedback-success-message');
+        if (successMessage) {
+            const alert = successMessage.querySelector('.alert-success');
+            if (alert) {
+                setTimeout(function() {
+                    alert.style.transition = 'opacity 0.5s ease-out';
+                    alert.style.opacity = '0';
+                    setTimeout(function() {
+                        successMessage.style.display = 'none';
+                    }, 500);
+                }, 7000);
+            }
+        }
+    }
+})();
+</script>
+{% endif %}
 {% endblock %}
 
