@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.urls import reverse
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
 import os
 from .models import Feedback
@@ -34,7 +34,7 @@ def home(request):
             messages.error(request, 'Please enter your feedback.')
         
         # Redirect after POST to prevent form resubmission on refresh (PRG pattern)
-        return redirect('/')
+        return redirect('home')
     
     context = {
         'categories': [
