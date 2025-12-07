@@ -136,6 +136,22 @@
                         }
                     });
                 })();
+                
+                // Auto-hide success messages (like feedback thank you) after 7 seconds
+                (function() {
+                    const successMessages = document.querySelectorAll('.alert-success');
+                    successMessages.forEach(function(alert) {
+                        setTimeout(function() {
+                            // Add fade-out animation
+                            alert.style.transition = 'opacity 0.5s ease-out';
+                            alert.style.opacity = '0';
+                            // Remove from DOM after animation
+                            setTimeout(function() {
+                                alert.style.display = 'none';
+                            }, 500);
+                        }, 7000); // 7 seconds
+                    });
+                })();
                 </script>
             {% endif %}
             
