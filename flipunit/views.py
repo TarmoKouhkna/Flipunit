@@ -34,7 +34,7 @@ def home(request):
             messages.error(request, 'Please enter your feedback.')
         
         # Redirect after POST to prevent form resubmission on refresh (PRG pattern)
-        return redirect('home')
+        return redirect('/')
     
     context = {
         'categories': [
