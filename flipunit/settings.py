@@ -79,6 +79,8 @@ INSTALLED_APPS = [
     'archive_converter',
     'text_converter',
     'developer_converter',
+    'isdown',
+    'youtube_thumbnail',
 ]
 
 MIDDLEWARE = [

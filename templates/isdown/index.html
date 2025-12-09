@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block title %}Is This Website Down? - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Is This Website Down?</h1>
+    <p>Instantly check if any website is reachable.</p>
+</div>
+
+<div class="card container-narrow" style="margin-top: 2rem; margin-bottom: 2rem;">
+    <form id="status-check-form" class="converter-tool">
+        <div style="display: flex; align-items: stretch;" class="gap-xs">
+            <input 
+                type="text" 
+                id="domain-input" 
+                name="url" 
+                class="form-control" 
+                placeholder="example.com" 
+                required
+                style="flex: 1; font-size: 1.1rem; padding: 1rem; border-radius: 8px; border: 2px solid var(--border-color);"
+            >
+            <button 
+                type="submit" 
+                id="check-btn" 
+                class="btn btn-primary" 
+                style="padding: 1rem 2rem; font-size: 1.1rem; border-radius: 8px; white-space: nowrap;"
+            >
+                Check
+            </button>
+        </div>
+    </form>
+    
+    <div id="result-card" style="margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; display: none; border: 1px solid var(--border-color);">
+        <div id="result-content"></div>
+    </div>
+    
+    <div id="error-message" style="margin-top: 1rem; display: none;" class="alert alert-error"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('status-check-form');
+    const domainInput = document.getElementById('domain-input');
+    const checkBtn = document.getElementById('check-btn');
+    const resultCard = document.getElementById('result-card');
+    const resultContent = document.getElementById('result-content');
+    const errorMessage = document.getElementById('error-message');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const domain = domainInput.value.trim();
+        
+        if (!domain) {
+            showError('Please enter a domain name');
+            return;
+        }
+        
+        // Show loading state
+        checkBtn.textContent = 'Checking...';
+        checkBtn.disabled = true;
+        errorMessage.style.display = 'none';
+        resultCard.style.display = 'none';
+        
+        // Make API request
+        fetch(`{% url 'isdown:api_check' %}?url=${encodeURIComponent(domain)}`)
+            .then(response => response.json())
+            .then(data => {
+                checkBtn.textContent = 'Check';
+                checkBtn.disabled = false;
+                
+                if (data.status === 'error') {
+                    showError(data.error || 'An error occurred');
+                    return;
+                }
+                
+                showResult(data, domain);
+            })
+            .catch(error => {
+                checkBtn.textContent = 'Check';
+                checkBtn.disabled = false;
+                showError('Network error. Please check your connection and try again.');
+                console.error('Error:', error);
+            });
+    });
+    
+    function showResult(data, domain) {
+        const isUp = data.status === 'up';
+        const statusIcon = isUp 
+            ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--success-color); display: inline-block; vertical-align: middle; margin-right: 0.5rem;"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--danger-color); display: inline-block; vertical-align: middle; margin-right: 0.5rem;"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+        
+        const statusText = isUp ? 'UP ✔' : 'DOWN ✖';
+        const statusColor = isUp ? 'var(--success-color)' : 'var(--danger-color)';
+        
+        let html = `
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; color: ${statusColor}; display: flex; align-items: center;">
+                    ${statusIcon}
+                    <strong>${domain} is ${statusText}</strong>
+                </h3>
+            </div>
+        `;
+        
+        if (isUp) {
+            html += `
+                <div style="display: grid; gap: 0.75rem;">
+                    ${data.response_time ? `
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                            <span style="color: var(--text-secondary);">Response Time:</span>
+                            <strong>${data.response_time} ms</strong>
+                        </div>
+                    ` : ''}
+                    ${data.dns ? `
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                            <span style="color: var(--text-secondary);">DNS Status:</span>
+                            <strong style="color: ${data.dns === 'ok' ? 'var(--success-color)' : 'var(--danger-color)'}">${data.dns === 'ok' ? 'OK' : data.dns.toUpperCase()}</strong>
+                        </div>
+                    ` : ''}
+                    ${data.ssl && data.ssl !== 'unknown' && data.ssl !== 'not_applicable' ? `
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                            <span style="color: var(--text-secondary);">SSL Certificate:</span>
+                            <strong style="color: ${data.ssl === 'ok' ? 'var(--success-color)' : 'var(--danger-color)'}">${data.ssl === 'ok' ? 'Valid' : 'Invalid'}</strong>
+                        </div>
+                    ` : ''}
+                    ${data.ip ? `
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                            <span style="color: var(--text-secondary);">Resolved IP:</span>
+                            <strong>${data.ip}</strong>
+                        </div>
+                    ` : ''}
+                    ${data.http_status ? `
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-top: 1px solid var(--border-color); margin-top: 0.5rem;">
+                            <span style="color: var(--text-secondary);">HTTP Status:</span>
+                            <strong>${data.http_status}</strong>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            html += `
+                <div style="padding: 1rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; margin-top: 1rem;">
+                    <p style="margin: 0; color: var(--text-primary);">
+                        ${data.error || 'The website appears to be down or unreachable.'}
+                    </p>
+                    ${data.dns === 'fail' ? `
+                        <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">
+                            DNS resolution failed. The domain may not exist or there may be a DNS issue.
+                        </p>
+                    ` : ''}
+                </div>
+            `;
+        }
+        
+        resultContent.innerHTML = html;
+        resultCard.style.display = 'block';
+        resultCard.style.opacity = '0';
+        resultCard.style.transition = 'opacity 0.3s ease-in';
+        
+        // Trigger fade-in animation
+        setTimeout(() => {
+            resultCard.style.opacity = '1';
+        }, 10);
+        
+        errorMessage.style.display = 'none';
+    }
+    
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+        resultCard.style.display = 'none';
+    }
+    
+    // Focus input on load
+    domainInput.focus();
+});
+</script>
+{% endblock %}

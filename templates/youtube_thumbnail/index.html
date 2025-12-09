@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}YouTube Thumbnail Downloader - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Download YouTube video thumbnails in multiple resolutions (HD, HQ, MQ, Default) - Free, fast, no registration required.{% endblock %}
+
+{% block extra_css %}
+<style>
+    .thumbnail-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: var(--gap-lg, 1.5rem);
+        margin-top: 2rem;
+    }
+    
+    .thumbnail-card {
+        background: var(--card-bg);
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-md, 1rem);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .thumbnail-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .thumbnail-preview {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        border-radius: 6px;
+        background: var(--surface);
+        border: 1px solid var(--border-color);
+    }
+    
+    .thumbnail-label {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 1rem;
+    }
+    
+    .thumbnail-resolution {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    
+    .download-btn {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+        display: inline-block;
+    }
+    
+    .download-btn:hover:not(:disabled) {
+        background-color: var(--primary-hover);
+    }
+    
+    .download-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .url-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-sm, 0.75rem);
+    }
+    
+    .error-message {
+        display: none;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-top: 1rem;
+    }
+    
+    .error-message.show {
+        display: block;
+    }
+    
+    .thumbnail-grid {
+        display: none;
+    }
+    
+    .thumbnail-grid.show {
+        display: grid;
+    }
+    
+    @media (max-width: 768px) {
+        .thumbnail-container {
+            grid-template-columns: 1fr;
+            gap: var(--gap-md, 1rem);
+        }
+        
+        .card {
+            padding: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-narrow">
+    <div class="card">
+        <h1 class="card-title">YouTube Thumbnail Downloader</h1>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+            Paste any YouTube URL to download thumbnails in multiple resolutions. All processing is done client-side - no data is sent to our servers.
+        </p>
+        
+        <div class="url-input-group">
+            <label for="youtube-url" class="form-label">YouTube URL</label>
+            <input 
+                type="text" 
+                id="youtube-url" 
+                class="form-control" 
+                placeholder="https://www.youtube.com/watch?v=..." 
+                autofocus
+            >
+            <button type="button" id="extract-btn" class="btn btn-primary btn-block">Extract Thumbnails</button>
+        </div>
+        
+        <div id="error-message" class="alert alert-error error-message"></div>
+        
+        <div id="thumbnail-grid" class="thumbnail-container thumbnail-grid">
+            <!-- Thumbnails will be inserted here by JavaScript -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    'use strict';
+    
+    const urlInput = document.getElementById('youtube-url');
+    const extractBtn = document.getElementById('extract-btn');
+    const errorMessage = document.getElementById('error-message');
+    const thumbnailGrid = document.getElementById('thumbnail-grid');
+    
+    // Supported thumbnail resolutions
+    const resolutions = [
+        { name: 'High Resolution', code: 'maxresdefault', label: 'HD (1280x720)' },
+        { name: 'HQ', code: 'hqdefault', label: 'HQ (480x360)' },
+        { name: 'MQ', code: 'mqdefault', label: 'MQ (320x180)' },
+        { name: 'Default', code: 'default', label: 'Default (120x90)' }
+    ];
+    
+    /**
+     * Extract video ID from various YouTube URL formats
+     * Supports:
+     * - https://www.youtube.com/watch?v=VIDEO_ID
+     * - https://youtu.be/VIDEO_ID
+     * - https://youtube.com/shorts/VIDEO_ID
+     * - https://www.youtube.com/embed/VIDEO_ID
+     * - URLs with parameters
+     */
+    function extractVideoId(url) {
+        if (!url || typeof url !== 'string') {
+            return null;
+        }
+        
+        // Remove whitespace
+        url = url.trim();
+        
+        // Video ID is always 11 characters
+        const videoIdPattern = /[a-zA-Z0-9_-]{11}/;
+        
+        // Try different patterns
+        let match = null;
+        
+        // Pattern 1: youtube.com/watch?v=VIDEO_ID or youtube.com/watch?vi=VIDEO_ID
+        match = url.match(/(?:youtube\.com\/watch\?v=|youtube\.com\/watch\?vi=)([a-zA-Z0-9_-]{11})/);
+        if (match) {
+            return match[1];
+        }
+        
+        // Pattern 2: youtu.be/VIDEO_ID
+        match = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+        if (match) {
+            return match[1];
+        }
+        
+        // Pattern 3: youtube.com/shorts/VIDEO_ID
+        match = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+        if (match) {
+            return match[1];
+        }
+        
+        // Pattern 4: youtube.com/embed/VIDEO_ID
+        match = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+        if (match) {
+            return match[1];
+        }
+        
+        // Pattern 5: Just the video ID itself (11 characters)
+        match = url.match(/^([a-zA-Z0-9_-]{11})$/);
+        if (match) {
+            return match[1];
+        }
+        
+        // Pattern 6: Try to find any 11-character video ID in the string
+        match = url.match(videoIdPattern);
+        if (match && match[0].length === 11) {
+            return match[0];
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Show error message
+     */
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.classList.add('show');
+        thumbnailGrid.classList.remove('show');
+    }
+    
+    /**
+     * Hide error message
+     */
+    function hideError() {
+        errorMessage.classList.remove('show');
+    }
+    
+    /**
+     * Generate thumbnail URL
+     */
+    function getThumbnailUrl(videoId, resolution) {
+        return `https://img.youtube.com/vi/${videoId}/${resolution}.jpg`;
+    }
+    
+    /**
+     * Download image as blob
+     */
+    async function downloadImage(url, filename) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Failed to fetch image');
+            }
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (error) {
+            console.error('Download failed:', error);
+            alert('Failed to download image. Please try again.');
+        }
+    }
+    
+    /**
+     * Create thumbnail card HTML
+     */
+    function createThumbnailCard(videoId, resolution) {
+        const thumbnailUrl = getThumbnailUrl(videoId, resolution.code);
+        const filename = `thumbnail-${resolution.code}-${videoId}.jpg`;
+        const cardId = `thumbnail-card-${videoId}-${resolution.code}`;
+        
+        return `
+            <div class="thumbnail-card" id="${cardId}">
+                <img 
+                    src="${thumbnailUrl}" 
+                    alt="${resolution.name} thumbnail" 
+                    class="thumbnail-preview"
+                    loading="lazy"
+                    onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'320\\' height=\\'180\\'%3E%3Crect fill=\\'%23ccc\\' width=\\'320\\' height=\\'180\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\' dy=\\'.3em\\' fill=\\'%23999\\' font-family=\\'sans-serif\\' font-size=\\'14\\'%3EImage not available%3C/text%3E%3C/svg%3E';"
+                >
+                <div>
+                    <div class="thumbnail-label">${resolution.name}</div>
+                    <div class="thumbnail-resolution">${resolution.label}</div>
+                </div>
+                <button 
+                    type="button"
+                    class="download-btn"
+                    data-url="${thumbnailUrl}"
+                    data-filename="${filename}"
+                >
+                    Download
+                </button>
+            </div>
+        `;
+    }
+    
+    /**
+     * Display thumbnails
+     */
+    function displayThumbnails(videoId) {
+        hideError();
+        
+        // Clear previous thumbnails
+        thumbnailGrid.innerHTML = '';
+        
+        // Create and append thumbnail cards
+        resolutions.forEach(resolution => {
+            const cardHtml = createThumbnailCard(videoId, resolution);
+            thumbnailGrid.insertAdjacentHTML('beforeend', cardHtml);
+        });
+        
+        // Attach download event listeners to all download buttons
+        const downloadButtons = thumbnailGrid.querySelectorAll('.download-btn');
+        downloadButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const url = this.getAttribute('data-url');
+                const filename = this.getAttribute('data-filename');
+                const originalText = this.textContent;
+                this.textContent = 'Downloading...';
+                this.disabled = true;
+                
+                downloadImage(url, filename).finally(() => {
+                    this.textContent = originalText;
+                    this.disabled = false;
+                });
+            });
+        });
+        
+        // Show the grid
+        thumbnailGrid.classList.add('show');
+        
+        // Scroll to thumbnails
+        thumbnailGrid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+    /**
+     * Handle extract button click
+     */
+    function handleExtract() {
+        const url = urlInput.value.trim();
+        
+        if (!url) {
+            showError('Please enter a YouTube URL');
+            return;
+        }
+        
+        const videoId = extractVideoId(url);
+        
+        if (!videoId) {
+            showError('Invalid YouTube URL. Please check the URL and try again.\n\nSupported formats:\n• https://www.youtube.com/watch?v=VIDEO_ID\n• https://youtu.be/VIDEO_ID\n• https://youtube.com/shorts/VIDEO_ID\n• https://www.youtube.com/embed/VIDEO_ID');
+            return;
+        }
+        
+        displayThumbnails(videoId);
+    }
+    
+    /**
+     * Handle Enter key in input field
+     */
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+            handleExtract();
+        }
+    }
+    
+    // Event listeners
+    extractBtn.addEventListener('click', handleExtract);
+    urlInput.addEventListener('keypress', handleKeyPress);
+    
+    // Auto-focus input on page load (already set via HTML autofocus, but ensure it works)
+    window.addEventListener('load', function() {
+        urlInput.focus();
+    });
+})();
+</script>
+{% endblock %}

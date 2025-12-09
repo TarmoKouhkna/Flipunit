@@ -95,6 +95,18 @@ def home(request):
                 'description': 'Developer tools: minify/unminify code, CSV/JSON conversion, SQL formatter, regex tester, JWT decoder, and more',
                 'icon': 'developer-converters.svg'
             },
+            {
+                'name': 'Website Status Checker',
+                'url': 'isdown:index',
+                'description': 'Check instantly if any website is online or down',
+                'icon': 'website-status.svg'
+            },
+            {
+                'name': 'YouTube Thumbnail Downloader',
+                'url': 'youtube_thumbnail:index',
+                'description': 'Download YouTube video thumbnails in multiple resolutions (HD, HQ, MQ, Default)',
+                'icon': 'youtube-thumbnail.svg'
+            },
         ]
     }
     return render(request, 'home.html', context)
@@ -116,6 +128,8 @@ def _get_all_tools():
         {'name': 'Archive Converters', 'url': 'archive_converter:index', 'category': 'Archive Converters', 'description': 'Convert between ZIP, RAR, 7Z, and TAR.GZ formats'},
         {'name': 'Text & String Converters', 'url': 'text_converter:index', 'category': 'Text Converters', 'description': 'Convert text between formats'},
         {'name': 'Developer Converters', 'url': 'developer_converter:index', 'category': 'Developer Converters', 'description': 'Developer tools and code utilities'},
+        {'name': 'Website Status Checker', 'url': 'isdown:index', 'category': 'Network Tools', 'description': 'Check instantly if any website is online or down'},
+        {'name': 'YouTube Thumbnail Downloader', 'url': 'youtube_thumbnail:index', 'category': 'Media Converters', 'description': 'Download YouTube video thumbnails in multiple resolutions'},
     ]
     tools.extend(categories)
     
@@ -300,6 +314,12 @@ def search(request):
             'url': 'developer_converter:index',
             'description': 'Developer tools: minify/unminify code, CSV/JSON conversion, SQL formatter, regex tester, JWT decoder, and more',
             'icon': 'developer-converters.svg'
+        },
+        {
+            'name': 'Website Status Checker',
+            'url': 'isdown:index',
+            'description': 'Check instantly if any website is online or down',
+            'icon': 'website-status.svg'
         },
     ]
     
