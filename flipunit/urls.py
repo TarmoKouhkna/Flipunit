@@ -60,29 +60,26 @@ def sitemap(request):
     xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
     
     # Remove XSL stylesheet reference - Google Search Console has issues with it
-    # Count occurrences before removal for debugging
+    # Count occurrences before removal
     xsl_before = xml_content.count('xml-stylesheet')
     
-    # Use multiple approaches to ensure complete removal
-    # Method 1: Regex patterns (try all variations)
-    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', xml_content, flags=re.IGNORECASE)
-    xml_content = re.sub(r'<\?xml-stylesheet.*?\?>\s*', '', xml_content, flags=re.DOTALL | re.IGNORECASE)
-    xml_content = re.sub(r'<\?xml-stylesheet[^\?]*\?>\s*\n?', '', xml_content, flags=re.IGNORECASE)
-    
-    # Method 2: Line-by-line filtering (most reliable)
+    # CRITICAL: Use line-by-line filtering - this is the most reliable method
+    # Split by newlines, filter out any line containing xml-stylesheet (case-insensitive)
     lines = xml_content.split('\n')
     filtered_lines = []
     for line in lines:
+        # Check if line contains xml-stylesheet (case-insensitive)
         if 'xml-stylesheet' not in line.lower():
             filtered_lines.append(line)
     xml_content = '\n'.join(filtered_lines)
     
-    # Verify removal
+    # Also try regex as backup (but line filtering should catch everything)
+    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', xml_content, flags=re.IGNORECASE | re.MULTILINE)
+    
+    # Final verification - if still present, use string replacement
     xsl_after = xml_content.count('xml-stylesheet')
-    if xsl_before > 0 and xsl_after > 0:
-        # If still present, try one more aggressive removal
-        xml_content = xml_content.replace('<?xml-stylesheet', '').replace('<?xml-stylesheet', '')
-        # Remove any remaining XSL lines
+    if xsl_after > 0:
+        # Last resort: remove character by character if needed
         xml_content = '\n'.join([l for l in xml_content.split('\n') if 'xml-stylesheet' not in l.lower()])
     
     # Update the response content
