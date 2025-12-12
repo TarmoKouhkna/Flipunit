@@ -30,17 +30,17 @@ sitemaps = {
 
 def sitemap(request):
     """Custom sitemap view that removes noindex header for Google Search Console and fixes date format"""
+    from django.http import HttpResponse
+    import re
+    from datetime import datetime, timezone
+    import xml.etree.ElementTree as ET
+    
     response = sitemap_view(request, sitemaps)
     # Ensure correct content type
     response['Content-Type'] = 'application/xml; charset=utf-8'
     # Remove X-Robots-Tag header if present (Google needs to index sitemaps)
     if 'X-Robots-Tag' in response:
         del response['X-Robots-Tag']
-    
-    # Fix lastmod date format for Google Search Console compliance
-    # Convert YYYY-MM-DD to YYYY-MM-DDTHH:MM:SS+00:00 format
-    import re
-    from datetime import datetime, timezone
     
     # Render the response to get the content
     response.render()
@@ -85,11 +85,26 @@ def sitemap(request):
         # Remove the entire processing instruction including any whitespace after
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
-    # Update the response content
-    response.content = xml_content.encode('utf-8')
-    response['Content-Length'] = str(len(response.content))
+    # Parse and reformat XML for better Google Search Console compatibility
+    # This ensures proper XML structure and removes any potential parsing issues
+    try:
+        root = ET.fromstring(xml_content)
+        # Format XML with proper indentation (Python 3.9+)
+        if hasattr(ET, 'indent'):
+            ET.indent(root, space='  ')
+        # Convert back to string
+        xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding='unicode')
+    except (ET.ParseError, AttributeError):
+        # If parsing fails or indent not available, use the original content
+        # The XML is already valid, so this is just for formatting
+        pass
     
-    return response
+    # Create a new HttpResponse to ensure proper response handling
+    # This avoids any issues with StreamingHttpResponse or other response types
+    http_response = HttpResponse(xml_content.encode('utf-8'), content_type='application/xml; charset=utf-8')
+    http_response['Content-Length'] = str(len(http_response.content))
+    
+    return http_response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
