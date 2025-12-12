@@ -1,11 +1,34 @@
 from django.contrib.sitemaps import Sitemap
+from django.contrib.sitemaps.views import SitemapIndexItem
+from django.utils.feedgenerator import SitemapFeed
 from django.urls import reverse
 from datetime import datetime, timezone
+
+class NoXSLSitemapFeed(SitemapFeed):
+    """Custom SitemapFeed that doesn't add XSL stylesheet reference"""
+    def write(self, outfile, encoding):
+        # Override write method to prevent XSL addition
+        # Call parent but then remove XSL if added
+        from io import StringIO
+        import re
+        
+        # Create a temporary buffer
+        buffer = StringIO()
+        super().write(buffer, encoding)
+        
+        # Get content and remove XSL
+        content = buffer.getvalue()
+        content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', content)
+        
+        # Write to actual output
+        outfile.write(content.encode(encoding))
 
 class StaticViewSitemap(Sitemap):
     priority = 0.8
     changefreq = 'weekly'
     protocol = 'https'  # Force HTTPS URLs in sitemap
+    # Use custom feed class that doesn't add XSL
+    feed_class = NoXSLSitemapFeed
 
     def lastmod(self, obj):
         # Return datetime with UTC timezone
