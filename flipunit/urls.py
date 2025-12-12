@@ -61,7 +61,8 @@ def sitemap(request):
     # Remove XSL stylesheet reference - Google Search Console has issues with it
     # We'll serve plain XML for all clients to ensure maximum compatibility
     # Browsers will still display it correctly as XML
-    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*\n?', '', xml_content)
+    # Use multiline flag and more aggressive pattern to catch all variations
+    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', xml_content, flags=re.MULTILINE)
     
     # Update the response content
     response.content = xml_content.encode('utf-8')
