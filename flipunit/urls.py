@@ -58,9 +58,12 @@ def sitemap(request):
     date_only_pattern = r'<lastmod>\s*(\d{4}-\d{2}-\d{2})\s*</lastmod>'
     xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
     
-    # Add XSL stylesheet reference for better browser display
-    # Insert after <?xml version="1.0" encoding="UTF-8"?>
-    if '<?xml-stylesheet' not in xml_content:
+    # Add XSL stylesheet reference for better browser display (only for browsers, not search engines)
+    # Google Search Console may have issues with XSL references, so we only add it for browsers
+    user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
+    is_search_engine = any(bot in user_agent for bot in ['googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'yandexbot', 'sogou', 'exabot', 'facebot', 'ia_archiver'])
+    
+    if not is_search_engine and '<?xml-stylesheet' not in xml_content:
         xsl_reference = '<?xml-stylesheet type="text/xsl" href="/static/sitemap.xsl"?>\n'
         # Find the XML declaration and insert XSL reference after it
         # Match XML declaration with optional newline after it
