@@ -58,30 +58,10 @@ def sitemap(request):
     date_only_pattern = r'<lastmod>\s*(\d{4}-\d{2}-\d{2})\s*</lastmod>'
     xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
     
-    # Handle XSL stylesheet reference for better browser display
-    # Google Search Console may have issues with XSL references, so we remove it for search engines
-    # Check User-Agent header (may be in different formats depending on proxy)
-    user_agent = (
-        request.META.get('HTTP_USER_AGENT', '') or 
-        request.META.get('HTTP_X_FORWARDED_USER_AGENT', '') or
-        request.META.get('USER_AGENT', '')
-    ).lower()
-    
-    is_search_engine = any(bot in user_agent for bot in ['googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'yandexbot', 'sogou', 'exabot', 'facebot', 'ia_archiver'])
-    
-    # Always remove XSL reference if present, then add back only for browsers
+    # Remove XSL stylesheet reference - Google Search Console has issues with it
+    # We'll serve plain XML for all clients to ensure maximum compatibility
+    # Browsers will still display it correctly as XML
     xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*\n?', '', xml_content)
-    
-    if not is_search_engine:
-        # Add XSL reference for browsers only
-        xsl_reference = '<?xml-stylesheet type="text/xsl" href="/static/sitemap.xsl"?>\n'
-        # Find the XML declaration and insert XSL reference after it
-        xml_content = re.sub(
-            r'(<\?xml[^>]*\?>)\s*\n?',
-            r'\1\n' + xsl_reference,
-            xml_content,
-            count=1
-        )
     
     # Update the response content
     response.content = xml_content.encode('utf-8')
