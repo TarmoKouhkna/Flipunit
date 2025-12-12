@@ -58,6 +58,18 @@ def sitemap(request):
     date_only_pattern = r'<lastmod>\s*(\d{4}-\d{2}-\d{2})\s*</lastmod>'
     xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
     
+    # Add XSL stylesheet reference for better browser display
+    # Insert after <?xml version="1.0" encoding="UTF-8"?>
+    if '<?xml-stylesheet' not in xml_content:
+        xsl_reference = '<?xml-stylesheet type="text/xsl" href="/static/sitemap.xsl"?>\n'
+        # Find the XML declaration and insert XSL reference after it
+        xml_content = re.sub(
+            r'(<\?xml[^>]*\?>)',
+            r'\1\n' + xsl_reference,
+            xml_content,
+            count=1
+        )
+    
     # Update the response content
     response.content = xml_content.encode('utf-8')
     response['Content-Length'] = str(len(response.content))
