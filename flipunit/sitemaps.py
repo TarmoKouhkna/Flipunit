@@ -127,6 +127,10 @@ class StaticViewSitemap(Sitemap):
             'developer_converter:jwt_decoder',
             'developer_converter:url_encoder',
             'developer_converter:hash_generator',
+            
+            # Additional tools
+            'isdown:index',
+            'youtube_thumbnail:index',
         ]
 
     def location(self, item):
