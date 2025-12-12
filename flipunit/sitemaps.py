@@ -134,8 +134,16 @@ class StaticViewSitemap(Sitemap):
         ]
 
     def location(self, item):
-        if isinstance(item, tuple):
-            url_name, *args = item
-            return reverse(url_name, args=args)
-        return reverse(item)
+        try:
+            if isinstance(item, tuple):
+                url_name, *args = item
+                return reverse(url_name, args=args)
+            return reverse(item)
+        except Exception as e:
+            # Log error but don't crash - Django sitemap framework will skip invalid URLs
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to reverse URL for sitemap item {item}: {e}")
+            # Return None to skip this item
+            return None
 

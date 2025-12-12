@@ -63,8 +63,9 @@ def sitemap(request):
     if '<?xml-stylesheet' not in xml_content:
         xsl_reference = '<?xml-stylesheet type="text/xsl" href="/static/sitemap.xsl"?>\n'
         # Find the XML declaration and insert XSL reference after it
+        # Match XML declaration with optional newline after it
         xml_content = re.sub(
-            r'(<\?xml[^>]*\?>)',
+            r'(<\?xml[^>]*\?>)\s*\n?',
             r'\1\n' + xsl_reference,
             xml_content,
             count=1
