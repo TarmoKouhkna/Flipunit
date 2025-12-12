@@ -82,6 +82,7 @@ class Command(BaseCommand):
         from datetime import datetime, timezone
 
         # Find all lastmod tags with date-only format and add time + timezone
+        # Handle potential whitespace around the date
         def fix_date_format(match):
             date_str = match.group(1)
             # Add current UTC time and UTC timezone
@@ -89,7 +90,17 @@ class Command(BaseCommand):
             return f'<lastmod>{date_str}{current_time}</lastmod>'
 
         # Replace date-only lastmod tags with full ISO 8601 format
-        xml_content = re.sub(r'<lastmod>(\d{4}-\d{2}-\d{2})</lastmod>', fix_date_format, xml_content)
+        # Use \s* to handle any whitespace (though Django typically outputs minified XML)
+        count_before = xml_content.count('<lastmod>')
+        xml_content = re.sub(r'<lastmod>\s*(\d{4}-\d{2}-\d{2})\s*</lastmod>', fix_date_format, xml_content)
+        count_after = xml_content.count('<lastmod>')
+        
+        # Debug: Log if replacements were made
+        if count_before == count_after:
+            # Check if dates are already in full format
+            full_format_count = len(re.findall(r'<lastmod>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00</lastmod>', xml_content))
+            if full_format_count == 0:
+                self.stdout.write(self.style.WARNING('⚠️  Warning: No date-only lastmod tags found to convert'))
 
         # Write to file
         try:
