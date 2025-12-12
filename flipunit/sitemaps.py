@@ -8,10 +8,10 @@ class StaticViewSitemap(Sitemap):
     protocol = 'https'  # Force HTTPS URLs in sitemap
 
     def lastmod(self, obj):
-        # Return ISO 8601 formatted datetime string with UTC timezone
-        # Django's sitemap framework formats datetime objects as date-only,
-        # so we return a string to preserve the full datetime format
-        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
+        # Return datetime with UTC timezone
+        # Django's sitemap framework will format this, and our post-processing
+        # in generate_sitemap.py will ensure it's in full ISO 8601 format
+        return datetime.now(timezone.utc)
 
     def items(self):
         return [
