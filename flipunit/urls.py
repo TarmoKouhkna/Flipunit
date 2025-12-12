@@ -60,27 +60,30 @@ def sitemap(request):
     xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
     
     # Remove XSL stylesheet reference - Google Search Console has issues with it
-    # Count occurrences before removal
-    xsl_before = xml_content.count('xml-stylesheet')
+    # Use multiple aggressive methods to ensure complete removal
     
-    # CRITICAL: Use line-by-line filtering - this is the most reliable method
-    # Split by newlines, filter out any line containing xml-stylesheet (case-insensitive)
+    # Method 1: Regex removal (handles both single-line and multi-line)
+    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', xml_content, flags=re.IGNORECASE | re.MULTILINE | re.DOTALL)
+    xml_content = re.sub(r'<\?xml-stylesheet.*?\?>\s*', '', xml_content, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Method 2: Line-by-line filtering (most reliable for separate lines)
     lines = xml_content.split('\n')
-    filtered_lines = []
-    for line in lines:
-        # Check if line contains xml-stylesheet (case-insensitive)
-        if 'xml-stylesheet' not in line.lower():
-            filtered_lines.append(line)
+    filtered_lines = [line for line in lines if 'xml-stylesheet' not in line.lower()]
     xml_content = '\n'.join(filtered_lines)
     
-    # Also try regex as backup (but line filtering should catch everything)
-    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', xml_content, flags=re.IGNORECASE | re.MULTILINE)
-    
-    # Final verification - if still present, use string replacement
-    xsl_after = xml_content.count('xml-stylesheet')
-    if xsl_after > 0:
-        # Last resort: remove character by character if needed
-        xml_content = '\n'.join([l for l in xml_content.split('\n') if 'xml-stylesheet' not in l.lower()])
+    # Method 3: String replacement as final fallback
+    # Remove any remaining XSL references character by character
+    while 'xml-stylesheet' in xml_content.lower():
+        # Find and remove the XSL processing instruction
+        start_idx = xml_content.lower().find('<?xml-stylesheet')
+        if start_idx == -1:
+            break
+        # Find the closing ?>
+        end_idx = xml_content.find('?>', start_idx)
+        if end_idx == -1:
+            break
+        # Remove the entire processing instruction including any whitespace after
+        xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
     # Update the response content
     response.content = xml_content.encode('utf-8')
