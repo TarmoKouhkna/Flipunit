@@ -60,14 +60,20 @@ def sitemap(request):
     
     # Handle XSL stylesheet reference for better browser display
     # Google Search Console may have issues with XSL references, so we remove it for search engines
-    user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
+    # Check User-Agent header (may be in different formats depending on proxy)
+    user_agent = (
+        request.META.get('HTTP_USER_AGENT', '') or 
+        request.META.get('HTTP_X_FORWARDED_USER_AGENT', '') or
+        request.META.get('USER_AGENT', '')
+    ).lower()
+    
     is_search_engine = any(bot in user_agent for bot in ['googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'yandexbot', 'sogou', 'exabot', 'facebot', 'ia_archiver'])
     
-    if is_search_engine:
-        # Remove XSL reference for search engines
-        xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*\n?', '', xml_content)
-    elif '<?xml-stylesheet' not in xml_content:
-        # Add XSL reference for browsers
+    # Always remove XSL reference if present, then add back only for browsers
+    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*\n?', '', xml_content)
+    
+    if not is_search_engine:
+        # Add XSL reference for browsers only
         xsl_reference = '<?xml-stylesheet type="text/xsl" href="/static/sitemap.xsl"?>\n'
         # Find the XML declaration and insert XSL reference after it
         xml_content = re.sub(
