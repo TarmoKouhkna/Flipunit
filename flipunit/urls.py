@@ -28,13 +28,40 @@ sitemaps = {
 }
 
 def sitemap(request):
-    """Custom sitemap view that removes noindex header for Google Search Console"""
+    """Custom sitemap view that removes noindex header for Google Search Console and fixes date format"""
     response = sitemap_view(request, sitemaps)
     # Ensure correct content type
     response['Content-Type'] = 'application/xml; charset=utf-8'
     # Remove X-Robots-Tag header if present (Google needs to index sitemaps)
     if 'X-Robots-Tag' in response:
         del response['X-Robots-Tag']
+    
+    # Fix lastmod date format for Google Search Console compliance
+    # Convert YYYY-MM-DD to YYYY-MM-DDTHH:MM:SS+00:00 format
+    import re
+    from datetime import datetime, timezone
+    
+    # Render the response to get the content
+    response.render()
+    
+    # Get the XML content
+    xml_content = response.content.decode('utf-8')
+    
+    # Find all lastmod tags with date-only format and add time + timezone
+    def fix_date_format(match):
+        date_str = match.group(1)
+        # Add current UTC time and UTC timezone
+        current_time = datetime.now(timezone.utc).strftime('T%H:%M:%S+00:00')
+        return f'<lastmod>{date_str}{current_time}</lastmod>'
+    
+    # Replace date-only lastmod tags with full ISO 8601 format
+    date_only_pattern = r'<lastmod>\s*(\d{4}-\d{2}-\d{2})\s*</lastmod>'
+    xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
+    
+    # Update the response content
+    response.content = xml_content.encode('utf-8')
+    response['Content-Length'] = str(len(response.content))
+    
     return response
 
 urlpatterns = [
