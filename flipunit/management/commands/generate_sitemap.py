@@ -75,7 +75,22 @@ class Command(BaseCommand):
                 self.style.ERROR(f'❌ Failed to decode response content: {e}')
             )
             raise
-        
+
+        # Fix lastmod date format for Google Search Console compliance
+        # Convert YYYY-MM-DD to YYYY-MM-DDTHH:MM:SS+00:00 format
+        import re
+        from datetime import datetime, timezone
+
+        # Find all lastmod tags with date-only format and add time + timezone
+        def fix_date_format(match):
+            date_str = match.group(1)
+            # Add current UTC time and UTC timezone
+            current_time = datetime.now(timezone.utc).strftime('T%H:%M:%S+00:00')
+            return f'<lastmod>{date_str}{current_time}</lastmod>'
+
+        # Replace date-only lastmod tags with full ISO 8601 format
+        xml_content = re.sub(r'<lastmod>(\d{4}-\d{2}-\d{2})</lastmod>', fix_date_format, xml_content)
+
         # Write to file
         try:
             with open(output_path, 'w', encoding='utf-8') as f:

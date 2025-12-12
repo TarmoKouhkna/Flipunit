@@ -1,12 +1,15 @@
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
-from datetime import datetime
+from datetime import datetime, timezone
 
 class StaticViewSitemap(Sitemap):
     priority = 0.8
     changefreq = 'weekly'
     protocol = 'https'  # Force HTTPS URLs in sitemap
-    lastmod = datetime.now()  # Set lastmod for all pages
+
+    def lastmod(self, obj):
+        # Return datetime with UTC timezone for proper ISO 8601 formatting
+        return datetime.now(timezone.utc)
 
     def items(self):
         return [
