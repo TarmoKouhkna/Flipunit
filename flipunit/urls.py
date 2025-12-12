@@ -59,10 +59,15 @@ def sitemap(request):
     xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
     
     # Remove XSL stylesheet reference - Google Search Console has issues with it
-    # We'll serve plain XML for all clients to ensure maximum compatibility
-    # Browsers will still display it correctly as XML
-    # Use multiline flag and more aggressive pattern to catch all variations
-    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', xml_content, flags=re.MULTILINE)
+    # Use multiple approaches to ensure complete removal
+    # Method 1: Regex patterns
+    xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', xml_content)
+    xml_content = re.sub(r'<\?xml-stylesheet.*?\?>\s*', '', xml_content, flags=re.DOTALL)
+    
+    # Method 2: Line-by-line filtering (more reliable)
+    lines = xml_content.split('\n')
+    filtered_lines = [line for line in lines if 'xml-stylesheet' not in line.lower()]
+    xml_content = '\n'.join(filtered_lines)
     
     # Update the response content
     response.content = xml_content.encode('utf-8')
