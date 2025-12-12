@@ -91,16 +91,23 @@ class Command(BaseCommand):
 
         # Replace date-only lastmod tags with full ISO 8601 format
         # Use \s* to handle any whitespace (though Django typically outputs minified XML)
-        count_before = xml_content.count('<lastmod>')
-        xml_content = re.sub(r'<lastmod>\s*(\d{4}-\d{2}-\d{2})\s*</lastmod>', fix_date_format, xml_content)
-        count_after = xml_content.count('<lastmod>')
+        date_only_pattern = r'<lastmod>\s*(\d{4}-\d{2}-\d{2})\s*</lastmod>'
+        date_only_count = len(re.findall(date_only_pattern, xml_content))
         
-        # Debug: Log if replacements were made
-        if count_before == count_after:
+        if date_only_count > 0:
+            # Replace date-only formats
+            xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
+            self.stdout.write(self.style.SUCCESS(f'   ✓ Converted {date_only_count} date-only lastmod tags to ISO 8601 format'))
+        else:
             # Check if dates are already in full format
             full_format_count = len(re.findall(r'<lastmod>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00</lastmod>', xml_content))
-            if full_format_count == 0:
-                self.stdout.write(self.style.WARNING('⚠️  Warning: No date-only lastmod tags found to convert'))
+            if full_format_count > 0:
+                self.stdout.write(self.style.SUCCESS(f'   ✓ Found {full_format_count} lastmod tags already in ISO 8601 format'))
+            else:
+                # Debug: show a sample of what we actually got
+                sample = re.findall(r'<lastmod>[^<]*</lastmod>', xml_content)
+                if sample:
+                    self.stdout.write(self.style.WARNING(f'   ⚠️  Sample lastmod format: {sample[0]}'))
 
         # Write to file
         try:
