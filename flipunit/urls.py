@@ -20,8 +20,34 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.sitemaps.views import sitemap as sitemap_view
 from django.views.generic import TemplateView
+from django.utils.feedgenerator import SitemapFeed
 from . import views
 from .sitemaps import StaticViewSitemap
+
+# Monkey-patch Django's SitemapFeed to prevent XSL addition
+_original_write = SitemapFeed.write
+def write_without_xsl(self, outfile, encoding):
+    """Override write method to prevent XSL stylesheet addition"""
+    from io import BytesIO
+    import re
+    
+    # Create temporary buffer
+    buffer = BytesIO()
+    # Call original write method
+    _original_write(self, buffer, encoding)
+    
+    # Get content and remove XSL
+    content = buffer.getvalue().decode(encoding)
+    content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', content, flags=re.IGNORECASE)
+    # Also filter line by line
+    lines = content.split('\n')
+    content = '\n'.join([l for l in lines if 'xml-stylesheet' not in l.lower()])
+    
+    # Write to actual output
+    outfile.write(content.encode(encoding))
+
+# Apply monkey patch
+SitemapFeed.write = write_without_xsl
 
 sitemaps = {
     'static': StaticViewSitemap,
