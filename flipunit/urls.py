@@ -66,24 +66,29 @@ def sitemap(request):
     
     xml_content += '</urlset>\n'
     
-    # Debug: Log a sample of the content to verify formatting
+    # Verify XML has proper newlines before encoding
+    newline_count = xml_content.count('\n')
+    expected_newlines = 2 + (len(items) * 6) + 1  # XML decl + urlset + (each url has 6 lines) + closing urlset
     import logging
     logger = logging.getLogger(__name__)
-    sample = xml_content[:500].replace('\n', '\\n').replace('\r', '\\r')
-    logger.error(f"[SITEMAP] Generated XML sample (first 500 chars): {sample}")
-    logger.error(f"[SITEMAP] Total lines in XML: {len(xml_lines)}, Newlines in content: {xml_content.count(chr(10))}")
+    logger.error(f"[SITEMAP] XML has {newline_count} newlines, expected approximately {expected_newlines}")
+    logger.error(f"[SITEMAP] First 200 chars of XML: {repr(xml_content[:200])}")
     
     # Create HttpResponse with properly formatted XML
-    # Ensure we're not using any compression or processing
-    http_response = HttpResponse(xml_content.encode('utf-8'), content_type='application/xml; charset=utf-8')
-    http_response['Content-Length'] = str(len(http_response.content))
-    # Explicitly disable any compression
-    http_response['Content-Encoding'] = 'identity'
+    # Encode to bytes explicitly - use binary mode to preserve newlines
+    xml_bytes = xml_content.encode('utf-8')
     
-    # Verify what we're actually returning
-    response_sample = http_response.content[:500].decode('utf-8', errors='ignore').replace('\n', '\\n').replace('\r', '\\r')
-    logger.error(f"[SITEMAP] Response content sample (first 500 chars): {response_sample}")
-    logger.error(f"[SITEMAP] Response content length: {len(http_response.content)}")
+    # Verify bytes contain newline characters (0x0A)
+    newline_bytes = xml_bytes.count(b'\n')
+    logger.error(f"[SITEMAP] Encoded bytes contain {newline_bytes} newline bytes (0x0A)")
+    
+    # Create response and set headers to prevent compression/minification
+    http_response = HttpResponse(xml_bytes, content_type='application/xml; charset=utf-8')
+    http_response['Content-Length'] = str(len(xml_bytes))
+    # Prevent any compression or minification
+    http_response['Cache-Control'] = 'no-transform, no-cache'
+    # Explicitly tell Nginx not to compress
+    http_response['X-Accel-Buffering'] = 'no'
     
     return http_response
 
