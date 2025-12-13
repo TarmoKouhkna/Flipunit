@@ -94,16 +94,46 @@ def sitemap(request):
         formatted_xml = dom.toprettyxml(indent='  ', encoding=None)
         # Remove the extra newline that minidom adds after the XML declaration
         formatted_xml = re.sub(r'<\?xml[^>]*\?>\n\n', r'<?xml version="1.0" encoding="UTF-8"?>\n', formatted_xml)
-        # Remove any trailing whitespace/newlines
+        # Remove any trailing whitespace/newlines but keep final newline
         formatted_xml = formatted_xml.rstrip() + '\n'
-        # Use formatted XML if it's valid
-        if formatted_xml and len(formatted_xml.strip()) > 100:
+        # Use formatted XML if parsing succeeded (it should always be longer due to whitespace)
+        if formatted_xml:
             xml_content = formatted_xml
     except Exception as e:
-        # If formatting fails, log but continue with original
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Sitemap XML formatting failed: {str(e)}, using original minified XML")
+        # If formatting fails, try a simpler regex-based approach
+        try:
+            # Simple regex-based formatting: add newlines before closing tags and after opening tags
+            formatted_xml = xml_content
+            # Add newline before </urlset>
+            formatted_xml = re.sub(r'</urlset>', '\n</urlset>', formatted_xml)
+            # Add newline and indent before each <url>
+            formatted_xml = re.sub(r'<url>', '\n  <url>', formatted_xml)
+            # Add newline and indent before each closing </url>
+            formatted_xml = re.sub(r'</url>', '\n  </url>', formatted_xml)
+            # Add newline and indent before child elements
+            formatted_xml = re.sub(r'<loc>', '\n    <loc>', formatted_xml)
+            formatted_xml = re.sub(r'</loc>', '</loc>', formatted_xml)
+            formatted_xml = re.sub(r'<lastmod>', '\n    <lastmod>', formatted_xml)
+            formatted_xml = re.sub(r'</lastmod>', '</lastmod>', formatted_xml)
+            formatted_xml = re.sub(r'<changefreq>', '\n    <changefreq>', formatted_xml)
+            formatted_xml = re.sub(r'</changefreq>', '</changefreq>', formatted_xml)
+            formatted_xml = re.sub(r'<priority>', '\n    <priority>', formatted_xml)
+            formatted_xml = re.sub(r'</priority>', '</priority>', formatted_xml)
+            # Clean up multiple newlines
+            formatted_xml = re.sub(r'\n\n+', '\n', formatted_xml)
+            # Ensure XML declaration is on its own line
+            formatted_xml = re.sub(r'(<\?xml[^>]*\?>)', r'\1\n', formatted_xml)
+            # Ensure urlset opening tag is on its own line
+            formatted_xml = re.sub(r'(<urlset[^>]*>)', r'\1\n', formatted_xml)
+            # Clean up and use formatted version
+            formatted_xml = formatted_xml.strip() + '\n'
+            if len(formatted_xml) > len(xml_content):
+                xml_content = formatted_xml
+        except Exception as e2:
+            # If both fail, log and use original
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Sitemap XML formatting failed (minidom: {str(e)}, regex: {str(e2)}), using original")
     
     # Create a new HttpResponse to ensure proper response handling
     # This avoids any issues with StreamingHttpResponse or other response types
