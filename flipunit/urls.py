@@ -32,6 +32,7 @@ def sitemap(request):
     """Custom sitemap view that generates properly formatted XML from scratch"""
     from django.http import HttpResponse
     from datetime import datetime, timezone
+    import logging
     
     # Generate sitemap XML manually with proper formatting
     current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
@@ -68,7 +69,6 @@ def sitemap(request):
     # Debug: Verify newlines are present
     newline_count = xml_content.count('\n')
     url_count = xml_content.count('<url>')
-    import logging
     logger = logging.getLogger(__name__)
     logger.error(f"[SITEMAP DEBUG] XML has {newline_count} newlines, {url_count} URLs")
     logger.error(f"[SITEMAP DEBUG] First 300 chars: {repr(xml_content[:300])}")
