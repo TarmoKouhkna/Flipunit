@@ -86,8 +86,9 @@ def sitemap(request):
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
     # Format XML with proper indentation for better Google Search Console parsing
-    # First, remove any existing newlines to start fresh (XSL removal may have added some)
-    xml_content = re.sub(r'\s+', ' ', xml_content).strip()
+    # First, normalize whitespace but preserve structure - remove spaces between tags
+    xml_content = re.sub(r'>\s+<', '><', xml_content)  # Remove spaces between tags
+    xml_content = xml_content.strip()
     
     # Split XML declaration and root element
     xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
