@@ -68,70 +68,62 @@ def sitemap(request):
     xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
     
     # Remove XSL stylesheet reference - Google Search Console has issues with it
-    # Use multiple aggressive methods to ensure complete removal
-    
-    # Method 1: Regex removal (handles both single-line and multi-line)
+    # Use aggressive regex removal (don't split by lines as it interferes with formatting)
     xml_content = re.sub(r'<\?xml-stylesheet[^>]*\?>\s*', '', xml_content, flags=re.IGNORECASE | re.MULTILINE | re.DOTALL)
     xml_content = re.sub(r'<\?xml-stylesheet.*?\?>\s*', '', xml_content, flags=re.IGNORECASE | re.DOTALL)
-    
-    # Method 2: Line-by-line filtering (most reliable for separate lines)
-    lines = xml_content.split('\n')
-    filtered_lines = [line for line in lines if 'xml-stylesheet' not in line.lower()]
-    xml_content = '\n'.join(filtered_lines)
-    
-    # Method 3: String replacement as final fallback
-    # Remove any remaining XSL references character by character
+    # Final fallback: remove any remaining XSL references
     while 'xml-stylesheet' in xml_content.lower():
-        # Find and remove the XSL processing instruction
         start_idx = xml_content.lower().find('<?xml-stylesheet')
         if start_idx == -1:
             break
-        # Find the closing ?>
         end_idx = xml_content.find('?>', start_idx)
         if end_idx == -1:
             break
-        # Remove the entire processing instruction including any whitespace after
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
+    # Format XML with proper indentation for better Google Search Console parsing
+    # Try minidom first, fall back to regex if it fails
+    minidom_succeeded = False
     try:
-        # Format XML with proper indentation for better Google Search Console parsing
-        # Use minidom to properly format the XML - this is more reliable than regex
-        try:
-            # Parse the XML
-            dom = xml.dom.minidom.parseString(xml_content)
-            # Format with 2-space indentation
-            formatted_xml = dom.toprettyxml(indent='  ', encoding=None)
-            # Remove namespace prefixes that minidom might add (e.g., ns0:urlset -> urlset)
-            formatted_xml = re.sub(r'<ns\d+:', '<', formatted_xml)
-            formatted_xml = re.sub(r'</ns\d+:', '</', formatted_xml)
-            # Remove the extra newline that minidom adds after the XML declaration
-            formatted_xml = re.sub(r'<\?xml[^>]*\?>\n\n', r'<?xml version="1.0" encoding="UTF-8"?>\n', formatted_xml)
-            # Remove any trailing whitespace but keep final newline
-            formatted_xml = formatted_xml.rstrip() + '\n'
-            # Always use formatted XML if parsing succeeded
+        # Parse the XML with minidom
+        dom = xml.dom.minidom.parseString(xml_content)
+        # Format with 2-space indentation
+        formatted_xml = dom.toprettyxml(indent='  ', encoding=None)
+        # Remove namespace prefixes that minidom might add (e.g., ns0:urlset -> urlset)
+        formatted_xml = re.sub(r'<ns\d+:', '<', formatted_xml)
+        formatted_xml = re.sub(r'</ns\d+:', '</', formatted_xml)
+        # Remove the extra newline that minidom adds after the XML declaration
+        formatted_xml = re.sub(r'<\?xml[^>]*\?>\n\n', r'<?xml version="1.0" encoding="UTF-8"?>\n', formatted_xml)
+        # Remove any trailing whitespace but keep final newline
+        formatted_xml = formatted_xml.rstrip() + '\n'
+        # Check if formatting actually worked (should have multiple lines)
+        if '\n' in formatted_xml and formatted_xml.count('\n') > 5:
             xml_content = formatted_xml
-        except Exception as format_error:
-            logger.warning(f"Minidom formatting failed, using regex fallback: {format_error}")
-            # If minidom fails, fall back to simple regex formatting
-            # First, ensure we have clean minified XML (remove spaces between tags)
-            xml_content = re.sub(r'> +<', '><', xml_content).strip()
-            # Split XML declaration and urlset if not already split
-            if re.search(r'<\?xml[^>]*\?><urlset', xml_content):
-                xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
-            # Format first <url> after <urlset> (handle optional newline)
-            xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
-            # Format </url><url> pairs
-            xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
-            # Format child elements within <url> tags
-            xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
-            xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
-            xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
-            xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
-            xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
-            # Format closing </urlset>
-            xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
-            # Clean up and ensure proper formatting
-            xml_content = xml_content.strip() + '\n'
+            minidom_succeeded = True
+    except Exception as format_error:
+        logger.warning(f"Minidom formatting failed: {format_error}")
+    
+    # If minidom didn't succeed, use regex formatting
+    if not minidom_succeeded:
+        # Remove spaces between tags first
+        xml_content = re.sub(r'> +<', '><', xml_content).strip()
+        # Split XML declaration and urlset if not already split
+        if re.search(r'<\?xml[^>]*\?><urlset', xml_content):
+            xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
+        # Format first <url> after <urlset> (handle optional newline)
+        xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
+        # Format </url><url> pairs
+        xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
+        # Format child elements within <url> tags
+        xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
+        xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
+        xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
+        xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
+        xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
+        # Format closing </urlset>
+        xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
+        # Clean up and ensure proper formatting
+        xml_content = xml_content.strip() + '\n'
         
         # Create a new HttpResponse to ensure proper response handling
         # This avoids any issues with StreamingHttpResponse or other response types
