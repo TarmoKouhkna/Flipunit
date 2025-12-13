@@ -101,6 +101,9 @@ def sitemap(request):
             dom = xml.dom.minidom.parseString(xml_content)
             # Format with 2-space indentation
             formatted_xml = dom.toprettyxml(indent='  ', encoding=None)
+            # Remove namespace prefixes that minidom might add (e.g., ns0:urlset -> urlset)
+            formatted_xml = re.sub(r'<ns\d+:', '<', formatted_xml)
+            formatted_xml = re.sub(r'</ns\d+:', '</', formatted_xml)
             # Remove the extra newline that minidom adds after the XML declaration
             formatted_xml = re.sub(r'<\?xml[^>]*\?>\n\n', r'<?xml version="1.0" encoding="UTF-8"?>\n', formatted_xml)
             # Remove any trailing whitespace but keep final newline
@@ -110,26 +113,24 @@ def sitemap(request):
         except Exception as format_error:
             logger.warning(f"Minidom formatting failed, using regex fallback: {format_error}")
             # If minidom fails, fall back to simple regex formatting
-            # Remove spaces between tags first (but preserve any existing newlines)
+            # First, ensure we have clean minified XML (remove spaces between tags)
             xml_content = re.sub(r'> +<', '><', xml_content).strip()
-            # Add newlines at key points (handle case where XML declaration/urlset already split)
-            if '<?xml' in xml_content and '<urlset' in xml_content:
-                # Check if already split
-                if not re.search(r'<\?xml[^>]*\?>\s*<urlset', xml_content):
-                    # Already split, just ensure urlset has newline after it
-                    xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
-                else:
-                    # Not split yet, split them
-                    xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
-                    xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
-            # Format URL entries
+            # Split XML declaration and urlset if not already split
+            if re.search(r'<\?xml[^>]*\?><urlset', xml_content):
+                xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
+            # Format first <url> after <urlset> (handle optional newline)
+            xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
+            # Format </url><url> pairs
             xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
+            # Format child elements within <url> tags
             xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
             xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
             xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
             xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
             xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
+            # Format closing </urlset>
             xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
+            # Clean up and ensure proper formatting
             xml_content = xml_content.strip() + '\n'
         
         # Create a new HttpResponse to ensure proper response handling
