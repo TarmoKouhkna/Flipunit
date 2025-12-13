@@ -32,56 +32,46 @@ def sitemap(request):
     """Custom sitemap view that generates properly formatted XML from scratch"""
     from django.http import HttpResponse
     from datetime import datetime, timezone
-    import logging
     
-    logger = logging.getLogger(__name__)
+    # Generate sitemap XML manually with proper formatting
+    current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
     
-    try:
-        # Generate sitemap XML manually with proper formatting
-        current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
-        
-        # Build XML string directly with explicit newlines
-        xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
-        
-        # Get all URLs from the sitemap
-        sitemap_instance = StaticViewSitemap()
-        items = sitemap_instance.items()
-        
-        # Format each URL entry with proper indentation
-        for item in items:
-            try:
-                relative_url = sitemap_instance.location(item)
-                # Make URL absolute using the protocol from sitemap_instance
-                if sitemap_instance.protocol:
-                    absolute_url = f"{sitemap_instance.protocol}://{request.get_host()}{relative_url}"
-                else:
-                    absolute_url = request.build_absolute_uri(relative_url)
-                xml_content += '  <url>\n'
-                xml_content += f'    <loc>{absolute_url}</loc>\n'
-                xml_content += f'    <lastmod>{current_time}</lastmod>\n'
-                xml_content += f'    <changefreq>{sitemap_instance.changefreq}</changefreq>\n'
-                xml_content += f'    <priority>{sitemap_instance.priority}</priority>\n'
-                xml_content += '  </url>\n'
-            except Exception as e:
-                # Skip URLs that can't be reversed
-                logger.warning(f"Skipping URL item {item}: {e}")
-                continue
-        
-        xml_content += '</urlset>\n'
-        
-        # Create HttpResponse with properly formatted XML
-        xml_bytes = xml_content.encode('utf-8')
-        http_response = HttpResponse(xml_bytes, content_type='application/xml; charset=utf-8')
-        http_response['Content-Length'] = str(len(xml_bytes))
-        http_response['Cache-Control'] = 'no-transform, no-cache'
-        
-        return http_response
-    except Exception as e:
-        logger.error(f"Error generating sitemap: {e}", exc_info=True)
-        # Return a minimal valid sitemap on error
-        error_xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>\n'
-        return HttpResponse(error_xml.encode('utf-8'), content_type='application/xml; charset=utf-8')
+    # Build XML string directly with explicit newlines
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+    
+    # Get all URLs from the sitemap
+    sitemap_instance = StaticViewSitemap()
+    items = sitemap_instance.items()
+    
+    # Format each URL entry with proper indentation
+    for item in items:
+        try:
+            relative_url = sitemap_instance.location(item)
+            # Make URL absolute using the protocol from sitemap_instance
+            if sitemap_instance.protocol:
+                absolute_url = f"{sitemap_instance.protocol}://{request.get_host()}{relative_url}"
+            else:
+                absolute_url = request.build_absolute_uri(relative_url)
+            xml_content += '  <url>\n'
+            xml_content += f'    <loc>{absolute_url}</loc>\n'
+            xml_content += f'    <lastmod>{current_time}</lastmod>\n'
+            xml_content += f'    <changefreq>{sitemap_instance.changefreq}</changefreq>\n'
+            xml_content += f'    <priority>{sitemap_instance.priority}</priority>\n'
+            xml_content += '  </url>\n'
+        except Exception:
+            # Skip URLs that can't be reversed
+            continue
+    
+    xml_content += '</urlset>\n'
+    
+    # Create HttpResponse with properly formatted XML
+    xml_bytes = xml_content.encode('utf-8')
+    http_response = HttpResponse(xml_bytes, content_type='application/xml; charset=utf-8')
+    http_response['Content-Length'] = str(len(xml_bytes))
+    http_response['Cache-Control'] = 'no-transform, no-cache'
+    
+    return http_response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
