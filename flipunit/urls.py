@@ -33,7 +33,7 @@ def sitemap(request):
     from django.http import HttpResponse
     import re
     from datetime import datetime, timezone
-    import xml.etree.ElementTree as ET
+    import xml.dom.minidom
     
     response = sitemap_view(request, sitemaps)
     # Ensure correct content type
@@ -85,20 +85,28 @@ def sitemap(request):
         # Remove the entire processing instruction including any whitespace after
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
-    # Validate XML structure without modifying namespaces
-    # ElementTree parsing/reformatting can add namespace prefixes which breaks Google Search Console
-    # So we just validate it's parseable but keep the original format
+    # Format XML with proper indentation for better Google Search Console parsing
+    # Use minidom which preserves namespace declarations without adding prefixes
     try:
-        ET.fromstring(xml_content)  # Just validate, don't reformat
-    except ET.ParseError:
-        # If XML is invalid, log but continue (shouldn't happen)
+        # Parse the XML
+        dom = xml.dom.minidom.parseString(xml_content)
+        # Format with 2-space indentation
+        formatted_xml = dom.toprettyxml(indent='  ', encoding=None)
+        # Remove the extra newline that minidom adds after the XML declaration
+        formatted_xml = re.sub(r'<\?xml[^>]*\?>\n\n', r'<?xml version="1.0" encoding="UTF-8"?>\n', formatted_xml)
+        # Remove any trailing whitespace/newlines
+        formatted_xml = formatted_xml.rstrip() + '\n'
+        # Use formatted XML if it's valid
+        if formatted_xml and len(formatted_xml.strip()) > 100:
+            xml_content = formatted_xml
+    except Exception as e:
+        # If formatting fails, log but continue with original
         import logging
         logger = logging.getLogger(__name__)
-        logger.error("Sitemap XML failed validation")
+        logger.warning(f"Sitemap XML formatting failed: {str(e)}, using original minified XML")
     
     # Create a new HttpResponse to ensure proper response handling
     # This avoids any issues with StreamingHttpResponse or other response types
-    # Keep the original XML format to preserve namespace declarations
     http_response = HttpResponse(xml_content.encode('utf-8'), content_type='application/xml; charset=utf-8')
     http_response['Content-Length'] = str(len(http_response.content))
     
