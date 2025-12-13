@@ -105,17 +105,24 @@ def sitemap(request):
             formatted_xml = re.sub(r'<\?xml[^>]*\?>\n\n', r'<?xml version="1.0" encoding="UTF-8"?>\n', formatted_xml)
             # Remove any trailing whitespace but keep final newline
             formatted_xml = formatted_xml.rstrip() + '\n'
-            # Use formatted XML if it's valid
-            if formatted_xml and len(formatted_xml) > 100:
-                xml_content = formatted_xml
+            # Always use formatted XML if parsing succeeded
+            xml_content = formatted_xml
         except Exception as format_error:
             logger.warning(f"Minidom formatting failed, using regex fallback: {format_error}")
             # If minidom fails, fall back to simple regex formatting
-            # Remove spaces between tags first
+            # Remove spaces between tags first (but preserve any existing newlines)
             xml_content = re.sub(r'> +<', '><', xml_content).strip()
-            # Add newlines at key points
-            xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
-            xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
+            # Add newlines at key points (handle case where XML declaration/urlset already split)
+            if '<?xml' in xml_content and '<urlset' in xml_content:
+                # Check if already split
+                if not re.search(r'<\?xml[^>]*\?>\s*<urlset', xml_content):
+                    # Already split, just ensure urlset has newline after it
+                    xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
+                else:
+                    # Not split yet, split them
+                    xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
+                    xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
+            # Format URL entries
             xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
             xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
             xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
