@@ -31,64 +31,61 @@ sitemaps = {
 def sitemap(request):
     """Custom sitemap view that generates properly formatted XML from scratch"""
     from django.http import HttpResponse
-    from django.urls import reverse
     from datetime import datetime, timezone
+    import xml.etree.ElementTree as ET
+    from xml.dom import minidom
     
-    # Generate sitemap XML manually with proper formatting
+    # Generate sitemap XML using ElementTree for proper structure
     current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
     
-    # Build XML string directly with explicit newlines
-    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+    # Create root element
+    urlset = ET.Element('urlset')
+    urlset.set('xmlns', 'http://www.sitemaps.org/schemas/sitemap/0.9')
+    urlset.set('xmlns:xhtml', 'http://www.w3.org/1999/xhtml')
     
     # Get all URLs from the sitemap
     sitemap_instance = StaticViewSitemap()
     items = sitemap_instance.items()
     
-    # Format each URL entry with proper indentation
+    # Add each URL entry
     for item in items:
         try:
             relative_url = sitemap_instance.location(item)
-            # Make URL absolute using the protocol from sitemap_instance
+            # Make URL absolute
             if sitemap_instance.protocol:
                 absolute_url = f"{sitemap_instance.protocol}://{request.get_host()}{relative_url}"
             else:
                 absolute_url = request.build_absolute_uri(relative_url)
-            xml_content += '  <url>\n'
-            xml_content += f'    <loc>{absolute_url}</loc>\n'
-            xml_content += f'    <lastmod>{current_time}</lastmod>\n'
-            xml_content += f'    <changefreq>{sitemap_instance.changefreq}</changefreq>\n'
-            xml_content += f'    <priority>{sitemap_instance.priority}</priority>\n'
-            xml_content += '  </url>\n'
-        except Exception as e:
-            # Skip URLs that can't be reversed
+            
+            # Create url element
+            url_elem = ET.SubElement(urlset, 'url')
+            ET.SubElement(url_elem, 'loc').text = absolute_url
+            ET.SubElement(url_elem, 'lastmod').text = current_time
+            ET.SubElement(url_elem, 'changefreq').text = sitemap_instance.changefreq
+            ET.SubElement(url_elem, 'priority').text = str(sitemap_instance.priority)
+        except Exception:
             continue
     
-    xml_content += '</urlset>\n'
+    # Convert to string and format with proper indentation
+    # First get the raw XML
+    rough_string = ET.tostring(urlset, encoding='unicode')
     
-    # Verify XML has proper newlines before encoding
-    newline_count = xml_content.count('\n')
-    expected_newlines = 2 + (len(items) * 6) + 1  # XML decl + urlset + (each url has 6 lines) + closing urlset
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.error(f"[SITEMAP] XML has {newline_count} newlines, expected approximately {expected_newlines}")
-    logger.error(f"[SITEMAP] First 200 chars of XML: {repr(xml_content[:200])}")
+    # Use minidom to format it properly
+    reparsed = minidom.parseString(rough_string)
+    xml_content = reparsed.toprettyxml(indent='  ', encoding=None)
     
-    # Create HttpResponse with properly formatted XML
-    # Encode to bytes explicitly - use binary mode to preserve newlines
+    # Remove the XML declaration that minidom adds (we'll add our own)
+    if xml_content.startswith('<?xml'):
+        xml_content = xml_content.split('?>', 1)[1].lstrip()
+    
+    # Add our own XML declaration with proper encoding
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_content
+    
+    # Create HttpResponse
     xml_bytes = xml_content.encode('utf-8')
-    
-    # Verify bytes contain newline characters (0x0A)
-    newline_bytes = xml_bytes.count(b'\n')
-    logger.error(f"[SITEMAP] Encoded bytes contain {newline_bytes} newline bytes (0x0A)")
-    
-    # Create response and set headers to prevent compression/minification
     http_response = HttpResponse(xml_bytes, content_type='application/xml; charset=utf-8')
     http_response['Content-Length'] = str(len(xml_bytes))
-    # Prevent any compression or minification
     http_response['Cache-Control'] = 'no-transform, no-cache'
-    # Explicitly tell Nginx not to compress
-    http_response['X-Accel-Buffering'] = 'no'
     
     return http_response
 
