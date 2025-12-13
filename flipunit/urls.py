@@ -65,17 +65,13 @@ def sitemap(request):
     
     xml_content += '</urlset>\n'
     
-    # Create HttpResponse - use StreamingHttpResponse to prevent any compression
-    from django.http import StreamingHttpResponse
+    # Create HttpResponse with properly formatted XML
     xml_bytes = xml_content.encode('utf-8')
+    http_response = HttpResponse(xml_bytes, content_type='application/xml; charset=utf-8')
+    http_response['Content-Length'] = str(len(xml_bytes))
+    http_response['Cache-Control'] = 'no-transform, no-cache'
     
-    # Use StreamingHttpResponse to ensure no compression/minification
-    response = StreamingHttpResponse(iter([xml_bytes]), content_type='application/xml; charset=utf-8')
-    response['Content-Length'] = str(len(xml_bytes))
-    response['Cache-Control'] = 'no-transform, no-cache'
-    response['X-Accel-Buffering'] = 'no'
-    
-    return response
+    return http_response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
