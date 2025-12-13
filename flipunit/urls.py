@@ -67,10 +67,10 @@ def sitemap(request):
             continue
     
     # Convert to string and format with proper indentation
-    # First get the raw XML
-    rough_string = ET.tostring(urlset, encoding='unicode')
+    # First get the raw XML as bytes
+    rough_string = ET.tostring(urlset, encoding='utf-8')
     
-    # Use minidom to format it properly
+    # Use minidom to format it properly (parseString expects bytes)
     reparsed = minidom.parseString(rough_string)
     xml_content = reparsed.toprettyxml(indent='  ', encoding=None)
     
