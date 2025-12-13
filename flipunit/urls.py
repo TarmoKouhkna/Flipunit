@@ -141,6 +141,11 @@ def sitemap(request):
     print(f"[SITEMAP DEBUG] After formatting, found {url_count_after} formatted URL entries", flush=True)
     logger.warning(f"Sitemap formatting: After formatting, found {url_count_after} formatted URL entries")
     
+    # Debug: Check if formatting actually happened
+    has_newlines = '\n  <url>' in xml_content or '\n    <loc>' in xml_content
+    print(f"[SITEMAP DEBUG] Has newlines in formatted content: {has_newlines}", flush=True)
+    print(f"[SITEMAP DEBUG] Content length: {len(xml_content)}, First 200 chars: {repr(xml_content[:200])}", flush=True)
+    
     # Clean up and ensure proper formatting
     xml_content = xml_content.strip() + '\n'
     
@@ -148,6 +153,10 @@ def sitemap(request):
     # This avoids any issues with StreamingHttpResponse or other response types
     http_response = HttpResponse(xml_content.encode('utf-8'), content_type='application/xml; charset=utf-8')
     http_response['Content-Length'] = str(len(http_response.content))
+    
+    # Debug: Verify what we're actually returning
+    response_sample = http_response.content[:200].decode('utf-8', errors='ignore')
+    print(f"[SITEMAP DEBUG] Response content sample (first 200 chars): {repr(response_sample)}", flush=True)
     
     return http_response
 
