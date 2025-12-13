@@ -93,15 +93,20 @@ def sitemap(request):
         # Format first <url> after <urlset>
         xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
         
-        # Format child elements within each <url> tag (apply multiple times to catch all)
-        for _ in range(10):  # Apply multiple times to ensure all instances are formatted
+        # Format child elements within <url> tags
+        # Apply each pattern multiple times to catch all instances
+        old_content = ""
+        iterations = 0
+        while xml_content != old_content and iterations < 20:
+            old_content = xml_content
             xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
             xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
             xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
             xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
             xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
+            iterations += 1
         
-        # Format </url><url> pairs - separate consecutive URLs (this is critical!)
+        # Format </url><url> pairs - separate consecutive URLs
         xml_content = re.sub(r'</url><url>', '</url>\n  <url>', xml_content)
         
         # Format closing </urlset>
