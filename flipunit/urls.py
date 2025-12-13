@@ -75,11 +75,6 @@ def sitemap(request):
     xml_bytes = xml_content.encode('utf-8')
     http_response = HttpResponse(xml_bytes, content_type='application/xml; charset=utf-8')
     http_response['Content-Length'] = str(len(xml_bytes))
-    http_response['Cache-Control'] = 'no-transform, no-cache'
-    # Tell Nginx not to compress this response
-    http_response['X-Accel-Buffering'] = 'no'
-    # Explicitly disable gzip compression
-    http_response['Content-Encoding'] = 'identity'
     
     return http_response
 
