@@ -37,9 +37,11 @@ def sitemap(request):
     # Generate sitemap XML manually with proper formatting
     current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
     
-    # Build XML string directly with explicit newlines
-    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+    # Build XML as a list of lines to preserve formatting
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+    ]
     
     # Get all URLs from the sitemap
     sitemap_instance = StaticViewSitemap()
@@ -54,17 +56,20 @@ def sitemap(request):
                 absolute_url = f"{sitemap_instance.protocol}://{request.get_host()}{relative_url}"
             else:
                 absolute_url = request.build_absolute_uri(relative_url)
-            xml_content += '  <url>\n'
-            xml_content += f'    <loc>{absolute_url}</loc>\n'
-            xml_content += f'    <lastmod>{current_time}</lastmod>\n'
-            xml_content += f'    <changefreq>{sitemap_instance.changefreq}</changefreq>\n'
-            xml_content += f'    <priority>{sitemap_instance.priority}</priority>\n'
-            xml_content += '  </url>\n'
+            xml_lines.append('  <url>')
+            xml_lines.append(f'    <loc>{absolute_url}</loc>')
+            xml_lines.append(f'    <lastmod>{current_time}</lastmod>')
+            xml_lines.append(f'    <changefreq>{sitemap_instance.changefreq}</changefreq>')
+            xml_lines.append(f'    <priority>{sitemap_instance.priority}</priority>')
+            xml_lines.append('  </url>')
         except Exception:
             # Skip URLs that can't be reversed
             continue
     
-    xml_content += '</urlset>\n'
+    xml_lines.append('</urlset>')
+    
+    # Join all lines with newlines
+    xml_content = '\n'.join(xml_lines) + '\n'
     
     # Debug: Verify newlines are present
     newline_count = xml_content.count('\n')
