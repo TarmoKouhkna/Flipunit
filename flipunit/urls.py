@@ -30,6 +30,7 @@ sitemaps = {
 
 def sitemap(request):
     """Custom sitemap view that removes noindex header for Google Search Console and fixes date format"""
+    print("[SITEMAP DEBUG] sitemap() function called", flush=True)
     from django.http import HttpResponse
     import re
     from datetime import datetime, timezone
@@ -84,7 +85,9 @@ def sitemap(request):
     # Format XML with proper indentation using simple string replacement
     # Count occurrences before formatting
     url_count_before = xml_content.count('<url><loc>')
+    sample_content = xml_content[:500].replace('\n', '\\n').replace('\r', '\\r')
     print(f"[SITEMAP DEBUG] Found {url_count_before} URL entries to format", flush=True)
+    print(f"[SITEMAP DEBUG] Sample content (first 500 chars): {sample_content}", flush=True)
     logger.warning(f"Sitemap formatting: Found {url_count_before} URL entries to format")
     
     # Split XML declaration and urlset if not already split
