@@ -83,24 +83,35 @@ def sitemap(request):
     
     try:
         # Format XML with proper indentation using simple string replacement
-        # Log sample before formatting for debugging
-        sample_before = xml_content[:300] if len(xml_content) > 300 else xml_content
-        logger.debug(f"Sitemap before formatting (first 300 chars): {repr(sample_before)}")
+        # Count occurrences before formatting
+        url_count_before = xml_content.count('<url><loc>')
+        logger.warning(f"Sitemap formatting: Found {url_count_before} URL entries to format")
         
         # Split XML declaration and urlset if not already split
         xml_content = xml_content.replace('?><urlset', '?>\n<urlset')
         
-        # Format first <url> after <urlset> - simple replacement
-        xml_content = xml_content.replace('><url>', '>\n  <url>', 1)  # Only first occurrence
+        # Format first <url> after <urlset> - find urlset closing tag and format first url
+        urlset_pos = xml_content.find('<urlset')
+        if urlset_pos >= 0:
+            urlset_end = xml_content.find('>', urlset_pos)
+            if urlset_end > 0 and urlset_end + 1 < len(xml_content):
+                # Check if <url> comes right after urlset
+                if xml_content[urlset_end+1:urlset_end+6] == '<url>':
+                    xml_content = xml_content[:urlset_end+1] + '\n  ' + xml_content[urlset_end+1:]
         
         # Format child elements - use string replacement (replaces ALL instances)
-        # Apply multiple times to ensure all are caught (in case of nested replacements)
-        for _ in range(5):
+        # Apply multiple times to ensure all are caught
+        for iteration in range(10):
+            old_content = xml_content
             xml_content = xml_content.replace('<url><loc>', '<url>\n    <loc>')
             xml_content = xml_content.replace('</loc><lastmod>', '</loc>\n    <lastmod>')
             xml_content = xml_content.replace('</lastmod><changefreq>', '</lastmod>\n    <changefreq>')
             xml_content = xml_content.replace('</changefreq><priority>', '</changefreq>\n    <priority>')
             xml_content = xml_content.replace('</priority></url>', '</priority>\n  </url>')
+            # Stop if no changes were made
+            if xml_content == old_content:
+                logger.warning(f"Sitemap formatting: Stopped after {iteration+1} iterations (no more changes)")
+                break
         
         # Format </url><url> pairs - separate consecutive URLs
         xml_content = xml_content.replace('</url><url>', '</url>\n  <url>')
@@ -108,9 +119,9 @@ def sitemap(request):
         # Format closing </urlset>
         xml_content = xml_content.replace('</url></urlset>', '</url>\n</urlset>')
         
-        # Log sample after formatting
-        sample_after = xml_content[:300] if len(xml_content) > 300 else xml_content
-        logger.debug(f"Sitemap after formatting (first 300 chars): {repr(sample_after)}")
+        # Verify formatting worked
+        url_count_after = xml_content.count('\n    <loc>')
+        logger.warning(f"Sitemap formatting: After formatting, found {url_count_after} formatted URL entries")
         
         # Clean up and ensure proper formatting
         xml_content = xml_content.strip() + '\n'
