@@ -61,6 +61,7 @@ def sitemap(request):
             xml_lines.append(f'    <changefreq>{sitemap_instance.changefreq}</changefreq>')
             xml_lines.append(f'    <priority>{sitemap_instance.priority}</priority>')
             xml_lines.append('  </url>')
+            xml_lines.append('')  # Add empty line between URLs
         except Exception:
             # Skip URLs that can't be reversed
             continue
