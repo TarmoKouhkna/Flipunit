@@ -82,26 +82,27 @@ def sitemap(request):
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
     try:
-        # Format XML with proper indentation using regex (more reliable than minidom)
-        # Remove spaces between tags first (but preserve structure)
-        xml_content = re.sub(r'> +<', '><', xml_content).strip()
+        # Format XML with proper indentation using regex
+        # First, normalize whitespace - remove spaces between tags
+        xml_content = re.sub(r'>\s+<', '><', xml_content).strip()
         
         # Split XML declaration and urlset if not already split
         if re.search(r'<\?xml[^>]*\?><urlset', xml_content):
             xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
         
-        # Format first <url> after <urlset> (handle optional whitespace/newline)
-        xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
+        # Format first <url> after <urlset>
+        xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
         
-        # Format </url><url> pairs - this is the key pattern that formats multiple URLs
-        xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
+        # Format child elements within each <url> tag (apply multiple times to catch all)
+        for _ in range(10):  # Apply multiple times to ensure all instances are formatted
+            xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
+            xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
+            xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
+            xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
+            xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
         
-        # Format child elements within <url> tags
-        xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
-        xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
-        xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
-        xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
-        xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
+        # Format </url><url> pairs - separate consecutive URLs (this is critical!)
+        xml_content = re.sub(r'</url><url>', '</url>\n  <url>', xml_content)
         
         # Format closing </urlset>
         xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
