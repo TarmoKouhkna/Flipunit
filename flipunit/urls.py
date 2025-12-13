@@ -93,18 +93,25 @@ def sitemap(request):
         # Format first <url> after <urlset>
         xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
         
-        # Format child elements within <url> tags
-        # Apply each pattern multiple times to catch all instances
-        old_content = ""
-        iterations = 0
-        while xml_content != old_content and iterations < 20:
-            old_content = xml_content
-            xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
-            xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
-            xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
-            xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
-            xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
-            iterations += 1
+        # Use a single comprehensive regex to format each complete URL entry
+        # Pattern matches: <url><loc>...</loc><lastmod>...</lastmod><changefreq>...</changefreq><priority>...</priority></url>
+        def format_single_url(match):
+            full_url = match.group(0)
+            # Format each part
+            formatted = full_url
+            formatted = re.sub(r'^<url><loc>', '<url>\n    <loc>', formatted)
+            formatted = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', formatted)
+            formatted = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', formatted)
+            formatted = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', formatted)
+            formatted = re.sub(r'</priority></url>$', '</priority>\n  </url>', formatted)
+            return formatted
+        
+        # Replace all URL entries - match the complete URL block
+        xml_content = re.sub(
+            r'<url><loc>([^<]+)</loc><lastmod>([^<]+)</lastmod><changefreq>([^<]+)</changefreq><priority>([^<]+)</priority></url>',
+            format_single_url,
+            xml_content
+        )
         
         # Format </url><url> pairs - separate consecutive URLs
         xml_content = re.sub(r'</url><url>', '</url>\n  <url>', xml_content)
