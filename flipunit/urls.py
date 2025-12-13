@@ -81,62 +81,64 @@ def sitemap(request):
             break
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
-    try:
-        # Format XML with proper indentation using simple string replacement
-        # Count occurrences before formatting
-        url_count_before = xml_content.count('<url><loc>')
-        logger.warning(f"Sitemap formatting: Found {url_count_before} URL entries to format")
-        
-        # Split XML declaration and urlset if not already split
-        xml_content = xml_content.replace('?><urlset', '?>\n<urlset')
-        
-        # Format first <url> after <urlset> - find urlset closing tag and format first url
-        urlset_pos = xml_content.find('<urlset')
-        if urlset_pos >= 0:
-            urlset_end = xml_content.find('>', urlset_pos)
-            if urlset_end > 0 and urlset_end + 1 < len(xml_content):
-                # Check if <url> comes right after urlset
-                if xml_content[urlset_end+1:urlset_end+6] == '<url>':
-                    xml_content = xml_content[:urlset_end+1] + '\n  ' + xml_content[urlset_end+1:]
-        
-        # Format child elements - use string replacement (replaces ALL instances)
-        # Apply multiple times to ensure all are caught
-        for iteration in range(10):
-            old_content = xml_content
-            xml_content = xml_content.replace('<url><loc>', '<url>\n    <loc>')
-            xml_content = xml_content.replace('</loc><lastmod>', '</loc>\n    <lastmod>')
-            xml_content = xml_content.replace('</lastmod><changefreq>', '</lastmod>\n    <changefreq>')
-            xml_content = xml_content.replace('</changefreq><priority>', '</changefreq>\n    <priority>')
-            xml_content = xml_content.replace('</priority></url>', '</priority>\n  </url>')
-            # Stop if no changes were made
-            if xml_content == old_content:
-                logger.warning(f"Sitemap formatting: Stopped after {iteration+1} iterations (no more changes)")
-                break
-        
-        # Format </url><url> pairs - separate consecutive URLs
-        xml_content = xml_content.replace('</url><url>', '</url>\n  <url>')
-        
-        # Format closing </urlset>
-        xml_content = xml_content.replace('</url></urlset>', '</url>\n</urlset>')
-        
-        # Verify formatting worked
-        url_count_after = xml_content.count('\n    <loc>')
-        logger.warning(f"Sitemap formatting: After formatting, found {url_count_after} formatted URL entries")
-        
-        # Clean up and ensure proper formatting
-        xml_content = xml_content.strip() + '\n'
-        
-        # Create a new HttpResponse to ensure proper response handling
-        # This avoids any issues with StreamingHttpResponse or other response types
-        http_response = HttpResponse(xml_content.encode('utf-8'), content_type='application/xml; charset=utf-8')
-        http_response['Content-Length'] = str(len(http_response.content))
-        
-        return http_response
-    except Exception as e:
-        logger.error(f"Error processing sitemap: {e}", exc_info=True)
-        # Return a basic valid sitemap even if formatting fails
-        fallback_xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>\n'
-        return HttpResponse(fallback_xml.encode('utf-8'), content_type='application/xml; charset=utf-8')
+    # Format XML with proper indentation using simple string replacement
+    # Count occurrences before formatting
+    url_count_before = xml_content.count('<url><loc>')
+    print(f"[SITEMAP DEBUG] Found {url_count_before} URL entries to format", flush=True)
+    logger.warning(f"Sitemap formatting: Found {url_count_before} URL entries to format")
+    
+    # Split XML declaration and urlset if not already split
+    xml_content = xml_content.replace('?><urlset', '?>\n<urlset')
+    
+    # Format first <url> after <urlset> - find urlset closing tag and format first url
+    urlset_pos = xml_content.find('<urlset')
+    if urlset_pos >= 0:
+        urlset_end = xml_content.find('>', urlset_pos)
+        if urlset_end > 0 and urlset_end + 1 < len(xml_content):
+            # Check if <url> comes right after urlset (handle whitespace)
+            next_chars = xml_content[urlset_end+1:urlset_end+10].strip()
+            if next_chars.startswith('<url>'):
+                # Insert newline and indentation before <url>
+                insert_pos = urlset_end + 1
+                while insert_pos < len(xml_content) and xml_content[insert_pos] in ' \t\n':
+                    insert_pos += 1
+                xml_content = xml_content[:insert_pos] + '\n  ' + xml_content[insert_pos:]
+    
+    # Format child elements - use string replacement (replaces ALL instances)
+    # Apply multiple times to ensure all are caught
+    for iteration in range(10):
+        old_content = xml_content
+        xml_content = xml_content.replace('<url><loc>', '<url>\n    <loc>')
+        xml_content = xml_content.replace('</loc><lastmod>', '</loc>\n    <lastmod>')
+        xml_content = xml_content.replace('</lastmod><changefreq>', '</lastmod>\n    <changefreq>')
+        xml_content = xml_content.replace('</changefreq><priority>', '</changefreq>\n    <priority>')
+        xml_content = xml_content.replace('</priority></url>', '</priority>\n  </url>')
+        # Stop if no changes were made
+        if xml_content == old_content:
+            print(f"[SITEMAP DEBUG] Stopped after {iteration+1} iterations (no more changes)", flush=True)
+            logger.warning(f"Sitemap formatting: Stopped after {iteration+1} iterations (no more changes)")
+            break
+    
+    # Format </url><url> pairs - separate consecutive URLs
+    xml_content = xml_content.replace('</url><url>', '</url>\n  <url>')
+    
+    # Format closing </urlset>
+    xml_content = xml_content.replace('</url></urlset>', '</url>\n</urlset>')
+    
+    # Verify formatting worked
+    url_count_after = xml_content.count('\n    <loc>')
+    print(f"[SITEMAP DEBUG] After formatting, found {url_count_after} formatted URL entries", flush=True)
+    logger.warning(f"Sitemap formatting: After formatting, found {url_count_after} formatted URL entries")
+    
+    # Clean up and ensure proper formatting
+    xml_content = xml_content.strip() + '\n'
+    
+    # Create a new HttpResponse to ensure proper response handling
+    # This avoids any issues with StreamingHttpResponse or other response types
+    http_response = HttpResponse(xml_content.encode('utf-8'), content_type='application/xml; charset=utf-8')
+    http_response['Content-Length'] = str(len(http_response.content))
+    
+    return http_response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
