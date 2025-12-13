@@ -86,23 +86,36 @@ def sitemap(request):
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
     # Format XML with proper indentation for better Google Search Console parsing
-    # Use regex-based formatting (more reliable than minidom which can fail silently)
+    # First, remove any existing newlines to start fresh (XSL removal may have added some)
+    xml_content = re.sub(r'\s+', ' ', xml_content).strip()
+    
     # Split XML declaration and root element
     xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
-    # Format each URL entry with proper indentation
+    
+    # Format each URL entry: replace </url><url> with formatted version
     xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
-    # Add newline before first <url> after <urlset>
+    
+    # Add newline and indent before first <url> after <urlset>
     xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
+    
     # Format child elements within <url> tags with proper indentation
-    xml_content = re.sub(r'<url>(<loc>)', r'<url>\n    \1', xml_content)
-    xml_content = re.sub(r'(</loc>)(<lastmod>)', r'\1\n    \2', xml_content)
-    xml_content = re.sub(r'(</lastmod>)(<changefreq>)', r'\1\n    \2', xml_content)
-    xml_content = re.sub(r'(</changefreq>)(<priority>)', r'\1\n    \2', xml_content)
-    xml_content = re.sub(r'(</priority>)(</url>)', r'\1\n  \2', xml_content)
+    # Replace <url><loc> with <url>\n    <loc>
+    xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
+    # Replace </loc><lastmod> with </loc>\n    <lastmod>
+    xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
+    # Replace </lastmod><changefreq> with </lastmod>\n    <changefreq>
+    xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
+    # Replace </changefreq><priority> with </changefreq>\n    <priority>
+    xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
+    # Replace </priority></url> with </priority>\n  </url>
+    xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
+    
     # Add newline before closing </urlset>
     xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
-    # Clean up any excessive newlines
+    
+    # Clean up any excessive newlines (more than 2 consecutive)
     xml_content = re.sub(r'\n\n+', '\n', xml_content)
+    
     # Ensure proper final formatting
     xml_content = xml_content.strip() + '\n'
     
