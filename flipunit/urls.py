@@ -86,40 +86,34 @@ def sitemap(request):
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
     # Format XML with proper indentation for better Google Search Console parsing
-    # First, normalize whitespace but preserve structure - remove SPACES (not newlines) between tags
-    xml_content = re.sub(r'> +<', '><', xml_content)  # Remove spaces (but not newlines) between tags
-    xml_content = xml_content.strip()
-    
-    # Split XML declaration and root element
-    xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
-    
-    # IMPORTANT: Add newline and indent before first <url> after <urlset> FIRST
-    # This must happen before processing </url><url> pairs
-    xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
-    
-    # Format each URL entry: replace </url><url> with formatted version (handle optional whitespace)
-    xml_content = re.sub(r'></url>\s*<url>', '>\n  </url>\n  <url>', xml_content)
-    
-    # Format child elements within <url> tags with proper indentation
-    # Replace <url><loc> with <url>\n    <loc>
-    xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
-    # Replace </loc><lastmod> with </loc>\n    <lastmod>
-    xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
-    # Replace </lastmod><changefreq> with </lastmod>\n    <changefreq>
-    xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
-    # Replace </changefreq><priority> with </changefreq>\n    <priority>
-    xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
-    # Replace </priority></url> with </priority>\n  </url>
-    xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
-    
-    # Add newline before closing </urlset> (handle optional whitespace)
-    xml_content = re.sub(r'(</url>)\s*(</urlset>)', r'\1\n\2', xml_content)
-    
-    # Clean up any excessive newlines (more than 2 consecutive)
-    xml_content = re.sub(r'\n\n+', '\n', xml_content)
-    
-    # Ensure proper final formatting
-    xml_content = xml_content.strip() + '\n'
+    # Use minidom to properly format the XML - this is more reliable than regex
+    try:
+        # Parse the XML
+        dom = xml.dom.minidom.parseString(xml_content)
+        # Format with 2-space indentation
+        formatted_xml = dom.toprettyxml(indent='  ', encoding=None)
+        # Remove the extra newline that minidom adds after the XML declaration
+        formatted_xml = re.sub(r'<\?xml[^>]*\?>\n\n', r'<?xml version="1.0" encoding="UTF-8"?>\n', formatted_xml)
+        # Remove any trailing whitespace but keep final newline
+        formatted_xml = formatted_xml.rstrip() + '\n'
+        # Use formatted XML if it's valid
+        if formatted_xml and len(formatted_xml) > 100:
+            xml_content = formatted_xml
+    except Exception:
+        # If minidom fails, fall back to simple regex formatting
+        # Remove spaces between tags first
+        xml_content = re.sub(r'> +<', '><', xml_content).strip()
+        # Add newlines at key points
+        xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
+        xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
+        xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
+        xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
+        xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
+        xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
+        xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
+        xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
+        xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
+        xml_content = xml_content.strip() + '\n'
     
     # Create a new HttpResponse to ensure proper response handling
     # This avoids any issues with StreamingHttpResponse or other response types
