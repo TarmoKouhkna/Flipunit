@@ -30,7 +30,9 @@ sitemaps = {
 
 def sitemap(request):
     """Custom sitemap view that removes noindex header for Google Search Console and fixes date format"""
-    print("[SITEMAP DEBUG] sitemap() function called", flush=True)
+    import sys
+    sys.stderr.write("[SITEMAP DEBUG] sitemap() function called\n")
+    sys.stderr.flush()
     from django.http import HttpResponse
     import re
     from datetime import datetime, timezone
@@ -84,10 +86,12 @@ def sitemap(request):
     
     # Format XML with proper indentation using simple string replacement
     # Count occurrences before formatting
+    import sys
     url_count_before = xml_content.count('<url><loc>')
     sample_content = xml_content[:500].replace('\n', '\\n').replace('\r', '\\r')
-    print(f"[SITEMAP DEBUG] Found {url_count_before} URL entries to format", flush=True)
-    print(f"[SITEMAP DEBUG] Sample content (first 500 chars): {sample_content}", flush=True)
+    sys.stderr.write(f"[SITEMAP DEBUG] Found {url_count_before} URL entries to format\n")
+    sys.stderr.write(f"[SITEMAP DEBUG] Sample content (first 500 chars): {sample_content}\n")
+    sys.stderr.flush()
     logger.warning(f"Sitemap formatting: Found {url_count_before} URL entries to format")
     
     # Split XML declaration and urlset if not already split
@@ -125,8 +129,9 @@ def sitemap(request):
             xml_content = xml_content.replace('</priority></url>', '</priority>\n  </url>')
         # Stop if no changes were made
         if xml_content == old_content:
-            print(f"[SITEMAP DEBUG] Stopped after {iteration+1} iterations (no more changes)", flush=True)
-            print(f"[SITEMAP DEBUG] Total replacements made: {replacements_made}", flush=True)
+            sys.stderr.write(f"[SITEMAP DEBUG] Stopped after {iteration+1} iterations (no more changes)\n")
+            sys.stderr.write(f"[SITEMAP DEBUG] Total replacements made: {replacements_made}\n")
+            sys.stderr.flush()
             logger.warning(f"Sitemap formatting: Stopped after {iteration+1} iterations (no more changes)")
             break
     
@@ -138,13 +143,13 @@ def sitemap(request):
     
     # Verify formatting worked
     url_count_after = xml_content.count('\n    <loc>')
-    print(f"[SITEMAP DEBUG] After formatting, found {url_count_after} formatted URL entries", flush=True)
+    sys.stderr.write(f"[SITEMAP DEBUG] After formatting, found {url_count_after} formatted URL entries\n")
     logger.warning(f"Sitemap formatting: After formatting, found {url_count_after} formatted URL entries")
     
     # Debug: Check if formatting actually happened
     has_newlines = '\n  <url>' in xml_content or '\n    <loc>' in xml_content
-    print(f"[SITEMAP DEBUG] Has newlines in formatted content: {has_newlines}", flush=True)
-    print(f"[SITEMAP DEBUG] Content length: {len(xml_content)}, First 200 chars: {repr(xml_content[:200])}", flush=True)
+    sys.stderr.write(f"[SITEMAP DEBUG] Has newlines in formatted content: {has_newlines}\n")
+    sys.stderr.write(f"[SITEMAP DEBUG] Content length: {len(xml_content)}, First 200 chars: {repr(xml_content[:200])}\n")
     
     # Clean up and ensure proper formatting
     xml_content = xml_content.strip() + '\n'
@@ -156,7 +161,8 @@ def sitemap(request):
     
     # Debug: Verify what we're actually returning
     response_sample = http_response.content[:200].decode('utf-8', errors='ignore')
-    print(f"[SITEMAP DEBUG] Response content sample (first 200 chars): {repr(response_sample)}", flush=True)
+    sys.stderr.write(f"[SITEMAP DEBUG] Response content sample (first 200 chars): {repr(response_sample)}\n")
+    sys.stderr.flush()
     
     return http_response
 
