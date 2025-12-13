@@ -82,32 +82,62 @@ def sitemap(request):
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
     try:
-        # Format XML with proper indentation using regex
-        # DON'T normalize whitespace first - format directly on the content as Django generates it
+        # Format XML with proper indentation using ElementTree
+        # Parse the XML and reformat it properly
+        import xml.etree.ElementTree as ET
         
-        # Split XML declaration and urlset if not already split
-        if re.search(r'<\?xml[^>]*\?><urlset', xml_content):
-            xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
-        
-        # Format first <url> after <urlset> (handle any whitespace)
-        xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
-        
-        # Format child elements within <url> tags - patterns must match exactly as Django outputs
-        # Django outputs: <url><loc>...</loc><lastmod>...</lastmod><changefreq>...</changefreq><priority>...</priority></url>
-        xml_content = re.sub(r'<url><loc>', '<url>\n    <loc>', xml_content)
-        xml_content = re.sub(r'</loc><lastmod>', '</loc>\n    <lastmod>', xml_content)
-        xml_content = re.sub(r'</lastmod><changefreq>', '</lastmod>\n    <changefreq>', xml_content)
-        xml_content = re.sub(r'</changefreq><priority>', '</changefreq>\n    <priority>', xml_content)
-        xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
-        
-        # Format </url><url> pairs - separate consecutive URLs (CRITICAL: must come after formatting child elements)
-        xml_content = re.sub(r'</url><url>', '</url>\n  <url>', xml_content)
-        
-        # Format closing </urlset>
-        xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
-        
-        # Clean up and ensure proper formatting
-        xml_content = xml_content.strip() + '\n'
+        try:
+            # Parse the XML
+            root = ET.fromstring(xml_content)
+            
+            # Create a formatted XML string manually to avoid namespace prefix issues
+            formatted_lines = ['<?xml version="1.0" encoding="UTF-8"?>']
+            
+            # Get namespace from root
+            ns = root.tag.split('}')[0].strip('{') if '}' in root.tag else ''
+            ns_prefix = '{' + ns + '}' if ns else ''
+            
+            # Format urlset opening tag
+            urlset_attrs = ' '.join([f'{k}="{v}"' for k, v in root.attrib.items()])
+            formatted_lines.append(f'<urlset {urlset_attrs}>')
+            
+            # Format each URL entry
+            for url_elem in root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}url'):
+                formatted_lines.append('  <url>')
+                for child in url_elem:
+                    tag_name = child.tag.split('}')[-1]  # Remove namespace prefix
+                    formatted_lines.append(f'    <{tag_name}>{child.text}</{tag_name}>')
+                formatted_lines.append('  </url>')
+            
+            # Close urlset
+            formatted_lines.append('</urlset>')
+            
+            xml_content = '\n'.join(formatted_lines) + '\n'
+            
+        except Exception as parse_error:
+            logger.warning(f"ElementTree parsing failed: {parse_error}, falling back to regex")
+            # Fallback to regex formatting
+            # Split XML declaration and urlset if not already split
+            if re.search(r'<\?xml[^>]*\?><urlset', xml_content):
+                xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
+            
+            # Format first <url> after <urlset>
+            xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
+            
+            # Format child elements - use replace_all to ensure all instances are formatted
+            xml_content = xml_content.replace('<url><loc>', '<url>\n    <loc>')
+            xml_content = xml_content.replace('</loc><lastmod>', '</loc>\n    <lastmod>')
+            xml_content = xml_content.replace('</lastmod><changefreq>', '</lastmod>\n    <changefreq>')
+            xml_content = xml_content.replace('</changefreq><priority>', '</changefreq>\n    <priority>')
+            xml_content = xml_content.replace('</priority></url>', '</priority>\n  </url>')
+            
+            # Format </url><url> pairs
+            xml_content = xml_content.replace('</url><url>', '</url>\n  <url>')
+            
+            # Format closing </urlset>
+            xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
+            
+            xml_content = xml_content.strip() + '\n'
         
         # Create a new HttpResponse to ensure proper response handling
         # This avoids any issues with StreamingHttpResponse or other response types
