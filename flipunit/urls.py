@@ -29,26 +29,26 @@ sitemaps = {
 }
 
 def sitemap(request):
-    """Custom sitemap view that generates properly formatted XML using ElementTree"""
+    """Custom sitemap view that generates properly formatted XML with explicit formatting"""
     from django.http import HttpResponse
     from datetime import datetime, timezone
-    import xml.etree.ElementTree as ET
-    from xml.dom import minidom
+    import xml.sax.saxutils as saxutils
     
     try:
-        # Generate sitemap XML using ElementTree for proper structure
+        # Generate sitemap XML manually with proper formatting
         current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
         
-        # Create root element with namespaces
-        urlset = ET.Element('urlset')
-        urlset.set('xmlns', 'http://www.sitemaps.org/schemas/sitemap/0.9')
-        urlset.set('xmlns:xhtml', 'http://www.w3.org/1999/xhtml')
+        # Build XML as a list of lines to preserve formatting
+        xml_lines = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+        ]
         
         # Get all URLs from the sitemap
         sitemap_instance = StaticViewSitemap()
         items = sitemap_instance.items()
         
-        # Add each URL entry
+        # Format each URL entry with proper indentation
         for item in items:
             try:
                 relative_url = sitemap_instance.location(item)
@@ -58,30 +58,24 @@ def sitemap(request):
                 else:
                     absolute_url = request.build_absolute_uri(relative_url)
                 
-                # Create url element
-                url_elem = ET.SubElement(urlset, 'url')
-                ET.SubElement(url_elem, 'loc').text = absolute_url
-                ET.SubElement(url_elem, 'lastmod').text = current_time
-                ET.SubElement(url_elem, 'changefreq').text = sitemap_instance.changefreq
-                ET.SubElement(url_elem, 'priority').text = str(sitemap_instance.priority)
+                # Escape XML special characters in URLs
+                absolute_url = saxutils.escape(absolute_url)
+                
+                # Add URL entry with proper indentation
+                xml_lines.append('  <url>')
+                xml_lines.append(f'    <loc>{absolute_url}</loc>')
+                xml_lines.append(f'    <lastmod>{current_time}</lastmod>')
+                xml_lines.append(f'    <changefreq>{sitemap_instance.changefreq}</changefreq>')
+                xml_lines.append(f'    <priority>{sitemap_instance.priority}</priority>')
+                xml_lines.append('  </url>')
             except Exception:
                 # Skip URLs that can't be reversed
                 continue
         
-        # Convert to string and format with minidom for proper indentation
-        rough_string = ET.tostring(urlset, encoding='unicode')
-        reparsed = minidom.parseString(rough_string.encode('utf-8'))
-        xml_content = reparsed.toprettyxml(indent='  ', encoding='utf-8').decode('utf-8')
+        xml_lines.append('</urlset>')
         
-        # Fix XML declaration and remove empty line after it
-        # minidom adds: <?xml version="1.0" encoding="utf-8"?>\n\n<urlset...
-        # We want: <?xml version="1.0" encoding="UTF-8"?>\n<urlset...
-        xml_content = xml_content.replace('<?xml version="1.0" encoding="utf-8"?>', '<?xml version="1.0" encoding="UTF-8"?>')
-        # Remove empty line after XML declaration if present
-        xml_content = xml_content.replace('<?xml version="1.0" encoding="UTF-8"?>\n\n', '<?xml version="1.0" encoding="UTF-8"?>\n')
-        
-        # Ensure it ends with exactly one newline
-        xml_content = xml_content.rstrip() + '\n'
+        # Join all lines with newlines - this ensures proper formatting
+        xml_content = '\n'.join(xml_lines) + '\n'
         
         # Create HttpResponse with properly formatted XML
         xml_bytes = xml_content.encode('utf-8')
