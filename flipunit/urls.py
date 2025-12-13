@@ -32,62 +32,50 @@ def sitemap(request):
     """Custom sitemap view that generates properly formatted XML from scratch"""
     from django.http import HttpResponse
     from datetime import datetime, timezone
-    import xml.etree.ElementTree as ET
-    from xml.dom import minidom
     
-    # Generate sitemap XML using ElementTree for proper structure
+    # Generate sitemap XML manually with proper formatting
     current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
     
-    # Create root element
-    urlset = ET.Element('urlset')
-    urlset.set('xmlns', 'http://www.sitemaps.org/schemas/sitemap/0.9')
-    urlset.set('xmlns:xhtml', 'http://www.w3.org/1999/xhtml')
+    # Build XML string directly with explicit newlines
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
     
     # Get all URLs from the sitemap
     sitemap_instance = StaticViewSitemap()
     items = sitemap_instance.items()
     
-    # Add each URL entry
+    # Format each URL entry with proper indentation
     for item in items:
         try:
             relative_url = sitemap_instance.location(item)
-            # Make URL absolute
+            # Make URL absolute using the protocol from sitemap_instance
             if sitemap_instance.protocol:
                 absolute_url = f"{sitemap_instance.protocol}://{request.get_host()}{relative_url}"
             else:
                 absolute_url = request.build_absolute_uri(relative_url)
-            
-            # Create url element
-            url_elem = ET.SubElement(urlset, 'url')
-            ET.SubElement(url_elem, 'loc').text = absolute_url
-            ET.SubElement(url_elem, 'lastmod').text = current_time
-            ET.SubElement(url_elem, 'changefreq').text = sitemap_instance.changefreq
-            ET.SubElement(url_elem, 'priority').text = str(sitemap_instance.priority)
-        except Exception:
+            xml_content += '  <url>\n'
+            xml_content += f'    <loc>{absolute_url}</loc>\n'
+            xml_content += f'    <lastmod>{current_time}</lastmod>\n'
+            xml_content += f'    <changefreq>{sitemap_instance.changefreq}</changefreq>\n'
+            xml_content += f'    <priority>{sitemap_instance.priority}</priority>\n'
+            xml_content += '  </url>\n'
+        except Exception as e:
+            # Skip URLs that can't be reversed
             continue
     
-    # Convert to string and format with proper indentation
-    # First get the raw XML as bytes
-    rough_string = ET.tostring(urlset, encoding='utf-8')
+    xml_content += '</urlset>\n'
     
-    # Use minidom to format it properly (parseString expects bytes)
-    reparsed = minidom.parseString(rough_string)
-    xml_content = reparsed.toprettyxml(indent='  ', encoding=None)
-    
-    # Remove the XML declaration that minidom adds (we'll add our own)
-    if xml_content.startswith('<?xml'):
-        xml_content = xml_content.split('?>', 1)[1].lstrip()
-    
-    # Add our own XML declaration with proper encoding
-    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_content
-    
-    # Create HttpResponse
+    # Create HttpResponse - use StreamingHttpResponse to prevent any compression
+    from django.http import StreamingHttpResponse
     xml_bytes = xml_content.encode('utf-8')
-    http_response = HttpResponse(xml_bytes, content_type='application/xml; charset=utf-8')
-    http_response['Content-Length'] = str(len(xml_bytes))
-    http_response['Cache-Control'] = 'no-transform, no-cache'
     
-    return http_response
+    # Use StreamingHttpResponse to ensure no compression/minification
+    response = StreamingHttpResponse(iter([xml_bytes]), content_type='application/xml; charset=utf-8')
+    response['Content-Length'] = str(len(xml_bytes))
+    response['Cache-Control'] = 'no-transform, no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    
+    return response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
