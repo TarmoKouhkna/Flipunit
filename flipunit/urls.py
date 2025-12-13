@@ -69,9 +69,24 @@ def sitemap(request):
     # Join all lines with newlines
     xml_content = '\n'.join(xml_lines) + '\n'
     
+    # Debug: Log a sample of the content to verify formatting
+    import logging
+    logger = logging.getLogger(__name__)
+    sample = xml_content[:500].replace('\n', '\\n').replace('\r', '\\r')
+    logger.error(f"[SITEMAP] Generated XML sample (first 500 chars): {sample}")
+    logger.error(f"[SITEMAP] Total lines in XML: {len(xml_lines)}, Newlines in content: {xml_content.count(chr(10))}")
+    
     # Create HttpResponse with properly formatted XML
+    # Ensure we're not using any compression or processing
     http_response = HttpResponse(xml_content.encode('utf-8'), content_type='application/xml; charset=utf-8')
     http_response['Content-Length'] = str(len(http_response.content))
+    # Explicitly disable any compression
+    http_response['Content-Encoding'] = 'identity'
+    
+    # Verify what we're actually returning
+    response_sample = http_response.content[:500].decode('utf-8', errors='ignore').replace('\n', '\\n').replace('\r', '\\r')
+    logger.error(f"[SITEMAP] Response content sample (first 500 chars): {response_sample}")
+    logger.error(f"[SITEMAP] Response content length: {len(http_response.content)}")
     
     return http_response
 
