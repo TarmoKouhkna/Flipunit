@@ -93,11 +93,11 @@ def sitemap(request):
     # Split XML declaration and root element
     xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
     
-    # Format each URL entry: replace </url><url> with formatted version
-    xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
+    # Format each URL entry: replace </url><url> with formatted version (handle optional whitespace)
+    xml_content = re.sub(r'></url>\s*<url>', '>\n  </url>\n  <url>', xml_content)
     
-    # Add newline and indent before first <url> after <urlset>
-    xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
+    # Add newline and indent before first <url> after <urlset> (handle existing newline)
+    xml_content = re.sub(r'(<urlset[^>]*>)\s*(<url>)', r'\1\n  \2', xml_content)
     
     # Format child elements within <url> tags with proper indentation
     # Replace <url><loc> with <url>\n    <loc>
@@ -111,8 +111,8 @@ def sitemap(request):
     # Replace </priority></url> with </priority>\n  </url>
     xml_content = re.sub(r'</priority></url>', '</priority>\n  </url>', xml_content)
     
-    # Add newline before closing </urlset>
-    xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
+    # Add newline before closing </urlset> (handle optional whitespace)
+    xml_content = re.sub(r'(</url>)\s*(</urlset>)', r'\1\n\2', xml_content)
     
     # Clean up any excessive newlines (more than 2 consecutive)
     xml_content = re.sub(r'\n\n+', '\n', xml_content)
