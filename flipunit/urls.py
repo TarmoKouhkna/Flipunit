@@ -112,25 +112,33 @@ def sitemap(request):
                 xml_content = xml_content[:insert_pos] + '\n  ' + xml_content[insert_pos:]
     
     # Format child elements - use string replacement (replaces ALL instances)
-    # Apply multiple times to ensure all are caught
+    # First, verify patterns exist
+    pattern_checks = {
+        '<url><loc>': '<url><loc>' in xml_content,
+        '</loc><lastmod>': '</loc><lastmod>' in xml_content,
+        '</lastmod><changefreq>': '</lastmod><changefreq>' in xml_content,
+        '</changefreq><priority>': '</changefreq><priority>' in xml_content,
+        '</priority></url>': '</priority></url>' in xml_content,
+    }
+    sys.stderr.write(f"[SITEMAP DEBUG] Pattern checks: {pattern_checks}\n")
+    sys.stderr.flush()
+    
+    # Apply replacements - do them all at once, not conditionally
     replacements_made = 0
     for iteration in range(10):
         old_content = xml_content
-        if '<url><loc>' in xml_content:
-            xml_content = xml_content.replace('<url><loc>', '<url>\n    <loc>')
+        xml_content = xml_content.replace('<url><loc>', '<url>\n    <loc>')
+        xml_content = xml_content.replace('</loc><lastmod>', '</loc>\n    <lastmod>')
+        xml_content = xml_content.replace('</lastmod><changefreq>', '</lastmod>\n    <changefreq>')
+        xml_content = xml_content.replace('</changefreq><priority>', '</changefreq>\n    <priority>')
+        xml_content = xml_content.replace('</priority></url>', '</priority>\n  </url>')
+        # Count how many replacements were made this iteration
+        if xml_content != old_content:
             replacements_made += xml_content.count('\n    <loc>') - old_content.count('\n    <loc>')
-        if '</loc><lastmod>' in xml_content:
-            xml_content = xml_content.replace('</loc><lastmod>', '</loc>\n    <lastmod>')
-        if '</lastmod><changefreq>' in xml_content:
-            xml_content = xml_content.replace('</lastmod><changefreq>', '</lastmod>\n    <changefreq>')
-        if '</changefreq><priority>' in xml_content:
-            xml_content = xml_content.replace('</changefreq><priority>', '</changefreq>\n    <priority>')
-        if '</priority></url>' in xml_content:
-            xml_content = xml_content.replace('</priority></url>', '</priority>\n  </url>')
         # Stop if no changes were made
         if xml_content == old_content:
             sys.stderr.write(f"[SITEMAP DEBUG] Stopped after {iteration+1} iterations (no more changes)\n")
-            sys.stderr.write(f"[SITEMAP DEBUG] Total replacements made: {replacements_made}\n")
+            sys.stderr.write(f"[SITEMAP DEBUG] Total formatted URLs: {xml_content.count('\\n    <loc>')}\n")
             sys.stderr.flush()
             logger.warning(f"Sitemap formatting: Stopped after {iteration+1} iterations (no more changes)")
             break
