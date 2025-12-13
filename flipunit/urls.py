@@ -86,54 +86,25 @@ def sitemap(request):
         xml_content = xml_content[:start_idx] + xml_content[end_idx + 2:].lstrip()
     
     # Format XML with proper indentation for better Google Search Console parsing
-    # Use minidom which preserves namespace declarations without adding prefixes
-    try:
-        # Parse the XML
-        dom = xml.dom.minidom.parseString(xml_content)
-        # Format with 2-space indentation
-        formatted_xml = dom.toprettyxml(indent='  ', encoding=None)
-        # Remove the extra newline that minidom adds after the XML declaration
-        formatted_xml = re.sub(r'<\?xml[^>]*\?>\n\n', r'<?xml version="1.0" encoding="UTF-8"?>\n', formatted_xml)
-        # Remove any trailing whitespace/newlines but keep final newline
-        formatted_xml = formatted_xml.rstrip() + '\n'
-        # Use formatted XML if parsing succeeded (it should always be longer due to whitespace)
-        if formatted_xml:
-            xml_content = formatted_xml
-    except Exception as e:
-        # If formatting fails, try a simpler regex-based approach
-        try:
-            # Simple regex-based formatting: add newlines before closing tags and after opening tags
-            formatted_xml = xml_content
-            # Add newline before </urlset>
-            formatted_xml = re.sub(r'</urlset>', '\n</urlset>', formatted_xml)
-            # Add newline and indent before each <url>
-            formatted_xml = re.sub(r'<url>', '\n  <url>', formatted_xml)
-            # Add newline and indent before each closing </url>
-            formatted_xml = re.sub(r'</url>', '\n  </url>', formatted_xml)
-            # Add newline and indent before child elements
-            formatted_xml = re.sub(r'<loc>', '\n    <loc>', formatted_xml)
-            formatted_xml = re.sub(r'</loc>', '</loc>', formatted_xml)
-            formatted_xml = re.sub(r'<lastmod>', '\n    <lastmod>', formatted_xml)
-            formatted_xml = re.sub(r'</lastmod>', '</lastmod>', formatted_xml)
-            formatted_xml = re.sub(r'<changefreq>', '\n    <changefreq>', formatted_xml)
-            formatted_xml = re.sub(r'</changefreq>', '</changefreq>', formatted_xml)
-            formatted_xml = re.sub(r'<priority>', '\n    <priority>', formatted_xml)
-            formatted_xml = re.sub(r'</priority>', '</priority>', formatted_xml)
-            # Clean up multiple newlines
-            formatted_xml = re.sub(r'\n\n+', '\n', formatted_xml)
-            # Ensure XML declaration is on its own line
-            formatted_xml = re.sub(r'(<\?xml[^>]*\?>)', r'\1\n', formatted_xml)
-            # Ensure urlset opening tag is on its own line
-            formatted_xml = re.sub(r'(<urlset[^>]*>)', r'\1\n', formatted_xml)
-            # Clean up and use formatted version
-            formatted_xml = formatted_xml.strip() + '\n'
-            if len(formatted_xml) > len(xml_content):
-                xml_content = formatted_xml
-        except Exception as e2:
-            # If both fail, log and use original
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Sitemap XML formatting failed (minidom: {str(e)}, regex: {str(e2)}), using original")
+    # Use regex-based formatting (more reliable than minidom which can fail silently)
+    # Split XML declaration and root element
+    xml_content = re.sub(r'(<\?xml[^>]*\?>)(<urlset[^>]*>)', r'\1\n\2\n', xml_content)
+    # Format each URL entry with proper indentation
+    xml_content = re.sub(r'></url><url>', '>\n  </url>\n  <url>', xml_content)
+    # Add newline before first <url> after <urlset>
+    xml_content = re.sub(r'(<urlset[^>]*>)(<url>)', r'\1\n  \2', xml_content)
+    # Format child elements within <url> tags with proper indentation
+    xml_content = re.sub(r'<url>(<loc>)', r'<url>\n    \1', xml_content)
+    xml_content = re.sub(r'(</loc>)(<lastmod>)', r'\1\n    \2', xml_content)
+    xml_content = re.sub(r'(</lastmod>)(<changefreq>)', r'\1\n    \2', xml_content)
+    xml_content = re.sub(r'(</changefreq>)(<priority>)', r'\1\n    \2', xml_content)
+    xml_content = re.sub(r'(</priority>)(</url>)', r'\1\n  \2', xml_content)
+    # Add newline before closing </urlset>
+    xml_content = re.sub(r'(</url>)(</urlset>)', r'\1\n\2', xml_content)
+    # Clean up any excessive newlines
+    xml_content = re.sub(r'\n\n+', '\n', xml_content)
+    # Ensure proper final formatting
+    xml_content = xml_content.strip() + '\n'
     
     # Create a new HttpResponse to ensure proper response handling
     # This avoids any issues with StreamingHttpResponse or other response types
