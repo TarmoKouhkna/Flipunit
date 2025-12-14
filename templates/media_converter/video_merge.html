@@ -1,0 +1,1032 @@
+{% extends 'base.html' %}
+
+{% block title %}Video Merge - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online video merger - Merge multiple video files into one. Combine MP4, AVI, MOV, MKV, WebM, FLV, WMV, and 3GP files. Fast, secure, no registration required.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Video Merge</h1>
+    <p>Merge multiple video files into one with trimming and reordering</p>
+    
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
+        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center;" class="gap-xs">
+            <span style="font-size: 1.2rem;">🔒</span>
+            <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers.</span>
+        </p>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" id="mergeForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Video Files (at least 2)</label>
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="video_files" id="video_files" accept="video/*" multiple>
+                <div id="uploadContent">
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop multiple files</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: MP4, AVI, MOV, MKV, WebM, FLV, WMV, 3GP</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Video List with Drag-and-Drop -->
+        <div id="videoListContainer" style="margin-top: 2rem; display: none;">
+            <h3 style="margin-bottom: 1rem;">Videos to Merge (drag to reorder)</h3>
+            <div id="videoList" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+        </div>
+        
+        <!-- Preview Section -->
+        <div id="previewSection" style="margin-top: 2rem; display: none;">
+            <h3 style="margin-bottom: 1rem;">Preview Merged Video</h3>
+            <div style="background: var(--surface); padding: 1rem; border-radius: 6px;">
+                <video id="previewVideo" controls style="width: 100%; max-width: 800px; border-radius: 4px; margin: 0 auto; display: block;" preload="metadata">
+                    Your browser does not support the video tag.
+                </video>
+                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                    <button type="button" class="btn btn-primary" id="downloadBtn" style="display: none;">Download Merged Video</button>
+                    <button type="button" class="btn btn-secondary" id="backToEditBtn" style="display: none;">Edit Again</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div id="actionButtons" style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+            <button type="button" class="btn btn-primary" id="mergePreviewBtn" style="display: none;">Merge & Preview</button>
+        </div>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol class="list-indent" style="margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.8;">
+            <li>Select multiple video files (hold Ctrl/Cmd to select multiple)</li>
+            <li>Trim each video if needed (set start and end times)</li>
+            <li>Drag videos to reorder them</li>
+            <li>Click "Merge & Preview" to see the result</li>
+            <li>If satisfied, click "Download Merged Video"</li>
+        </ol>
+    </div>
+</div>
+
+<a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('mergeForm');
+    const fileInput = document.getElementById('video_files');
+    const uploadArea = document.getElementById('uploadArea');
+    const videoListContainer = document.getElementById('videoListContainer');
+    const videoList = document.getElementById('videoList');
+    const previewSection = document.getElementById('previewSection');
+    const previewVideo = document.getElementById('previewVideo');
+    const mergePreviewBtn = document.getElementById('mergePreviewBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const backToEditBtn = document.getElementById('backToEditBtn');
+    const actionButtons = document.getElementById('actionButtons');
+    
+    let videoFiles = [];
+    let mergedVideoBlob = null;
+    let mergedVideoFilename = null;
+    let isProcessing = false;
+    
+    // Video file object structure
+    function createVideoFile(file, index) {
+        // Use a more reliable ID generation that avoids floating point precision issues
+        // Store ID as string to ensure consistent matching
+        const id = String(Date.now()) + '_' + String(Math.random()).substring(2);
+        return {
+            file: file,
+            index: index,
+            id: id, // Store as string for consistent matching
+            startTime: 0,
+            endTime: null, // null means use full video
+            duration: null, // will be set after loading
+            previewUrl: null
+        };
+    }
+    
+    // Create video item HTML
+    function createVideoItem(videoFile) {
+        const item = document.createElement('div');
+        item.className = 'video-item';
+        item.draggable = true;
+        // Ensure ID is set as string and matches videoFile.id exactly
+        const idToSet = String(videoFile.id);
+        item.dataset.id = idToSet;
+        // Double-check it was set correctly
+        if (item.dataset.id !== idToSet) {
+            console.error(`Failed to set dataset.id: wanted ${idToSet}, got ${item.dataset.id}`);
+        }
+        item.style.cssText = 'background: var(--surface); padding: 1rem; border-radius: 6px; border: 2px solid var(--border-color); cursor: move; position: relative;';
+        
+        const fileSizeMB = (videoFile.file.size / (1024 * 1024)).toFixed(1);
+        const durationText = videoFile.duration ? `(${formatTime(videoFile.duration)}s)` : '';
+        
+        item.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <span style="font-size: 1.5rem; cursor: move;">☰</span>
+                <div style="flex: 1;">
+                    <strong>${videoFile.file.name}</strong>
+                    <span style="color: var(--text-secondary); margin-left: 0.5rem;">${fileSizeMB} MB ${durationText}</span>
+                </div>
+                <button type="button" class="preview-video-btn" style="background: var(--primary-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">▶ Preview & Trim</button>
+                <button type="button" class="remove-video-btn" style="background: var(--error-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">Remove</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time (seconds)</label>
+                    <input type="number" class="start-time" step="0.1" min="0" value="${videoFile.startTime}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time (seconds, leave empty for full video)</label>
+                    <input type="number" class="end-time" step="0.1" min="0" value="${videoFile.endTime || ''}" placeholder="Full video" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                </div>
+            </div>
+            <div style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                Duration: <span class="trim-duration">${videoFile.endTime ? formatTime(videoFile.endTime - videoFile.startTime) : 'Full'}</span>
+            </div>
+        `;
+        
+        // Duration will be loaded by loadMetadataSequentially to prevent overload
+        // Just show placeholder for now
+        if (videoFile.duration) {
+            const durationSpan = item.querySelector('.trim-duration');
+            if (durationSpan) {
+                const endTime = videoFile.endTime || videoFile.duration;
+                durationSpan.textContent = formatTime(endTime - videoFile.startTime);
+            }
+        }
+        
+        // Event listeners
+        const startTimeInput = item.querySelector('.start-time');
+        const endTimeInput = item.querySelector('.end-time');
+        const removeBtn = item.querySelector('.remove-video-btn');
+        const previewBtn = item.querySelector('.preview-video-btn');
+        
+        startTimeInput.addEventListener('input', function() {
+            // Normalize comma to dot for decimal separator
+            const normalizedValue = this.value.replace(',', '.');
+            videoFile.startTime = parseFloat(normalizedValue) || 0;
+            // Update input if value was changed
+            if (this.value !== normalizedValue) {
+                this.value = normalizedValue;
+            }
+            updateTrimDuration(item, videoFile);
+        });
+        
+        endTimeInput.addEventListener('input', function() {
+            // Normalize comma to dot for decimal separator
+            const normalizedValue = this.value.replace(',', '.');
+            videoFile.endTime = normalizedValue ? parseFloat(normalizedValue) : null;
+            // Update input if value was changed
+            if (this.value !== normalizedValue) {
+                this.value = normalizedValue;
+            }
+            updateTrimDuration(item, videoFile);
+        });
+        
+        removeBtn.addEventListener('click', function() {
+            removeVideo(videoFile.id);
+        });
+        
+        previewBtn.addEventListener('click', function() {
+            showVideoPreview(videoFile, item);
+        });
+        
+        // Drag and drop
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+        
+        return item;
+    }
+    
+    function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    function updateTrimDuration(item, videoFile) {
+        const durationSpan = item.querySelector('.trim-duration');
+        if (durationSpan && videoFile.duration) {
+            const endTime = videoFile.endTime || videoFile.duration;
+            const duration = Math.max(0, endTime - videoFile.startTime);
+            durationSpan.textContent = formatTime(duration);
+        }
+    }
+    
+    // Cleanup function moved below
+    
+    function updateVideoList() {
+        videoList.innerHTML = '';
+        videoFiles.forEach((videoFile, index) => {
+            videoFile.index = index;
+            const item = createVideoItem(videoFile);
+            // Verify ID was set correctly
+            const expectedId = String(videoFile.id);
+            const actualId = String(item.dataset.id);
+            if (actualId !== expectedId) {
+                console.error(`ID mismatch in updateVideoList [${index}]: videoFile.id=${expectedId}, item.dataset.id=${actualId}`);
+                item.dataset.id = expectedId; // Force set it
+            }
+            videoList.appendChild(item);
+        });
+        
+        // Debug: Log IDs after updateVideoList
+        console.log('After updateVideoList - videoFiles IDs:', videoFiles.map(vf => vf.id));
+        console.log('After updateVideoList - DOM IDs:', Array.from(videoList.querySelectorAll('.video-item')).map(item => item.dataset.id));
+        
+        if (videoFiles.length >= 2) {
+            mergePreviewBtn.style.display = 'block';
+        } else {
+            mergePreviewBtn.style.display = 'none';
+        }
+    }
+    
+    // Drag and drop handlers
+    let draggedElement = null;
+    
+    function handleDragStart(e) {
+        draggedElement = this;
+        this.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+    }
+    
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+    
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        
+            if (draggedElement !== this) {
+                const draggedId = draggedElement.dataset.id;
+                const targetId = this.dataset.id;
+                
+                // Use string comparison since IDs are now strings
+                const draggedIndex = videoFiles.findIndex(vf => String(vf.id) === String(draggedId));
+                const targetIndex = videoFiles.findIndex(vf => String(vf.id) === String(targetId));
+            
+            if (draggedIndex !== -1 && targetIndex !== -1) {
+                const [removed] = videoFiles.splice(draggedIndex, 1);
+                videoFiles.splice(targetIndex, 0, removed);
+                
+                // Debug: Log reordering
+                console.log(`Reordered: moved ${removed.file.name} from index ${draggedIndex} to ${targetIndex}`);
+                console.log('New order:', videoFiles.map((vf, idx) => `${idx}: ${vf.file.name}`));
+                
+                updateVideoList();
+            }
+        }
+        
+        return false;
+    }
+    
+    function handleDragEnd(e) {
+        this.style.opacity = '1';
+        draggedElement = null;
+    }
+    
+    // File input handler - limit concurrent metadata loading
+    fileInput.addEventListener('change', function(e) {
+        const newFiles = Array.from(e.target.files);
+        const startIndex = videoFiles.length;
+        newFiles.forEach(file => {
+            const videoFile = createVideoFile(file, videoFiles.length);
+            videoFiles.push(videoFile);
+        });
+        updateVideoList();
+        videoListContainer.style.display = 'block';
+        
+        // Load metadata sequentially to avoid overwhelming browser
+        loadMetadataSequentially(startIndex);
+    });
+    
+    // Load video metadata sequentially to prevent browser overload
+    function loadMetadataSequentially(startIndex) {
+        let currentIndex = startIndex || 0;
+        const maxConcurrent = 2; // Load max 2 videos at a time
+        let activeLoads = 0;
+        
+        function loadNext() {
+            if (currentIndex >= videoFiles.length) return;
+            if (activeLoads >= maxConcurrent) {
+                setTimeout(loadNext, 200);
+                return;
+            }
+            
+            const videoFile = videoFiles[currentIndex];
+            if (!videoFile.duration) {
+                activeLoads++;
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                const tempUrl = URL.createObjectURL(videoFile.file);
+                video.src = tempUrl;
+                
+                video.onloadedmetadata = function() {
+                    videoFile.duration = video.duration;
+                    URL.revokeObjectURL(tempUrl);
+                    video.src = '';
+                    activeLoads--;
+                    
+                    // Update UI if item exists
+                    const item = document.querySelector(`[data-id="${videoFile.id}"]`);
+                    if (item) {
+                        const durationSpan = item.querySelector('.trim-duration');
+                        if (durationSpan) {
+                            const endTime = videoFile.endTime || videoFile.duration;
+                            durationSpan.textContent = formatTime(endTime - videoFile.startTime);
+                        }
+                        // Update duration text in header
+                        const headerText = item.querySelector('strong').nextSibling;
+                        if (headerText && headerText.textContent) {
+                            const fileSizeMB = (videoFile.file.size / (1024 * 1024)).toFixed(1);
+                            headerText.textContent = ` ${fileSizeMB} MB (${formatTime(videoFile.duration)}s)`;
+                        }
+                    }
+                    
+                    currentIndex++;
+                    setTimeout(loadNext, 100); // Small delay between loads
+                };
+                
+                video.onerror = function() {
+                    URL.revokeObjectURL(tempUrl);
+                    video.src = '';
+                    activeLoads--;
+                    currentIndex++;
+                    setTimeout(loadNext, 100);
+                };
+            } else {
+                currentIndex++;
+                setTimeout(loadNext, 50);
+            }
+        }
+        
+        // Start loading
+        for (let i = 0; i < Math.min(maxConcurrent, videoFiles.length - startIndex); i++) {
+            setTimeout(() => loadNext(), i * 200);
+        }
+    }
+    
+    // Drag and drop file upload
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--primary-color)';
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border-color)';
+        const files = e.dataTransfer.files;
+        const videoFilesArray = Array.from(files).filter(f => f.type.startsWith('video/'));
+        if (videoFilesArray.length > 0) {
+            const startIndex = videoFiles.length;
+            videoFilesArray.forEach(file => {
+                const videoFile = createVideoFile(file, videoFiles.length);
+                videoFiles.push(videoFile);
+            });
+            updateVideoList();
+            videoListContainer.style.display = 'block';
+            // Load metadata sequentially
+            loadMetadataSequentially(startIndex);
+        }
+    });
+    
+    // Merge and preview
+    mergePreviewBtn.addEventListener('click', async function() {
+        if (isProcessing || videoFiles.length < 2) {
+            return;
+        }
+        
+        // Prevent multiple clicks
+        if (mergePreviewBtn.disabled) {
+            return;
+        }
+        
+        isProcessing = true;
+        mergePreviewBtn.disabled = true;
+        mergePreviewBtn.textContent = 'Merging videos...';
+        mergePreviewBtn.style.opacity = '0.6';
+        mergePreviewBtn.style.cursor = 'not-allowed';
+        
+        // Disable all video items during processing
+        videoList.querySelectorAll('.video-item').forEach(item => {
+            item.style.pointerEvents = 'none';
+            item.style.opacity = '0.6';
+        });
+        
+        // Declare progress variables at function scope for access in finally block
+        let progressBar = null;
+        let progressText = null;
+        let progressInterval = null;
+        
+        // Show progress indicator
+        const progressDiv = document.createElement('div');
+        progressDiv.id = 'mergeProgress';
+        progressDiv.style.cssText = 'margin-top: 1rem; padding: 1rem; background: #f0f0f0; border-radius: 4px; text-align: center;';
+        progressDiv.innerHTML = `
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Processing ${videoFiles.length} video(s)...</strong>
+            </div>
+            <div style="width: 100%; height: 8px; background: #ddd; border-radius: 4px; overflow: hidden;">
+                <div id="progressBar" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.3s;"></div>
+            </div>
+            <div id="progressText" style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+                Preparing files...
+            </div>
+        `;
+        actionButtons.insertAdjacentElement('afterend', progressDiv);
+        
+        // Get progress elements
+        progressBar = document.getElementById('progressBar');
+        progressText = document.getElementById('progressText');
+        
+        // Simulate progress (we can't get real progress from FFmpeg easily, so we estimate)
+        let progressPercent = 0;
+        if (progressBar && progressText) {
+            progressInterval = setInterval(() => {
+                if (progressPercent < 90) {
+                    progressPercent += 2;
+                    progressBar.style.width = progressPercent + '%';
+                    if (progressPercent < 30) {
+                        progressText.textContent = 'Preparing files...';
+                    } else if (progressPercent < 60) {
+                        progressText.textContent = 'Processing videos...';
+                    } else {
+                        progressText.textContent = 'Merging and encoding...';
+                    }
+                }
+            }, 500);
+        }
+        
+        try {
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            formData.append('action', 'preview');
+            
+            // Add files in order (videoFiles array order matches display order after drag-and-drop)
+            // Use explicit index in field name to guarantee order preservation
+            formData.append('file_count', String(videoFiles.length));
+            
+            // IMPORTANT: Read trim values from current input fields and send files in DOM order
+            // This ensures we get the latest values and correct order even if updateVideoList was called
+            const videoItems = Array.from(videoList.querySelectorAll('.video-item'));
+            
+            // Debug: Log all videoFiles and their IDs (expanded)
+            console.log('All videoFiles:');
+            videoFiles.forEach((vf, idx) => {
+                console.log(`  [${idx}] id=${vf.id} (${typeof vf.id}), name=${vf.file.name}, startTime=${vf.startTime}, endTime=${vf.endTime}`);
+            });
+            console.log('All DOM items:');
+            videoItems.forEach((item, idx) => {
+                const fileName = item.querySelector('strong') ? item.querySelector('strong').textContent.trim() : 'unknown';
+                console.log(`  [${idx}] id=${item.dataset.id} (${typeof item.dataset.id}), fileName=${fileName}`);
+            });
+            
+            // Build ordered list by matching DOM order with videoFiles array
+            // Use filename as fallback if ID matching fails (since IDs might not match after DOM recreation)
+            const orderedVideoFiles = [];
+            videoItems.forEach((item, idx) => {
+                const videoId = item.dataset.id;
+                // Try to find by ID first
+                let videoFile = videoFiles.find(vf => String(vf.id) === String(videoId));
+                
+                // If ID match fails, try matching by filename (more reliable fallback)
+                if (!videoFile) {
+                    const fileNameElement = item.querySelector('strong');
+                    if (fileNameElement) {
+                        const fileName = fileNameElement.textContent.trim();
+                        videoFile = videoFiles.find(vf => vf.file.name === fileName);
+                        if (videoFile) {
+                            console.log(`ID match failed for item ${idx}, matched by filename: ${fileName}`);
+                        }
+                    }
+                }
+                
+                if (videoFile) {
+                    // Read trim values from input fields
+                    const startInput = item.querySelector('.start-time');
+                    const endInput = item.querySelector('.end-time');
+                    if (startInput) {
+                        const normalizedValue = startInput.value.replace(',', '.');
+                        videoFile.startTime = parseFloat(normalizedValue) || 0;
+                    }
+                    if (endInput && endInput.value && endInput.value.trim()) {
+                        const normalizedValue = endInput.value.replace(',', '.');
+                        videoFile.endTime = parseFloat(normalizedValue) || null;
+                    } else if (endInput) {
+                        videoFile.endTime = null;
+                    }
+                    orderedVideoFiles.push(videoFile);
+                } else {
+                    console.error(`Video file not found for DOM item ${idx}, id=${videoId}`);
+                    // Try to get filename for better error message
+                    const fileNameElement = item.querySelector('strong');
+                    const fileName = fileNameElement ? fileNameElement.textContent.trim() : 'unknown';
+                    console.error(`  Looking for file: ${fileName}`);
+                    console.error(`  Available files: ${videoFiles.map(vf => vf.file.name).join(', ')}`);
+                }
+            });
+            
+            // Debug: Log the order and trim values before sending
+            console.log('Sending files in order:');
+            orderedVideoFiles.forEach((vf, idx) => {
+                console.log(`  Index ${idx}: ${vf.file.name}, start=${vf.startTime}, end=${vf.endTime}`);
+            });
+            
+            // Send files in the exact order they appear in the DOM (which matches user's reordering)
+            orderedVideoFiles.forEach((videoFile, index) => {
+                // Use explicit index in field name to guarantee order preservation
+                formData.append(`video_file_${index}`, videoFile.file);
+                // Ensure numeric values are sent as strings (normalize comma to dot)
+                const startTime = String(videoFile.startTime || 0).replace(',', '.');
+                const endTime = (videoFile.endTime !== null && videoFile.endTime !== undefined) ? String(videoFile.endTime).replace(',', '.') : '';
+                
+                console.log(`Sending file ${index}: ${videoFile.file.name}, start_time=${startTime}, end_time=${endTime || '(empty)'}`);
+                
+                formData.append(`start_time_${index}`, startTime);
+                // Always send end_time field, even if empty (so backend knows it's not set)
+                formData.append(`end_time_${index}`, endTime);
+            });
+            
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Merge failed');
+            }
+            
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('video/')) {
+                // Update progress to 100%
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                }
+                if (progressText) {
+                    progressText.textContent = 'Complete!';
+                }
+                
+                mergedVideoBlob = await response.blob();
+                mergedVideoFilename = response.headers.get('x-filename') || 'merged_video.mp4';
+                
+                const videoUrl = URL.createObjectURL(mergedVideoBlob);
+                previewVideo.src = videoUrl;
+                previewSection.style.display = 'block';
+                downloadBtn.style.display = 'block';
+                backToEditBtn.style.display = 'block';
+                actionButtons.style.display = 'none';
+                
+                // Scroll to preview
+                previewSection.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const errorDiv = doc.querySelector('.alert-error');
+                const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Merge failed.';
+                throw new Error(errorMessage);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        } finally {
+            // Clear progress interval
+            if (progressInterval !== null) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            
+            // Remove progress indicator
+            const progressDiv = document.getElementById('mergeProgress');
+            if (progressDiv) {
+                progressDiv.remove();
+            }
+            
+            isProcessing = false;
+            mergePreviewBtn.disabled = false;
+            mergePreviewBtn.textContent = 'Merge & Preview';
+            mergePreviewBtn.style.opacity = '1';
+            mergePreviewBtn.style.cursor = 'pointer';
+            
+            // Re-enable video items
+            videoList.querySelectorAll('.video-item').forEach(item => {
+                item.style.pointerEvents = 'auto';
+                item.style.opacity = '1';
+            });
+        }
+    });
+    
+    // Download
+    downloadBtn.addEventListener('click', function() {
+        if (!mergedVideoBlob) return;
+        
+        const url = URL.createObjectURL(mergedVideoBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = mergedVideoFilename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+    });
+    
+    // Back to edit
+    backToEditBtn.addEventListener('click', function() {
+        previewSection.style.display = 'none';
+        actionButtons.style.display = 'flex';
+        if (previewVideo.src && previewVideo.src.startsWith('blob:')) {
+            URL.revokeObjectURL(previewVideo.src);
+        }
+        previewVideo.src = '';
+        mergedVideoBlob = null;
+        mergedVideoFilename = null;
+    });
+    
+    // Show individual video preview with trim controls (client-side, no server processing)
+    function showVideoPreview(videoFile, itemElement) {
+        // Prevent opening multiple modals
+        const existingModal = document.getElementById('videoPreviewModal');
+        if (existingModal) {
+            return;
+        }
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.id = 'videoPreviewModal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99999; display: flex; align-items: center; justify-content: center;';
+        
+        // Create blob URL for original video (reuse if exists)
+        if (!videoFile.previewUrl) {
+            videoFile.previewUrl = URL.createObjectURL(videoFile.file);
+        }
+        
+        modal.innerHTML = `
+            <div style="background: white; padding: 1.5rem; border-radius: 8px; max-width: 95vw; max-height: 95vh; width: 90vw; overflow: auto; position: relative; box-sizing: border-box;">
+                <button id="closePreview" style="position: absolute; top: 1rem; right: 1rem; background: #ccc; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; z-index: 10;">✕ Close</button>
+                <h3 style="margin-bottom: 1rem; margin-right: 4rem;">Preview & Trim: ${videoFile.file.name}</h3>
+                <div style="position: relative; margin-bottom: 1rem; background: #000; display: flex; justify-content: center; align-items: center; width: 100%; max-height: 60vh; overflow: hidden; border-radius: 4px;">
+                    <video id="previewPlayer" controls preload="metadata" playsinline style="max-width: 100%; max-height: 60vh; width: auto; height: auto; display: block; object-fit: contain;"></video>
+                    <div id="videoError" style="display: none; padding: 2rem; text-align: center; color: #ff0000;">
+                        <p>Video preview failed to load. The video format may not be supported by your browser.</p>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually below.</p>
+                    </div>
+                    <div id="trimOverlay" style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: rgba(255,0,0,0.3); pointer-events: none; display: none;"></div>
+                    <div id="trimStartMarker" style="position: absolute; top: 0; bottom: 0; width: 2px; background: #00ff00; pointer-events: none; display: none;"></div>
+                    <div id="trimEndMarker" style="position: absolute; top: 0; bottom: 0; width: 2px; background: #ff0000; pointer-events: none; display: none;"></div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time (seconds)</label>
+                        <input type="number" id="previewStartTime" step="0.1" min="0" value="${videoFile.startTime}" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;">
+                        <button type="button" id="setStartFromPlayer" style="margin-top: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">Set from Player Position</button>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time (seconds)</label>
+                        <input type="number" id="previewEndTime" step="0.1" min="0" value="${videoFile.endTime || ''}" placeholder="Full video" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;">
+                        <button type="button" id="setEndFromPlayer" style="margin-top: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">Set from Player Position</button>
+                    </div>
+                </div>
+                <div style="margin-bottom: 1rem; padding: 1rem; background: #f0f0f0; border-radius: 4px;">
+                    <p style="margin: 0; font-size: 0.9rem; color: #666;">
+                        <strong>Tip:</strong> Play the video and use the buttons above to set trim points from the current playback position. 
+                        The trim will be applied when you merge the videos.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 1rem; position: relative; z-index: 1000; justify-content: flex-end;">
+                    <button id="applyTrim" style="background: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; position: relative; z-index: 1001;">Apply Trim</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        const previewPlayer = modal.querySelector('#previewPlayer');
+        const previewStartTime = modal.querySelector('#previewStartTime');
+        const previewEndTime = modal.querySelector('#previewEndTime');
+        const applyTrimBtn = modal.querySelector('#applyTrim');
+        const closeBtn = modal.querySelector('#closePreview');
+        const setStartBtn = modal.querySelector('#setStartFromPlayer');
+        const setEndBtn = modal.querySelector('#setEndFromPlayer');
+        const trimStartMarker = modal.querySelector('#trimStartMarker');
+        const trimEndMarker = modal.querySelector('#trimEndMarker');
+        const trimOverlay = modal.querySelector('#trimOverlay');
+        const videoError = modal.querySelector('#videoError');
+        
+        // Set video attributes for better compatibility
+        previewPlayer.setAttribute('playsinline', '');
+        previewPlayer.setAttribute('webkit-playsinline', '');
+        previewPlayer.muted = false;
+        
+        // Check file type - some browsers don't support .mov directly
+        const fileName = videoFile.file.name.toLowerCase();
+        const isMovFile = fileName.endsWith('.mov');
+        let useServerPreview = false;
+        
+        // Try client-side first, fallback to server if needed
+        function tryClientSidePreview() {
+            previewPlayer.src = videoFile.previewUrl;
+            previewPlayer.load();
+        }
+        
+        function tryServerPreview() {
+            videoError.innerHTML = '<p>Loading preview from server...</p>';
+            videoError.style.display = 'block';
+            previewPlayer.style.display = 'none';
+            
+            loadServerPreview(videoFile, previewPlayer).then(() => {
+                videoError.style.display = 'none';
+                previewPlayer.style.display = 'block';
+            }).catch(err => {
+                videoError.innerHTML = `
+                    <p><strong>Preview unavailable</strong></p>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually. The trim will be applied when merging.</p>
+                `;
+                videoError.style.display = 'block';
+            });
+        }
+        
+        // Handle video loading errors
+        previewPlayer.addEventListener('error', function(e) {
+            console.error('Video load error:', previewPlayer.error);
+            const errorCode = previewPlayer.error ? previewPlayer.error.code : 'unknown';
+            
+            // If client-side fails and it's a MOV file, try server-side preview
+            if (isMovFile && errorCode === 4 && !useServerPreview) {
+                useServerPreview = true;
+                tryServerPreview();
+                return;
+            }
+            
+            previewPlayer.style.display = 'none';
+            videoError.innerHTML = `
+                <p><strong>Video preview unavailable</strong></p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually below. The trim will be applied when merging.</p>
+            `;
+            videoError.style.display = 'block';
+        });
+        
+        // Handle successful load
+        previewPlayer.addEventListener('loadeddata', function() {
+            videoError.style.display = 'none';
+            previewPlayer.style.display = 'block';
+        });
+        
+        // Update trim markers when video metadata is loaded
+        previewPlayer.addEventListener('loadedmetadata', function() {
+            if (!videoFile.duration && previewPlayer.duration && isFinite(previewPlayer.duration)) {
+                videoFile.duration = previewPlayer.duration;
+            }
+            updateTrimMarkers();
+        });
+        
+        // Also try on canplay event
+        previewPlayer.addEventListener('canplay', function() {
+            if (!videoFile.duration && previewPlayer.duration && isFinite(previewPlayer.duration)) {
+                videoFile.duration = previewPlayer.duration;
+            }
+            updateTrimMarkers();
+        });
+        
+        // For MOV files, use server preview immediately (browsers don't support MOV)
+        // For other formats, try client-side first
+        if (isMovFile) {
+            // MOV files aren't supported by browsers - use server preview immediately
+            useServerPreview = true;
+            tryServerPreview();
+        } else {
+            // Try client-side first for supported formats
+            tryClientSidePreview();
+            
+            // Fallback to server preview if client-side fails
+            setTimeout(() => {
+                if (previewPlayer.readyState === 0 || previewPlayer.error) {
+                    console.log('Client preview failed, trying server preview');
+                    if (!useServerPreview) {
+                        useServerPreview = true;
+                        tryServerPreview();
+                    }
+                }
+            }, 2000);
+        }
+        
+        // Update trim markers when values change
+        function updateTrimMarkers() {
+            // Try to get duration from video element if not set
+            if (!videoFile.duration && previewPlayer.duration && isFinite(previewPlayer.duration)) {
+                videoFile.duration = previewPlayer.duration;
+            }
+            
+            if (!videoFile.duration || videoFile.duration <= 0) {
+                // Duration not available yet, hide markers
+                trimStartMarker.style.display = 'none';
+                trimEndMarker.style.display = 'none';
+                trimOverlay.style.display = 'none';
+                return;
+            }
+            
+            const videoRect = previewPlayer.getBoundingClientRect();
+            const startPercent = Math.max(0, Math.min(100, (videoFile.startTime / videoFile.duration) * 100));
+            const endPercent = videoFile.endTime ? Math.max(0, Math.min(100, (videoFile.endTime / videoFile.duration) * 100)) : 100;
+            
+            trimStartMarker.style.left = startPercent + '%';
+            trimStartMarker.style.display = 'block';
+            trimEndMarker.style.left = endPercent + '%';
+            trimEndMarker.style.display = videoFile.endTime ? 'block' : 'none';
+            trimOverlay.style.left = startPercent + '%';
+            trimOverlay.style.width = Math.max(0, endPercent - startPercent) + '%';
+            trimOverlay.style.display = 'block';
+        }
+        
+        // Set start time from player position
+        setStartBtn.addEventListener('click', function() {
+            const currentTime = previewPlayer.currentTime;
+            previewStartTime.value = currentTime.toFixed(1);
+            videoFile.startTime = currentTime;
+            updateTrimMarkers();
+        });
+        
+        // Set end time from player position
+        setEndBtn.addEventListener('click', function() {
+            const currentTime = previewPlayer.currentTime;
+            previewEndTime.value = currentTime.toFixed(1);
+            videoFile.endTime = currentTime;
+            updateTrimMarkers();
+        });
+        
+        // Update trim markers when inputs change
+        previewStartTime.addEventListener('input', function() {
+            // Normalize comma to dot for decimal separator
+            const normalizedValue = this.value.replace(',', '.');
+            videoFile.startTime = parseFloat(normalizedValue) || 0;
+            // Update input if value was changed
+            if (this.value !== normalizedValue) {
+                this.value = normalizedValue;
+            }
+            updateTrimMarkers();
+        });
+        
+        previewEndTime.addEventListener('input', function() {
+            // Normalize comma to dot for decimal separator
+            const normalizedValue = this.value.replace(',', '.');
+            videoFile.endTime = normalizedValue ? parseFloat(normalizedValue) : null;
+            // Update input if value was changed
+            if (this.value !== normalizedValue) {
+                this.value = normalizedValue;
+            }
+            updateTrimMarkers();
+        });
+        
+        // Initial marker update
+        setTimeout(updateTrimMarkers, 100);
+        
+        // Apply trim and close
+        applyTrimBtn.addEventListener('click', function() {
+            // Normalize comma to dot for decimal separator
+            const startValue = previewStartTime.value.replace(',', '.');
+            const endValue = previewEndTime.value ? previewEndTime.value.replace(',', '.') : '';
+            const start = parseFloat(startValue) || 0;
+            const end = endValue ? parseFloat(endValue) : null;
+            videoFile.startTime = start;
+            videoFile.endTime = end;
+            
+            // Update the form inputs
+            const startInput = itemElement.querySelector('.start-time');
+            const endInput = itemElement.querySelector('.end-time');
+            if (startInput) startInput.value = start;
+            if (endInput) endInput.value = end || '';
+            updateTrimDuration(itemElement, videoFile);
+            
+            // Don't revoke previewUrl - we'll reuse it
+            previewPlayer.src = '';
+            document.body.removeChild(modal);
+        });
+        
+        // Close modal
+        closeBtn.addEventListener('click', function() {
+            previewPlayer.src = '';
+            document.body.removeChild(modal);
+        });
+        
+        // Close on outside click
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                previewPlayer.src = '';
+                document.body.removeChild(modal);
+            }
+        });
+    }
+    
+    // Load server-side preview (fallback for unsupported formats like MOV)
+    async function loadServerPreview(videoFile, videoElement) {
+        try {
+            const formData = new FormData();
+            formData.append('video_file', videoFile.file);
+            formData.append('start_time', videoFile.startTime || 0);
+            if (videoFile.endTime !== null) {
+                formData.append('end_time', videoFile.endTime);
+            }
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            const response = await fetch('{% url "media_converter:video_preview" %}', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Server preview failed: ${response.status} ${errorText.substring(0, 100)}`);
+            }
+            
+            const blob = await response.blob();
+            if (blob.size === 0) {
+                throw new Error('Preview video is empty');
+            }
+            
+            // Revoke old URL if exists
+            if (videoElement.src && videoElement.src.startsWith('blob:')) {
+                URL.revokeObjectURL(videoElement.src);
+            }
+            if (videoFile.serverPreviewUrl) {
+                URL.revokeObjectURL(videoFile.serverPreviewUrl);
+            }
+            
+            const url = URL.createObjectURL(blob);
+            videoElement.src = url;
+            videoElement.load();
+            
+            // Store URL for cleanup
+            videoFile.serverPreviewUrl = url;
+            
+            // Wait for metadata to load
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    if (videoElement.readyState === 0) {
+                        reject(new Error('Preview load timeout'));
+                    }
+                }, 30000);
+                
+                videoElement.addEventListener('loadedmetadata', () => {
+                    clearTimeout(timeout);
+                    if (videoElement.duration && isFinite(videoElement.duration)) {
+                        videoFile.duration = videoElement.duration;
+                    }
+                    resolve();
+                }, { once: true });
+                
+                videoElement.addEventListener('error', () => {
+                    clearTimeout(timeout);
+                    reject(new Error('Video failed to load'));
+                }, { once: true });
+            });
+        } catch (error) {
+            console.error('Server preview error:', error);
+            throw error;
+        }
+    }
+    
+    // Cleanup blob URLs when removing videos
+    function removeVideo(id) {
+        const videoFile = videoFiles.find(vf => String(vf.id) === String(id));
+        if (videoFile && videoFile.previewUrl) {
+            URL.revokeObjectURL(videoFile.previewUrl);
+        }
+        videoFiles = videoFiles.filter(vf => vf.id !== id);
+        updateVideoList();
+    }
+});
+</script>
+
+<style>
+.video-item {
+    transition: opacity 0.2s;
+}
+
+.video-item:hover {
+    border-color: var(--primary-color) !important;
+}
+
+.video-item.dragging {
+    opacity: 0.5;
+}
+</style>
+{% endblock %}
+{% endblock %}
