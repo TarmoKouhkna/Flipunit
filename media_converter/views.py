@@ -64,6 +64,11 @@ def index(request):
                 'url': 'media_converter:mute_video',
                 'description': 'Remove audio track from video files',
             },
+            {
+                'name': 'Video Merge',
+                'url': 'media_converter:video_merge',
+                'description': 'Merge multiple video files into one',
+            },
         ]
     }
     return render(request, 'media_converter/index.html', context)
@@ -1725,6 +1730,431 @@ def audio_merge(request):
         return render(request, 'media_converter/audio_merge.html', {
             'error': f'Error processing files: {str(e)}'
         })
+
+def video_merge(request):
+    """Merge multiple video files into one with trimming and reordering support"""
+    if request.method != 'POST':
+        return render(request, 'media_converter/video_merge.html')
+    
+    # Reconstruct ordered file list from indexed fields to guarantee order preservation
+    # This ensures drag-and-drop reordering is maintained
+    try:
+        file_count = int(request.POST.get('file_count', '0'))
+    except (ValueError, TypeError):
+        file_count = 0
+    
+    if file_count < 2:
+        return render(request, 'media_converter/video_merge.html', {
+            'error': 'Please upload at least 2 video files to merge.'
+        })
+    
+    uploaded_files = []
+    for i in range(file_count):
+        file_key = f'video_file_{i}'
+        if file_key in request.FILES:
+            uploaded_files.append(request.FILES[file_key])
+        else:
+            return render(request, 'media_converter/video_merge.html', {
+                'error': f'Missing file at index {i}. Please try uploading again.'
+            })
+    
+    action = request.POST.get('action', 'download')  # 'preview' or 'download'
+    
+    # Debug: Log received files order
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f'Received {len(uploaded_files)} files in order:')
+    for i, f in enumerate(uploaded_files):
+        logger.info(f'  Index {i}: {f.name}')
+    
+    # Get trim parameters for each file (in the same order as uploaded_files)
+    trim_params = []
+    for i in range(len(uploaded_files)):
+        start_time_str = request.POST.get(f'start_time_{i}', '0')
+        end_time_str = request.POST.get(f'end_time_{i}', '')
+        
+        # Debug: Log raw POST values
+        logger.info(f'File {i} ({uploaded_files[i].name}): raw POST start_time={start_time_str!r}, end_time={end_time_str!r}')
+        
+        try:
+            # Normalize comma decimal separator to dot (handles locale-specific input like "1,3")
+            start_time_str = start_time_str.replace(',', '.') if start_time_str else '0'
+            end_time_str = end_time_str.replace(',', '.') if end_time_str else ''
+            
+            start_time = float(start_time_str) if start_time_str else 0.0
+            # Empty string means no end time (use full video)
+            end_time = float(end_time_str) if end_time_str and end_time_str.strip() else None
+            
+            if start_time < 0:
+                start_time = 0.0
+            if end_time is not None and end_time <= start_time:
+                logger.warning(f'File {i}: end_time ({end_time}) <= start_time ({start_time}), ignoring end_time')
+                end_time = None
+        except (ValueError, AttributeError) as e:
+            logger.warning(f'Error parsing trim params for file {i}: {e}, start_time_str={start_time_str!r}, end_time_str={end_time_str!r}')
+            start_time = 0.0
+            end_time = None
+        
+        trim_params.append({'start': start_time, 'end': end_time})
+        logger.info(f'File {i} ({uploaded_files[i].name}): parsed trim start={start_time}, end={end_time}')
+    
+    # Validate files
+    max_size = 1000 * 1024 * 1024  # 1000MB per file
+    max_total_size = 5000 * 1024 * 1024  # 5000MB total
+    allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.3gp']
+    
+    total_size = 0
+    for uploaded_file in uploaded_files:
+        if uploaded_file.size > max_size:
+            return render(request, 'media_converter/video_merge.html', {
+                'error': f'File {uploaded_file.name} exceeds 1000MB limit.'
+            })
+        
+        total_size += uploaded_file.size
+        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+        if file_ext not in allowed_extensions:
+            return render(request, 'media_converter/video_merge.html', {
+                'error': f'Invalid file type: {uploaded_file.name}. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
+            })
+    
+    # Check total size limit
+    if total_size > max_total_size:
+        total_size_mb = total_size / (1024 * 1024)
+        return render(request, 'media_converter/video_merge.html', {
+            'error': f'Total file size ({total_size_mb:.1f}MB) exceeds 5000MB limit. Please use smaller files or fewer files.'
+        })
+    
+    # Check FFmpeg
+    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
+    if error:
+        return render(request, 'media_converter/video_merge.html', {'error': error})
+    
+    temp_dir = None
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        input_paths = []
+        file_list_path = os.path.join(temp_dir, 'file_list.txt')
+        
+        # Save all uploaded files
+        for i, uploaded_file in enumerate(uploaded_files):
+            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+            input_path = os.path.join(temp_dir, f'input_{i}{file_ext}')
+            input_paths.append(input_path)
+            
+            with open(input_path, 'wb') as f:
+                for chunk in uploaded_file.chunks():
+                    f.write(chunk)
+        
+        # Always use MP4 format for output (most compatible)
+        output_ext = '.mp4'
+        output_path = os.path.join(temp_dir, f'merged{output_ext}')
+        output_format = 'mp4'
+        
+        # Adjust timeout based on total file size
+        total_size_mb = sum(f.size for f in uploaded_files) / (1024 * 1024)
+        timeout_seconds = 600  # 10 minutes default
+        if total_size_mb > 3000:
+            timeout_seconds = 2400  # 40 minutes for very large files (up to 5GB)
+        elif total_size_mb > 2000:
+            timeout_seconds = 1800  # 30 minutes for large files
+        elif total_size_mb > 1000:
+            timeout_seconds = 1200  # 20 minutes for medium-large files
+        elif total_size_mb > 500:
+            timeout_seconds = 900  # 15 minutes for medium files
+        
+        # Use concat filter instead of concat demuxer for better compatibility
+        # The concat filter can handle videos with different properties
+        # Build filter_complex string to normalize and concatenate all videos
+        filter_parts = []
+        input_args = []
+        
+        # Add all inputs
+        for input_path in input_paths:
+            input_args.extend(['-i', input_path])
+        
+        # Process each video: trim if needed, then normalize
+        for i in range(len(input_paths)):
+            trim = trim_params[i] if i < len(trim_params) else {'start': 0.0, 'end': None}
+            
+            # Apply trimming using trim filter if needed
+            needs_trimming = (trim['start'] > 0) or (trim['end'] is not None)
+            
+            # Debug: Log trimming decision
+            logger.info(f'Video {i} ({input_paths[i]}): needs_trimming={needs_trimming}, start={trim["start"]}, end={trim["end"]}')
+            
+            if needs_trimming:
+                if trim['end'] is not None and trim['end'] > trim['start']:
+                    # Trim with start and end (end is absolute time, not duration)
+                    # Use duration instead of end for more reliable trimming
+                    duration = trim['end'] - trim['start']
+                    logger.info(f'Video {i}: Applying trim start={trim["start"]}, duration={duration}')
+                    filter_parts.append(f'[{i}:v]trim=start={trim["start"]}:duration={duration},setpts=PTS-STARTPTS[v{i}_trim]')
+                    filter_parts.append(f'[{i}:a]atrim=start={trim["start"]}:duration={duration},asetpts=PTS-STARTPTS[a{i}_trim]')
+                elif trim['start'] > 0:
+                    # Trim from start only (remove beginning)
+                    logger.info(f'Video {i}: Applying trim start={trim["start"]} (no end)')
+                    filter_parts.append(f'[{i}:v]trim=start={trim["start"]},setpts=PTS-STARTPTS[v{i}_trim]')
+                    filter_parts.append(f'[{i}:a]atrim=start={trim["start"]},asetpts=PTS-STARTPTS[a{i}_trim]')
+                else:
+                    logger.info(f'Video {i}: Skipping trim (invalid parameters)')
+                
+                # Normalize the trimmed video
+                filter_parts.append(f'[v{i}_trim]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v{i}]')
+                filter_parts.append(f'[a{i}_trim]aformat=sample_rates=44100:channel_layouts=stereo[a{i}]')
+            else:
+                # No trimming, just normalize
+                filter_parts.append(f'[{i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v{i}]')
+                filter_parts.append(f'[{i}:a]aformat=sample_rates=44100:channel_layouts=stereo[a{i}]')
+        
+        # Concatenate all normalized videos
+        # Build concat inputs (no semicolons between inputs in concat filter)
+        concat_video_inputs = ''.join([f'[v{i}]' for i in range(len(input_paths))])
+        concat_audio_inputs = ''.join([f'[a{i}]' for i in range(len(input_paths))])
+        filter_parts.append(f'{concat_video_inputs}concat=n={len(input_paths)}:v=1:a=0[outv]')
+        filter_parts.append(f'{concat_audio_inputs}concat=n={len(input_paths)}:v=0:a=1[outa]')
+        
+        filter_complex = ';'.join(filter_parts)
+        
+        # Always use MP4 format with H.264/AAC codecs
+        cmd = [
+            ffmpeg_path,
+        ] + input_args + [
+            '-filter_complex', filter_complex,
+            '-map', '[outv]',
+            '-map', '[outa]',
+            '-c:v', 'libx264',  # Video codec
+            '-c:a', 'aac',  # Audio codec
+            '-preset', 'fast',  # Balance between speed and quality
+            '-crf', '23',  # Good quality
+            '-threads', '2',  # Limit threads to prevent system overload
+            '-movflags', '+faststart',  # Optimize for web playback
+            '-f', 'mp4',
+            '-y',
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+        
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            
+            # Filter out FFmpeg version dumps and extract meaningful errors
+            error_stripped = error_msg.strip()
+            if error_stripped.startswith('ffmpeg version'):
+                # This is a version dump, use friendly message
+                full_error = 'Video merging failed. The video files may be corrupted, in incompatible formats, or have codec conflicts. Try using videos in the same format.'
+            else:
+                # Filter out version/config lines and extract actual error
+                error_lines = error_msg.split('\n')
+                meaningful_errors = []
+                
+                skip_patterns = [
+                    'ffmpeg version', 'built with', 'configuration:', 'copyright',
+                    'the ffmpeg developers', 'toolchain', 'libdir=', 'incdir=', 'arch=',
+                    '--prefix=', '--extra-version=', '--enable-', '--disable-'
+                ]
+                
+                for line in error_lines:
+                    line_lower = line.lower().strip()
+                    if not line_lower:
+                        continue
+                    should_skip = any(pattern in line_lower for pattern in skip_patterns) or line.strip().startswith('--')
+                    if not should_skip:
+                        meaningful_errors.append(line.strip())
+                
+                if meaningful_errors:
+                    # Take last few meaningful error lines
+                    error_text = '\n'.join(meaningful_errors[-5:])
+                    full_error = error_text[:500].strip() if len(error_text) > 500 else error_text.strip()
+                    if not full_error or len(full_error) < 10:
+                        full_error = 'Video merging failed. The video files may be corrupted, in incompatible formats, or have codec conflicts.'
+                else:
+                    full_error = 'Video merging failed. The video files may be corrupted, in incompatible formats, or have codec conflicts.'
+            
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/video_merge.html', {
+                'error': f'Merging failed: {full_error}'
+            })
+        
+        # Read output file
+        with open(output_path, 'rb') as f:
+            file_content = f.read()
+        
+        if len(file_content) == 0:
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return render(request, 'media_converter/video_merge.html', {
+                'error': 'Merging failed - output file is empty.'
+            })
+        
+        # Clean up
+        try:
+            shutil.rmtree(temp_dir)
+        except (OSError, PermissionError):
+            pass
+        
+        # Always use MP4 content type
+        content_type = 'video/mp4'
+        
+        # Create response
+        safe_filename = 'merged_video.mp4'
+        
+        # For preview action, return video for streaming
+        if action == 'preview':
+            response = HttpResponse(file_content, content_type=content_type)
+            response['Content-Length'] = len(file_content)
+            response['X-Filename'] = safe_filename
+            response['Accept-Ranges'] = 'bytes'
+            # Enable streaming
+            response['Cache-Control'] = 'no-cache'
+            return response
+        
+        # For download action, trigger download
+        response = HttpResponse(file_content, content_type=content_type)
+        response['Content-Length'] = len(file_content)
+        response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
+        response['X-Filename'] = safe_filename
+        return response
+        
+    except subprocess.TimeoutExpired:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/video_merge.html', {
+            'error': 'Processing timed out. The videos might be too long or complex. Try smaller files.'
+        })
+    except Exception as e:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return render(request, 'media_converter/video_merge.html', {
+            'error': f'Error processing files: {str(e)}'
+        })
+
+def video_preview(request):
+    """Preview/stream a single video file with optional trimming"""
+    if request.method != 'POST':
+        return HttpResponse('Method not allowed', status=405)
+    
+    if 'video_file' not in request.FILES:
+        return HttpResponse('No video file provided', status=400)
+    
+    uploaded_file = request.FILES['video_file']
+    try:
+        start_time = float(request.POST.get('start_time', 0))
+        if start_time < 0:
+            start_time = 0.0
+    except (ValueError, TypeError):
+        start_time = 0.0
+    
+    end_time = request.POST.get('end_time', '')
+    try:
+        end_time = float(end_time) if end_time else None
+        if end_time is not None and end_time <= start_time:
+            end_time = None
+    except (ValueError, TypeError):
+        end_time = None
+    
+    # Validate file size
+    max_size = 1000 * 1024 * 1024  # 1000MB
+    if uploaded_file.size > max_size:
+        return HttpResponse('File too large', status=400)
+    
+    # Check FFmpeg
+    ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
+    if error:
+        return HttpResponse('FFmpeg not available', status=500)
+    
+    temp_dir = None
+    try:
+        temp_dir = tempfile.mkdtemp()
+        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+        input_path = os.path.join(temp_dir, f'input{file_ext}')
+        output_path = os.path.join(temp_dir, 'preview.mp4')
+        
+        # Save uploaded file
+        with open(input_path, 'wb') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
+        
+        # Build FFmpeg command to trim and convert to MP4
+        # Use input seeking (-ss before -i) for faster processing when trimming from start
+        cmd = [ffmpeg_path]
+        
+        # Apply input-level seeking for start time (faster)
+        if start_time > 0:
+            cmd.extend(['-ss', str(start_time)])
+        
+        cmd.extend(['-i', input_path])
+        
+        # Apply duration limit if end time is specified
+        if end_time is not None and end_time > start_time:
+            duration = end_time - start_time
+            cmd.extend(['-t', str(duration)])
+        
+        # Encoding options - use ultrafast preset and lower quality for preview (much faster)
+        cmd.extend([
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'ultrafast',  # Fastest encoding for preview
+            '-crf', '28',  # Lower quality but much faster
+            '-movflags', '+faststart',
+            '-threads', '2',
+            '-f', 'mp4',
+            '-y',
+            output_path
+        ])
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            # Filter out version dumps
+            if not error_msg.strip().startswith('ffmpeg version'):
+                error_msg = error_msg[:500]
+            if temp_dir:
+                try:
+                    shutil.rmtree(temp_dir)
+                except (OSError, PermissionError):
+                    pass
+            return HttpResponse(f'Preview generation failed: {error_msg}', status=500, content_type='text/plain')
+        
+        # Read output file
+        with open(output_path, 'rb') as f:
+            file_content = f.read()
+        
+        # Clean up
+        try:
+            shutil.rmtree(temp_dir)
+        except (OSError, PermissionError):
+            pass
+        
+        # Return video for streaming
+        response = HttpResponse(file_content, content_type='video/mp4')
+        response['Content-Length'] = len(file_content)
+        response['Accept-Ranges'] = 'bytes'
+        response['Cache-Control'] = 'no-cache'
+        return response
+        
+    except Exception as e:
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
+        return HttpResponse(f'Error: {str(e)}', status=500)
 
 def reduce_noise(request):
     """Reduce background noise from audio files"""

@@ -14,5 +14,7 @@ urlpatterns = [
     path('video-converter/', views.video_converter, name='video_converter'),
     path('video-compressor/', views.video_compressor, name='video_compressor'),
     path('mute-video/', views.mute_video, name='mute_video'),
+    path('video-merge/', views.video_merge, name='video_merge'),
+    path('video-preview/', views.video_preview, name='video_preview'),
 ]
 
