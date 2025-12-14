@@ -25,6 +25,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
+# Explicitly ensure __init__.py is copied (fix for Docker build issue)
+COPY flipunit/__init__.py /app/flipunit/__init__.py
+# Explicitly ensure urls.py is copied (fix for Docker build issue)
+COPY flipunit/urls.py /app/flipunit/urls.py
+
 # Create directories for media and static files
 RUN mkdir -p /app/media /app/staticfiles
 

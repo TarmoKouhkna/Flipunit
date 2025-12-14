@@ -82,6 +82,7 @@ class Command(BaseCommand):
         from datetime import datetime, timezone
 
         # Find all lastmod tags with date-only format and add time + timezone
+        # Handle potential whitespace around the date
         def fix_date_format(match):
             date_str = match.group(1)
             # Add current UTC time and UTC timezone
@@ -89,7 +90,38 @@ class Command(BaseCommand):
             return f'<lastmod>{date_str}{current_time}</lastmod>'
 
         # Replace date-only lastmod tags with full ISO 8601 format
-        xml_content = re.sub(r'<lastmod>(\d{4}-\d{2}-\d{2})</lastmod>', fix_date_format, xml_content)
+        # Use \s* to handle any whitespace (though Django typically outputs minified XML)
+        date_only_pattern = r'<lastmod>\s*(\d{4}-\d{2}-\d{2})\s*</lastmod>'
+        date_only_count = len(re.findall(date_only_pattern, xml_content))
+        
+        if date_only_count > 0:
+            # Replace date-only formats
+            xml_content = re.sub(date_only_pattern, fix_date_format, xml_content)
+            self.stdout.write(self.style.SUCCESS(f'   ✓ Converted {date_only_count} date-only lastmod tags to ISO 8601 format'))
+        else:
+            # Check if dates are already in full format
+            full_format_count = len(re.findall(r'<lastmod>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00</lastmod>', xml_content))
+            if full_format_count > 0:
+                self.stdout.write(self.style.SUCCESS(f'   ✓ Found {full_format_count} lastmod tags already in ISO 8601 format'))
+            else:
+                # Debug: show a sample of what we actually got
+                sample = re.findall(r'<lastmod>[^<]*</lastmod>', xml_content)
+                if sample:
+                    self.stdout.write(self.style.WARNING(f'   ⚠️  Sample lastmod format: {sample[0]}'))
+        
+        # Add XSL stylesheet reference for better browser display
+        # Insert after <?xml version="1.0" encoding="UTF-8"?>
+        if '<?xml-stylesheet' not in xml_content:
+            xsl_reference = '<?xml-stylesheet type="text/xsl" href="/static/sitemap.xsl"?>\n'
+            # Find the XML declaration and insert XSL reference after it
+            # Match XML declaration with optional newline after it
+            xml_content = re.sub(
+                r'(<\?xml[^>]*\?>)\s*\n?',
+                r'\1\n' + xsl_reference,
+                xml_content,
+                count=1
+            )
+            self.stdout.write(self.style.SUCCESS('   ✓ Added XSL stylesheet reference for browser display'))
 
         # Write to file
         try:
