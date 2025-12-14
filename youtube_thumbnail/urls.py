@@ -6,3 +6,4 @@ app_name = 'youtube_thumbnail'
 urlpatterns = [
     path('', views.index, name='index'),
 ]
+

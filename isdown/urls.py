@@ -7,3 +7,4 @@ urlpatterns = [
     path('', views.index, name='index'),
     path('api/check', views.api_check, name='api_check'),
 ]
+

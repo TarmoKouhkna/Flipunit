@@ -161,3 +161,4 @@ def api_check(request):
         result['error'] = f'Unexpected error: {str(e)}'
     
     return JsonResponse(result)
+
