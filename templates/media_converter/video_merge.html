@@ -780,15 +780,32 @@ document.addEventListener('DOMContentLoaded', function() {
             videoError.style.display = 'block';
             previewPlayer.style.display = 'none';
             
-            // Add timeout to prevent infinite loading
+            // Add timeout to prevent infinite loading - longer timeout for large files
+            const fileSizeMB = (videoFile.file.size / (1024 * 1024)).toFixed(1);
+            const timeoutDuration = Math.max(60000, Math.min(120000, fileSizeMB * 10000)); // 60-120 seconds based on file size
+            console.log(`Setting timeout to ${timeoutDuration/1000} seconds for ${fileSizeMB}MB file`);
+            
             const timeout = setTimeout(() => {
-                console.error('Server preview timeout after 30 seconds');
-                videoError.innerHTML = `
-                    <p><strong>Preview loading timeout</strong></p>
-                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually. The trim will be applied when merging.</p>
-                `;
+                console.error('Server preview timeout after', timeoutDuration/1000, 'seconds');
+                // Check if video is actually loading
+                if (previewPlayer.readyState === 0 && !previewPlayer.src) {
+                    videoError.innerHTML = `
+                        <p><strong>Preview loading timeout</strong></p>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">The video file is large (${fileSizeMB}MB) and may take longer to load.</p>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually. The trim will be applied when merging.</p>
+                    `;
+                } else if (previewPlayer.readyState >= 2) {
+                    // Video is loading, give it more time
+                    console.log('Video is loading (readyState:', previewPlayer.readyState, '), extending timeout');
+                    return; // Don't show error yet
+                } else {
+                    videoError.innerHTML = `
+                        <p><strong>Preview loading timeout</strong></p>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually. The trim will be applied when merging.</p>
+                    `;
+                }
                 videoError.style.display = 'block';
-            }, 30000); // 30 second timeout
+            }, timeoutDuration);
             
             loadServerPreview(videoFile, previewPlayer).then(() => {
                 clearTimeout(timeout);
@@ -1054,15 +1071,35 @@ document.addEventListener('DOMContentLoaded', function() {
             // Store URL for cleanup
             videoFile.serverPreviewUrl = url;
             
-            // Wait for metadata to load
+            // Wait for metadata to load - longer timeout for large files
+            const fileSizeMB = (videoFile.file.size / (1024 * 1024)).toFixed(1);
+            const loadTimeout = Math.max(60000, Math.min(120000, fileSizeMB * 10000)); // 60-120 seconds based on file size
+            console.log(`Waiting for video metadata, timeout: ${loadTimeout/1000}s`);
+            
             return new Promise((resolve, reject) => {
+                let resolved = false;
                 const timeout = setTimeout(() => {
-                    if (videoElement.readyState === 0) {
-                        reject(new Error('Preview load timeout'));
+                    if (!resolved) {
+                        if (videoElement.readyState === 0) {
+                            console.error('Video metadata load timeout, readyState:', videoElement.readyState);
+                            reject(new Error(`Preview load timeout after ${loadTimeout/1000}s. Video readyState: ${videoElement.readyState}`));
+                        } else {
+                            // Video is loading, resolve anyway
+                            console.log('Video is loading (readyState:', videoElement.readyState, '), resolving');
+                            resolved = true;
+                            if (videoElement.duration && isFinite(videoElement.duration)) {
+                                videoFile.duration = videoElement.duration;
+                            }
+                            videoElement.style.display = 'block';
+                            videoElement.style.visibility = 'visible';
+                            resolve();
+                        }
                     }
-                }, 30000);
+                }, loadTimeout);
                 
                 const onLoaded = () => {
+                    if (resolved) return;
+                    resolved = true;
                     clearTimeout(timeout);
                     if (videoElement.duration && isFinite(videoElement.duration)) {
                         videoFile.duration = videoElement.duration;
@@ -1070,21 +1107,41 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Ensure video is visible after loading
                     videoElement.style.display = 'block';
                     videoElement.style.visibility = 'visible';
-                    console.log('Video metadata loaded, duration:', videoElement.duration);
+                    console.log('Video metadata loaded, duration:', videoElement.duration, 'readyState:', videoElement.readyState);
                     resolve();
                 };
                 
+                // Track loading progress
+                videoElement.addEventListener('loadstart', () => {
+                    console.log('Video load started');
+                });
+                
+                videoElement.addEventListener('progress', () => {
+                    console.log('Video loading progress, readyState:', videoElement.readyState, 'buffered:', videoElement.buffered.length);
+                });
+                
                 videoElement.addEventListener('loadedmetadata', onLoaded, { once: true });
-                videoElement.addEventListener('loadeddata', onLoaded, { once: true });
+                videoElement.addEventListener('loadeddata', () => {
+                    console.log('Video data loaded, readyState:', videoElement.readyState);
+                    if (!resolved && videoElement.readyState >= 2) {
+                        onLoaded();
+                    }
+                }, { once: true });
+                
                 videoElement.addEventListener('canplay', () => {
-                    console.log('Video can play');
+                    console.log('Video can play, readyState:', videoElement.readyState);
                     videoElement.style.display = 'block';
                     videoElement.style.visibility = 'visible';
+                    if (!resolved) {
+                        onLoaded();
+                    }
                 }, { once: true });
                 
                 videoElement.addEventListener('error', (e) => {
+                    if (resolved) return;
+                    resolved = true;
                     clearTimeout(timeout);
-                    console.error('Video element error:', videoElement.error);
+                    console.error('Video element error:', videoElement.error, 'readyState:', videoElement.readyState);
                     reject(new Error('Video failed to load: ' + (videoElement.error ? videoElement.error.message : 'Unknown error')));
                 }, { once: true });
             });
