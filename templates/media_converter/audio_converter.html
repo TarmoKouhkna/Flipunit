@@ -14,9 +14,9 @@
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
     
-    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 6px;">
-        <p style="margin: 0; color: #0c4a6e; font-size: 0.9rem; display: flex; align-items: center;" class="gap-xs">
-            <span style="font-size: 1.2rem;">🔒</span>
+    <div class="privacy-notice">
+        <p>
+            <span>🔒</span>
             <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers. Files are temporarily saved during conversion and deleted immediately after processing.</span>
         </p>
     </div>
@@ -448,14 +448,8 @@ if (window.audioConverterInitialized) {
             uploadArea.style.cursor = 'pointer';
             uploadArea.style.position = 'relative';
             
-            // Add a backup click handler in case main.js didn't attach one
-            uploadArea.addEventListener('click', function(e) {
-                console.log('🖱️ Upload area clicked');
-                if (e.target !== fileInput && !fileInput.contains(e.target)) {
-                    console.log('🖱️ Triggering file input click');
-                    fileInput.click();
-                }
-            }, { capture: false });
+            // Note: Click handler is already attached by main.js globally
+            // No need to add duplicate handler here
             
             // Update display when file is selected
             fileInput.addEventListener('change', (e) => {

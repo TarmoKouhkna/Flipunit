@@ -86,13 +86,13 @@ def home(request):
             {
                 'name': 'Text & String Converters',
                 'url': 'text_converter:index',
-                'description': 'Convert text between formats: uppercase/lowercase, CamelCase/snake_case, JSON/XML/YAML, HTML/Markdown, Base64, and more',
+                'description': 'Convert text formats: case, JSON/XML/YAML, HTML/Markdown, Base64, and more',
                 'icon': 'text-converters.svg'
             },
             {
                 'name': 'Developer Converters',
                 'url': 'developer_converter:index',
-                'description': 'Developer tools: minify/unminify code, CSV/JSON conversion, SQL formatter, regex tester, JWT decoder, and more',
+                'description': 'Code minify, CSV/JSON, SQL, regex, JWT, and more',
                 'icon': 'developer-converters.svg'
             },
             {
@@ -104,7 +104,7 @@ def home(request):
             {
                 'name': 'YouTube Thumbnail Downloader',
                 'url': 'youtube_thumbnail:index',
-                'description': 'Download YouTube video thumbnails in multiple resolutions (HD, HQ, MQ, Default)',
+                'description': 'Download YouTube thumbnails (HD, HQ, MQ, Default)',
                 'icon': 'youtube-thumbnail.svg'
             },
         ]
@@ -129,7 +129,7 @@ def _get_all_tools():
         {'name': 'Text & String Converters', 'url': 'text_converter:index', 'category': 'Text Converters', 'description': 'Convert text between formats'},
         {'name': 'Developer Converters', 'url': 'developer_converter:index', 'category': 'Developer Converters', 'description': 'Developer tools and code utilities'},
         {'name': 'Website Status Checker', 'url': 'isdown:index', 'category': 'Network Tools', 'description': 'Check instantly if any website is online or down'},
-        {'name': 'YouTube Thumbnail Downloader', 'url': 'youtube_thumbnail:index', 'category': 'Media Converters', 'description': 'Download YouTube video thumbnails in multiple resolutions'},
+        {'name': 'YouTube Thumbnail Downloader', 'url': 'youtube_thumbnail:index', 'category': 'Media Converters', 'description': 'Download YouTube thumbnails (HD, HQ, MQ, Default)'},
     ]
     tools.extend(categories)
     
@@ -307,13 +307,13 @@ def search(request):
         {
             'name': 'Text & String Converters',
             'url': 'text_converter:index',
-            'description': 'Convert text between formats: uppercase/lowercase, CamelCase/snake_case, JSON/XML/YAML, HTML/Markdown, Base64, and more',
+            'description': 'Convert text formats: case, JSON/XML/YAML, HTML/Markdown, Base64, and more',
             'icon': 'text-converters.svg'
         },
         {
             'name': 'Developer Converters',
             'url': 'developer_converter:index',
-            'description': 'Developer tools: minify/unminify code, CSV/JSON conversion, SQL formatter, regex tester, JWT decoder, and more',
+            'description': 'Code minify, CSV/JSON, SQL, regex, JWT, and more',
             'icon': 'developer-converters.svg'
         },
         {

@@ -8,3 +8,4 @@ urlpatterns = [
     path('api/check', views.api_check, name='api_check'),
 ]
 
+

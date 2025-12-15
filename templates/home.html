@@ -8,68 +8,137 @@
 
 {% block extra_css %}
 <style>
-.search-btn {
-    background: var(--card-bg) !important;
-    border: none !important;
-    border-radius: 8px !important;
-    padding: 1rem 2rem !important;
-    box-shadow: var(--shadow) !important;
-    transition: transform 0.2s, box-shadow 0.2s, background 0.3s ease !important;
-    color: var(--text-primary) !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
+/* Remove container-medium padding since we have our own layout */
+.main-content .container-medium {
+    padding: 0;
+    max-width: 100%;
 }
-.search-btn:hover {
-    background: var(--card-bg) !important;
-    transform: translateY(-4px) !important;
-    box-shadow: var(--shadow-lg) !important;
+
+/* Ensure search bar has proper spacing */
+.hybrid-search-container {
+    margin-top: 3rem !important;
+    padding-top: 1rem !important;
 }
+
+/* Wireframe Comment:
+ * 
+ * Layout Structure:
+ * ┌─────────────────────────────────────┐
+ * │  Glassmorphic Header (sticky)       │
+ * │  [Logo] [Dark Mode Toggle]          │
+ * ├─────────────────────────────────────┤
+ * │  Glassmorphic Search Bar            │
+ * │  [Search Input] [Search Button]     │
+ * ├─────────────────────────────────────┤
+ * │  Hero Section (Glass Card)          │
+ * │  Welcome to FlipUnit                │
+ * │  Tagline                             │
+ * ├─────────────────────────────────────┤
+ * │  Categories Grid (Neumorphic Cards) │
+ * │  [Card] [Card] [Card] [Card]        │
+ * │  [Card] [Card] [Card] [Card]        │
+ * │  [Card] [Card] [Card] [Card]        │
+ * ├─────────────────────────────────────┤
+ * │  Footer (Glassmorphic)              │
+ * │  Copyright & Links                   │
+ * └─────────────────────────────────────┘
+ * 
+ * Floating: [Feedback Button] (bottom-right)
+ * Modal: [Feedback Form] (overlay)
+ */
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="hero">
-        <h1>Welcome to {{ SITE_NAME }}</h1>
-        <p>Simple, fast, no-login required online converter hub</p>
+<main id="main-content">
+    <!-- Hero Section -->
+    <section class="hybrid-hero">
+        <div class="hybrid-hero-card">
+            <h1>Welcome to {{ SITE_NAME }}</h1>
+            <p>Simple, fast, no-login required online converter hub</p>
+        </div>
+    </section>
+
+    <!-- Glassmorphic Search Bar -->
+    <div class="hybrid-search-container">
+        <form method="get" action="{% url 'search' %}" class="hybrid-search-form" role="search">
+            <input 
+                type="search" 
+                name="q" 
+                id="hybrid-search-input" 
+                class="hybrid-search-input" 
+                placeholder="Search across all 12 categories and 100+ tools..." 
+                value="{{ request.GET.q|default:'' }}"
+                aria-label="Search tools and converters"
+                autocomplete="off"
+            >
+            <button type="submit" class="hybrid-search-btn" aria-label="Search">
+                Search
+            </button>
+        </form>
     </div>
 
-    <div style="margin-bottom: 3rem;">
-        <form method="get" action="{% url 'search' %}" class="search-form container-narrow">
-            <div style="display: flex; align-items: stretch;" class="gap-xs">
-                <input type="search" name="q" id="search-input" class="form-control" placeholder="Search for tools, converters, and utilities..." value="{{ request.GET.q|default:'' }}" style="flex: 1; font-size: 1.1rem; padding: 1rem; border-radius: 8px; border: 2px solid var(--border-color);">
-                <button type="submit" class="btn btn-primary search-btn" style="padding: 1rem 2rem; font-size: 1.1rem; border-radius: 8px; white-space: nowrap;">Search</button>
+    <!-- Categories Grid -->
+    <section class="hybrid-categories" aria-label="Tool categories">
+        <div class="hybrid-categories-grid">
+            {% for category in categories %}
+            <a href="{% url category.url %}" class="hybrid-category-card" aria-label="{{ category.name }}">
+                <div class="hybrid-category-icon">
+                    {% with 'images/icons/'|add:category.icon as icon_path %}
+                    <img src="{% static icon_path %}" alt="{{ category.name }} icon" loading="lazy">
+                    {% endwith %}
+                </div>
+                <h3>{{ category.name }}</h3>
+                <p>{{ category.description }}</p>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+</main>
+
+<!-- Floating Feedback Button -->
+<button 
+    class="hybrid-feedback-btn" 
+    id="hybrid-feedback-btn" 
+    aria-label="Open feedback form"
+    title="Send Feedback"
+>
+    💬
+</button>
+
+<!-- Feedback Modal -->
+<div class="hybrid-modal-overlay" id="hybrid-modal-overlay" role="dialog" aria-labelledby="feedback-modal-title" aria-modal="true">
+    <div class="hybrid-modal">
+        <button 
+            class="hybrid-modal-close" 
+            id="hybrid-modal-close" 
+            aria-label="Close feedback modal"
+        >
+            ×
+        </button>
+        <h2 id="feedback-modal-title">Send Feedback</h2>
+        <form method="post" class="hybrid-feedback-form" id="hybrid-feedback-form">
+            {% csrf_token %}
+            <textarea 
+                name="feedback" 
+                id="hybrid-feedback-textarea" 
+                placeholder="Your feedback helps us improve FlipUnit. Share your thoughts, suggestions, or report issues..."
+                rows="6" 
+                maxlength="1000" 
+                required
+                aria-label="Feedback text"
+                aria-describedby="char-count-desc"
+            ></textarea>
+            <div class="hybrid-feedback-footer">
+                <span class="hybrid-char-count" id="hybrid-char-count">
+                    <span id="char-count">0</span>/1000
+                </span>
+                <span id="char-count-desc" class="sr-only">Character count</span>
+                <button type="submit" class="hybrid-feedback-submit">Send Feedback</button>
             </div>
-            <p style="text-align: center; color: var(--text-secondary); margin-top: 0.5rem; font-size: 0.9rem;">Search across all {{ categories|length }} categories and 100+ tools</p>
         </form>
     </div>
 </div>
 
-<div class="tool-categories">
-    <div class="grid grid-2">
-        {% for category in categories %}
-        <a href="{% url category.url %}" class="category-card">
-            <div class="category-icon">
-                {% with 'images/icons/'|add:category.icon as icon_path %}
-                <img src="{% static icon_path %}" alt="{{ category.name }}">
-                {% endwith %}
-            </div>
-            <h3>{{ category.name }}</h3>
-            <p>{{ category.description }}</p>
-        </a>
-        {% endfor %}
-    </div>
-</div>
-
-<div class="feedback-section">
-    <form method="post" class="feedback-form">
-        {% csrf_token %}
-        <textarea name="feedback" id="feedback-textarea" placeholder="Your feedback..." rows="3" maxlength="1000" required></textarea>
-        <div class="feedback-footer">
-            <span class="char-count"><span id="char-count">0</span>/1000</span>
-            <button type="submit">Send Feedback</button>
-        </div>
-    </form>
-</div>
+<!-- Footer -->
 {% endblock %}
-

@@ -50,11 +50,12 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon.png' %}">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
-    <!-- Google Fonts - Varela Round for rounded, modern look -->
+    <!-- Google Fonts - Inter variable for hybrid design, Varela Round as fallback -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Varela+Round&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/hybrid-style.css' %}?v=20250101">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -62,16 +63,18 @@
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WM6SN3FS"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
-    <header>
-        <nav class="navbar">
-            <div class="container">
-                <a href="{% url 'home' %}" class="logo">
-                    <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
-                    <span class="logo-text">{{ SITE_DISPLAY_NAME }}</span>
+    
+    <!-- Hybrid Glassmorphic Header -->
+    <header class="hybrid-header">
+        <div class="container">
+            <div class="hybrid-header-top-row">
+                <a href="{% url 'home' %}" class="hybrid-logo-wrapper" aria-label="Go to homepage">
+                    <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}" class="hybrid-logo-img" style="display: block; height: 6rem; width: auto; background: transparent !important; border: none !important;" onerror="this.style.display='none';">
+                    <span class="hybrid-logo-text">{{ SITE_DISPLAY_NAME }}</span>
                 </a>
-                <div style="display: flex; align-items: center;" class="gap-xs">
-                    <button class="dark-mode-toggle" id="dark-mode-toggle" aria-label="Toggle dark mode">
-                        <svg class="sun-icon" viewBox="0 0 24 24">
+                <div class="hybrid-header-actions">
+                    <button class="dark-mode-toggle-hybrid" id="dark-mode-toggle-hybrid" aria-label="Toggle dark mode">
+                        <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true">
                             <circle cx="12" cy="12" r="5"></circle>
                             <line x1="12" y1="1" x2="12" y2="3"></line>
                             <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -82,34 +85,29 @@
                             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
                             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                         </svg>
-                        <svg class="moon-icon" viewBox="0 0 24 24">
+                        <svg class="moon-icon" viewBox="0 0 24 24" style="display: none;" aria-hidden="true">
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                         </svg>
-                        <span class="toggle-text">Dark Mode</span>
-                    </button>
-                    <button class="mobile-menu-toggle" aria-label="Toggle menu">
-                        <span></span>
-                        <span></span>
-                        <span></span>
                     </button>
                 </div>
-                <ul class="nav-menu">
-                    <li><a href="{% url 'home' %}">Home</a></li>
-                    <li><a href="{% url 'color_picker:index' %}">Color Code Generator & Picker</a></li>
-                    <li><a href="{% url 'image_converter:index' %}">Image Conversion & Editing</a></li>
-                    <li><a href="{% url 'media_converter:index' %}">Media Converters</a></li>
-                    <li><a href="{% url 'youtube_thumbnail:index' %}">YouTube Thumbnail Downloader</a></li>
-                    <li><a href="{% url 'pdf_tools:index' %}">PDF Tools</a></li>
-                    <li><a href="{% url 'converters:index' %}">Unit Converters</a></li>
-                    <li><a href="{% url 'utilities:index' %}">Utilities</a></li>
-                    <li><a href="{% url 'currency_converter:index' %}">Currency & Crypto</a></li>
-                    <li><a href="{% url 'archive_converter:index' %}">Archive Converters</a></li>
-                    <li><a href="{% url 'text_converter:index' %}">Text & String Converters</a></li>
-                    <li><a href="{% url 'developer_converter:index' %}">Developer Converters</a></li>
-                    <li><a href="{% url 'isdown:index' %}">Website Status Checker</a></li>
-                </ul>
             </div>
-        </nav>
+            <nav class="hybrid-nav-menu-inline" id="hybrid-nav-menu-inline" aria-label="Main navigation">
+                <ul>
+                    <li><a href="{% url 'color_picker:index' %}">Color</a></li>
+                    <li><a href="{% url 'image_converter:index' %}">Images</a></li>
+                    <li><a href="{% url 'media_converter:index' %}">Media</a></li>
+                    <li><a href="{% url 'youtube_thumbnail:index' %}">YouTube</a></li>
+                    <li><a href="{% url 'pdf_tools:index' %}">PDF</a></li>
+                    <li><a href="{% url 'converters:index' %}">Units</a></li>
+                    <li><a href="{% url 'utilities:index' %}">Utilities</a></li>
+                    <li><a href="{% url 'currency_converter:index' %}">Currency</a></li>
+                    <li><a href="{% url 'archive_converter:index' %}">Zip</a></li>
+                    <li><a href="{% url 'text_converter:index' %}">Text</a></li>
+                    <li><a href="{% url 'developer_converter:index' %}">Dev</a></li>
+                    <li><a href="{% url 'isdown:index' %}">Status</a></li>
+                </ul>
+            </nav>
+        </div>
     </header>
 
     <main class="main-content">
@@ -161,17 +159,22 @@
         </div>
     </main>
 
-    <footer>
-        <div class="container">
+    <footer class="hybrid-footer">
+        <div class="hybrid-footer-content">
             <p>&copy; {% now "Y" %} {{ SITE_NAME }}. All rights reserved.</p>
             <p>Fast, simple, no-login required online converters.</p>
-            <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
+            <div class="hybrid-footer-links">
+                <a href="#" aria-label="Privacy Policy">Privacy</a>
+                <a href="#" aria-label="Terms of Service">Terms</a>
+            </div>
+            <p style="margin-top: 1rem; font-size: 0.85rem;">
                 🔒 <strong>Privacy:</strong> Your files are never stored on our servers. All conversions are processed securely and files are deleted immediately after processing.
             </p>
         </div>
     </footer>
 
     <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/interactions.js' %}"></script>
     {% block extra_js %}{% endblock %}
     
     <!-- Ko-fi Floating Chat Widget -->
