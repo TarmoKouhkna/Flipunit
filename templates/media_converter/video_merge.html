@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span style="color: var(--text-secondary); margin-left: 0.5rem;">${fileSizeMB} MB ${durationText}</span>
                 </div>
                 <button type="button" class="preview-video-btn" style="background: var(--primary-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">▶ Preview & Trim</button>
-                <button type="button" class="remove-video-btn" style="background: var(--danger-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: 500;">Remove</button>
+                <button type="button" class="remove-video-btn" style="border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: 500;">Remove</button>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div>
@@ -1026,6 +1026,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .video-item.dragging {
     opacity: 0.5;
+}
+
+.remove-video-btn {
+    background: #ef4444 !important;
+    color: white !important;
+}
+
+.remove-video-btn:hover {
+    background: #dc2626 !important;
+}
+
+[data-theme="dark"] .remove-video-btn {
+    background: #f87171 !important;
+}
+
+[data-theme="dark"] .remove-video-btn:hover {
+    background: #ef4444 !important;
 }
 </style>
 {% endblock %}
