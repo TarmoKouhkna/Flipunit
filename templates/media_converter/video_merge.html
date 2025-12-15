@@ -191,22 +191,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         if (removeBtn) {
-            function handleRemove() {
+            let removeHandled = false;
+            
+            function handleRemove(e) {
+                if (removeHandled) return;
+                removeHandled = true;
                 console.log('Remove button clicked for video:', videoFile.id);
-                removeVideo(videoFile.id);
+                
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                
+                // Small delay to ensure UI updates
+                setTimeout(() => {
+                    removeVideo(videoFile.id);
+                    removeHandled = false;
+                }, 50);
             }
             
-            removeBtn.addEventListener('click', function(e) {
+            // Use touchstart for iOS to catch it before any zoom happens
+            removeBtn.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                handleRemove();
-            });
+                handleRemove(e);
+            }, { passive: false });
             
-            // Also listen for touch events on iOS
-            removeBtn.addEventListener('touchend', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                handleRemove();
+            // Also listen for click events (for desktop and as fallback)
+            removeBtn.addEventListener('click', function(e) {
+                if (!removeHandled) {
+                    handleRemove(e);
+                }
             });
         } else {
             console.error('Remove button not found for video:', videoFile.id);
