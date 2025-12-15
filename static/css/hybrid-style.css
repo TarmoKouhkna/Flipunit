@@ -2155,3 +2155,171 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
     border-radius: var(--radius-md) !important;
 }
 
+/* ============================================
+   COPY BUTTONS - HYBRID STYLING
+   ============================================ */
+
+.copy-btn {
+    padding: var(--space-sm) !important;
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--neu-shadow-inset) !important;
+    cursor: pointer !important;
+    transition: all var(--transition-base) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 2rem !important;
+    min-height: 2rem !important;
+    font-size: var(--font-size-base) !important;
+    color: var(--text-primary) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.copy-btn::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: var(--gradient-primary) !important;
+    opacity: 0 !important;
+    transition: opacity var(--transition-base) !important;
+    z-index: 0 !important;
+}
+
+.copy-btn > * {
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.copy-btn:hover {
+    background: var(--glass-bg) !important;
+    box-shadow: var(--neu-shadow) !important;
+    transform: translateY(-2px) scale(1.05) !important;
+    border-color: var(--primary-accent) !important;
+}
+
+.copy-btn:hover::before {
+    opacity: 0.1 !important;
+}
+
+.copy-btn:active {
+    transform: translateY(0) scale(0.98) !important;
+    box-shadow: var(--neu-shadow-pressed) !important;
+}
+
+/* Format items styling */
+.format-item {
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--neu-shadow-inset) !important;
+    padding: var(--space-md) !important;
+}
+
+/* ============================================
+   REFRESH BUTTON - HYBRID STYLING
+   ============================================ */
+
+.refresh-btn {
+    padding: var(--space-md) !important;
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--neu-shadow-inset) !important;
+    cursor: pointer !important;
+    transition: all var(--transition-base) !important;
+    font-size: var(--font-size-xl) !important;
+    line-height: 1 !important;
+    color: var(--text-primary) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 2.5rem !important;
+    min-height: 2.5rem !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.refresh-btn::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: var(--gradient-primary) !important;
+    opacity: 0 !important;
+    transition: opacity var(--transition-base) !important;
+    z-index: 0 !important;
+}
+
+.refresh-btn > * {
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.refresh-btn:hover {
+    background: var(--glass-bg) !important;
+    box-shadow: var(--neu-shadow) !important;
+    transform: translateY(-2px) rotate(90deg) scale(1.05) !important;
+    border-color: var(--primary-accent) !important;
+    color: var(--primary-accent) !important;
+}
+
+.refresh-btn:hover::before {
+    opacity: 0.1 !important;
+}
+
+.refresh-btn:active {
+    transform: translateY(0) rotate(180deg) scale(0.98) !important;
+    box-shadow: var(--neu-shadow-pressed) !important;
+}
+
+/* ============================================
+   HEX INPUT FIELD - HYBRID STYLING
+   ============================================ */
+
+.hex-input {
+    flex: 1 !important;
+    padding: var(--space-md) var(--space-lg) !important;
+    font-size: var(--font-size-base) !important;
+    font-family: monospace !important;
+    color: var(--text-primary) !important;
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--neu-shadow) !important;
+    transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base) !important;
+    outline: none !important;
+}
+
+.hex-input::placeholder {
+    color: var(--text-secondary) !important;
+    opacity: 1 !important;
+}
+
+.hex-input:focus {
+    box-shadow: var(--neu-shadow-hover) !important;
+    transform: translateY(-2px) !important;
+    border-color: var(--primary-accent) !important;
+}
+
+.hex-input-group {
+    display: flex !important;
+    gap: var(--space-sm) !important;
+    align-items: center !important;
+}
+
