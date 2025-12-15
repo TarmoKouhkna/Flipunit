@@ -793,8 +793,24 @@ document.addEventListener('DOMContentLoaded', function() {
             loadServerPreview(videoFile, previewPlayer).then(() => {
                 clearTimeout(timeout);
                 console.log('Server preview loaded successfully');
-                videoError.style.display = 'none';
+                // Force video to show and play
                 previewPlayer.style.display = 'block';
+                previewPlayer.style.visibility = 'visible';
+                videoError.style.display = 'none';
+                
+                // On mobile, ensure video is visible and can play
+                if (isMobile || isIOS) {
+                    previewPlayer.setAttribute('playsinline', '');
+                    previewPlayer.setAttribute('webkit-playsinline', '');
+                    previewPlayer.setAttribute('x5-playsinline', '');
+                    // Try to load and play
+                    previewPlayer.load();
+                    setTimeout(() => {
+                        previewPlayer.play().catch(e => {
+                            console.log('Auto-play prevented, user interaction required:', e);
+                        });
+                    }, 100);
+                }
             }).catch(err => {
                 clearTimeout(timeout);
                 console.error('Server preview error:', err);
@@ -1029,6 +1045,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const url = URL.createObjectURL(blob);
             videoElement.src = url;
+            
+            // Ensure video is visible
+            videoElement.style.display = 'block';
+            videoElement.style.visibility = 'visible';
             videoElement.load();
             
             // Store URL for cleanup
@@ -1042,17 +1062,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }, 30000);
                 
-                videoElement.addEventListener('loadedmetadata', () => {
+                const onLoaded = () => {
                     clearTimeout(timeout);
                     if (videoElement.duration && isFinite(videoElement.duration)) {
                         videoFile.duration = videoElement.duration;
                     }
+                    // Ensure video is visible after loading
+                    videoElement.style.display = 'block';
+                    videoElement.style.visibility = 'visible';
+                    console.log('Video metadata loaded, duration:', videoElement.duration);
                     resolve();
+                };
+                
+                videoElement.addEventListener('loadedmetadata', onLoaded, { once: true });
+                videoElement.addEventListener('loadeddata', onLoaded, { once: true });
+                videoElement.addEventListener('canplay', () => {
+                    console.log('Video can play');
+                    videoElement.style.display = 'block';
+                    videoElement.style.visibility = 'visible';
                 }, { once: true });
                 
-                videoElement.addEventListener('error', () => {
+                videoElement.addEventListener('error', (e) => {
                     clearTimeout(timeout);
-                    reject(new Error('Video failed to load'));
+                    console.error('Video element error:', videoElement.error);
+                    reject(new Error('Video failed to load: ' + (videoElement.error ? videoElement.error.message : 'Unknown error')));
                 }, { once: true });
             });
         } catch (error) {
@@ -1088,15 +1121,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
+    .video-item {
+        padding: 0.75rem !important;
+    }
+    
     .video-item > div:first-child {
         flex-direction: column;
-        align-items: flex-start !important;
+        align-items: stretch !important;
+        gap: 0.75rem !important;
+    }
+    
+    .video-item > div:first-child > div:first-of-type {
+        width: 100%;
+        min-width: 0;
+    }
+    
+    .video-item-buttons {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: stretch !important;
+        gap: 0.5rem !important;
+        margin-top: 0.5rem !important;
     }
     
     .video-item > div:first-child > div:last-child {
-        width: 100%;
-        justify-content: flex-start;
-        margin-top: 0.5rem;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: stretch !important;
+        gap: 0.5rem !important;
+        margin-top: 0.5rem !important;
     }
     
     .video-time-inputs {
@@ -1107,16 +1160,24 @@ document.addEventListener('DOMContentLoaded', function() {
         width: 95vw !important;
         max-width: 95vw !important;
         padding: 1rem !important;
+        margin: 0 !important;
     }
     
-    #videoPreviewModal > div > div:first-of-type {
+    #videoPreviewModal > div > div:nth-of-type(2) {
         grid-template-columns: 1fr !important;
     }
     
     .preview-video-btn,
     .remove-video-btn {
         flex: 1;
-        min-width: 120px;
+        min-width: 0;
+        width: 100%;
+        padding: 0.6rem 1rem !important;
+    }
+    
+    #previewPlayer {
+        width: 100% !important;
+        max-width: 100% !important;
     }
 }
 
