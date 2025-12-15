@@ -695,7 +695,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         modal.innerHTML = `
-            <div style="background: white; padding: 1.5rem; border-radius: 8px; max-width: 95vw; max-height: 95vh; width: 90vw; overflow: auto; position: relative; box-sizing: border-box; touch-action: manipulation; -webkit-overflow-scrolling: touch;">
+            <div style="background: white; padding: 1.5rem; border-radius: 8px; max-width: 95vw; max-height: 95vh; width: 90vw; overflow-y: auto; overflow-x: hidden; position: relative; box-sizing: border-box; touch-action: manipulation; -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none;">
                 <button id="closePreview" style="position: absolute; top: 1rem; right: 1rem; background: #ccc; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; z-index: 10;">✕ Close</button>
                 <h3 style="margin-bottom: 1rem; margin-right: 4rem;">Preview & Trim: ${videoFile.file.name}</h3>
                 <div id="videoPreviewContainer" style="position: relative; margin-bottom: 1rem; background: #000; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 200px; max-height: 60vh; overflow: hidden; border-radius: 4px;">
@@ -711,12 +711,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div style="display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem;">
                     <div>
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time (seconds)</label>
-                        <input type="number" id="previewStartTime" step="0.1" min="0" value="${videoFile.startTime}" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;">
-                        <button type="button" id="setStartFromPlayer" style="margin-top: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">Set from Player Position</button>
+                        <input type="number" id="previewStartTime" step="0.1" min="0" value="${videoFile.startTime}" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; -webkit-appearance: none;">
+                        <button type="button" id="setStartFromPlayer" style="margin-top: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px;">Set from Player Position</button>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time (seconds)</label>
-                        <input type="number" id="previewEndTime" step="0.1" min="0" value="${videoFile.endTime || ''}" placeholder="Full video" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;">
+                        <input type="number" id="previewEndTime" step="0.1" min="0" value="${videoFile.endTime || ''}" placeholder="Full video" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; -webkit-appearance: none;">
                         <button type="button" id="setEndFromPlayer" style="margin-top: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">Set from Player Position</button>
                     </div>
                 </div>
@@ -726,8 +726,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         The trim will be applied when you merge the videos.
                     </p>
                 </div>
-                <div style="display: flex; gap: 1rem; position: relative; z-index: 1000; justify-content: flex-end;">
-                    <button id="applyTrim" style="background: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; position: relative; z-index: 1001;">Apply Trim</button>
+                <div style="display: flex; gap: 1rem; position: relative; z-index: 1000; justify-content: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;">
+                    <button id="applyTrim" type="button" style="background: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; position: relative; z-index: 1001; font-size: 16px; min-height: 44px; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">Apply Trim</button>
                 </div>
             </div>
         `;
@@ -987,8 +987,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initial marker update
         setTimeout(updateTrimMarkers, 100);
         
-        // Apply trim and close
-        applyTrimBtn.addEventListener('click', function() {
+        // Apply trim and close - use both click and touchstart for iOS compatibility
+        function applyTrim() {
+            console.log('Apply Trim clicked');
             // Normalize comma to dot for decimal separator
             const startValue = previewStartTime.value.replace(',', '.');
             const endValue = previewEndTime.value ? previewEndTime.value.replace(',', '.') : '';
@@ -996,6 +997,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const end = endValue ? parseFloat(endValue) : null;
             videoFile.startTime = start;
             videoFile.endTime = end;
+            
+            console.log('Trim values:', { start, end });
             
             // Update the form inputs
             const startInput = itemElement.querySelector('.start-time');
@@ -1007,7 +1010,23 @@ document.addEventListener('DOMContentLoaded', function() {
             // Don't revoke previewUrl - we'll reuse it
             previewPlayer.src = '';
             document.body.removeChild(modal);
-        });
+        }
+        
+        if (applyTrimBtn) {
+            applyTrimBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                applyTrim();
+            });
+            // Also listen for touch events on iOS
+            applyTrimBtn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                applyTrim();
+            });
+        } else {
+            console.error('Apply Trim button not found!');
+        }
         
         // Close modal
         closeBtn.addEventListener('click', function() {
@@ -1229,6 +1248,26 @@ document.addEventListener('DOMContentLoaded', function() {
         max-width: 95vw !important;
         padding: 1rem !important;
         margin: 0 !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    
+    #videoPreviewModal input[type="number"] {
+        font-size: 16px !important;
+        padding: 0.75rem !important;
+    }
+    
+    #videoPreviewModal button {
+        font-size: 16px !important;
+        min-height: 44px !important;
+        -webkit-tap-highlight-color: transparent !important;
+    }
+    
+    #applyTrim {
+        position: sticky !important;
+        bottom: 0 !important;
+        background: var(--primary-color) !important;
+        z-index: 10000 !important;
     }
     
     #videoPreviewModal > div > div:nth-of-type(2) {
