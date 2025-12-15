@@ -698,11 +698,11 @@ document.addEventListener('DOMContentLoaded', function() {
             <div style="background: white; padding: 1.5rem; border-radius: 8px; max-width: 95vw; max-height: 95vh; width: 90vw; overflow: auto; position: relative; box-sizing: border-box; touch-action: manipulation; -webkit-overflow-scrolling: touch;">
                 <button id="closePreview" style="position: absolute; top: 1rem; right: 1rem; background: #ccc; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; z-index: 10;">✕ Close</button>
                 <h3 style="margin-bottom: 1rem; margin-right: 4rem;">Preview & Trim: ${videoFile.file.name}</h3>
-                <div style="position: relative; margin-bottom: 1rem; background: #000; display: flex; justify-content: center; align-items: center; width: 100%; max-height: 60vh; overflow: hidden; border-radius: 4px;">
+                <div id="videoPreviewContainer" style="position: relative; margin-bottom: 1rem; background: #000; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 200px; max-height: 60vh; overflow: hidden; border-radius: 4px;">
                     <video id="previewPlayer" controls preload="metadata" playsinline style="max-width: 100%; max-height: 60vh; width: auto; height: auto; display: block; object-fit: contain;"></video>
-                    <div id="videoError" style="display: none; padding: 2rem; text-align: center; color: #ff0000;">
-                        <p>Video preview failed to load. The video format may not be supported by your browser.</p>
-                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually below.</p>
+                    <div id="videoError" style="display: none; padding: 2rem; text-align: center; color: #666; background: #f0f0f0; width: 100%; border-radius: 4px;">
+                        <p style="color: #333; font-weight: 600;">Video preview unavailable</p>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem; color: #666;">You can still set trim times manually below. The trim will be applied when merging.</p>
                     </div>
                     <div id="trimOverlay" style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: rgba(255,0,0,0.3); pointer-events: none; display: none;"></div>
                     <div id="trimStartMarker" style="position: absolute; top: 0; bottom: 0; width: 2px; background: #00ff00; pointer-events: none; display: none;"></div>
@@ -882,9 +882,20 @@ document.addEventListener('DOMContentLoaded', function() {
             updateTrimMarkers();
         });
         
-        // For iOS, mobile, or MOV files, use server preview immediately
-        if (isIOS || isMobile || isMovFile) {
-            console.log('Using server preview for iOS/Mobile/MOV file');
+        // For iOS, skip video preview and just show manual input
+        // iOS Safari has issues with large blob URLs and server previews
+        if (isIOS) {
+            console.log('iOS detected - showing manual trim input only (no video preview)');
+            videoError.innerHTML = `
+                <p><strong>Manual Trim Mode</strong></p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;">On iOS, please set trim times manually below. The trim will be applied when merging.</p>
+            `;
+            videoError.style.display = 'block';
+            previewPlayer.style.display = 'none';
+            // Don't try to load preview
+            useServerPreview = false;
+        } else if (isMobile || isMovFile) {
+            console.log('Using server preview for Mobile/MOV file');
             useServerPreview = true;
             // Small delay to ensure modal is rendered
             setTimeout(() => {
