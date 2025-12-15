@@ -170,6 +170,7 @@ def _get_all_tools():
         {'name': 'Video to GIF', 'url': 'media_converter:video_to_gif', 'category': 'Media Converters', 'description': 'Convert video to animated GIF'},
         {'name': 'Audio Splitter', 'url': 'media_converter:audio_splitter', 'category': 'Media Converters', 'description': 'Split audio files into segments'},
         {'name': 'Audio Merge', 'url': 'media_converter:audio_merge', 'category': 'Media Converters', 'description': 'Merge multiple audio files'},
+        {'name': 'Video Merge', 'url': 'media_converter:video_merge', 'category': 'Media Converters', 'description': 'Merge multiple video files into one'},
         {'name': 'Video Compressor', 'url': 'media_converter:video_compressor', 'category': 'Media Converters', 'description': 'Compress video files'},
         {'name': 'Mute Video Audio', 'url': 'media_converter:mute_video', 'category': 'Media Converters', 'description': 'Remove audio from video'},
         {'name': 'Reduce Audio Noise', 'url': 'media_converter:reduce_noise', 'category': 'Media Converters', 'description': 'Reduce background noise from audio'},
