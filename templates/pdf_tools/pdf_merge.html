@@ -14,25 +14,33 @@
         {% endfor %}
     {% endif %}
     
-    <form method="post" enctype="multipart/form-data" class="converter-tool">
+    <form method="post" enctype="multipart/form-data" class="converter-tool" id="mergeForm">
         {% csrf_token %}
         <div class="form-group">
             <label class="form-label">Select PDF Files to Merge</label>
-            <div class="file-upload-area">
-                <input type="file" name="pdf_files" id="pdf_files" accept=".pdf" multiple required>
-                <p style="margin-top: 1rem;">Click to select or drag and drop multiple PDF files</p>
-                <p style="color: var(--text-secondary); font-size: 0.9rem;">Select 2 or more PDF files to merge</p>
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="pdf_files" id="pdf_files" accept=".pdf" multiple>
+                <p style="margin-top: 1rem;">Click to select or drag and drop PDF files</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Add files one by one or select multiple at once. You need at least 2 files to merge.</p>
+            </div>
+            
+            <!-- PDF Files List -->
+            <div id="pdfListContainer" style="margin-top: 1.5rem; display: none;">
+                <div style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Selected PDF files (drag to reorder):</div>
+                <div id="pdfList" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Merge PDFs</button>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="display: none;">Merge PDFs</button>
     </form>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
         <ol class="list-indent" style="margin-top: 0.5rem;">
-            <li>Select 2 or more PDF files</li>
-            <li>Click "Merge PDFs"</li>
+            <li>Add PDF files one by one or select multiple at once</li>
+            <li>Drag files to reorder them (order matters for merging)</li>
+            <li>Remove files if needed</li>
+            <li>Click "Merge PDFs" when you have 2 or more files</li>
             <li>Download the merged PDF file</li>
         </ol>
     </div>
@@ -44,36 +52,491 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('pdf_files');
-    const uploadArea = document.querySelector('.file-upload-area');
-    const form = document.querySelector('.converter-tool');
+    const uploadArea = document.getElementById('uploadArea');
+    const form = document.getElementById('mergeForm');
     const submitBtn = document.getElementById('submit-btn');
+    const pdfListContainer = document.getElementById('pdfListContainer');
+    const pdfList = document.getElementById('pdfList');
     
-    // Prevent click event from bubbling to the upload area
-    fileInput.addEventListener('click', function(e) {
+    // Safety checks
+    if (!fileInput || !uploadArea || !form || !submitBtn || !pdfListContainer || !pdfList) {
+        console.error('Required elements not found:', {
+            fileInput: !!fileInput,
+            uploadArea: !!uploadArea,
+            form: !!form,
+            submitBtn: !!submitBtn,
+            pdfListContainer: !!pdfListContainer,
+            pdfList: !!pdfList
+        });
+        return;
+    }
+    
+    let pdfFiles = [];
+    let draggedElement = null;
+    let isSubmitting = false; // Flag to prevent duplicate submissions
+    let downloadTriggered = false; // Flag to prevent duplicate downloads
+    
+    // Create PDF file object
+    function createPdfFile(file, index) {
+        const id = String(Date.now()) + '_' + String(Math.random()).substring(2);
+        return {
+            file: file,
+            index: index,
+            id: id
+        };
+    }
+    
+    // Create PDF item HTML
+    function createPdfItem(pdfFile) {
+        const item = document.createElement('div');
+        item.className = 'pdf-item';
+        item.draggable = true;
+        item.dataset.id = String(pdfFile.id);
+        // Store file reference on the element for recovery
+        item._pdfFile = pdfFile;
+        item.style.cssText = 'background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: var(--space-md); cursor: move; position: relative; display: flex; align-items: center; gap: var(--space-sm); box-shadow: var(--neu-shadow-inset); transition: all var(--transition-base);';
+        
+        const fileSizeMB = (pdfFile.file.size / (1024 * 1024)).toFixed(2);
+        
+        item.innerHTML = `
+            <span style="font-size: 1.5rem; cursor: move; flex-shrink: 0; user-select: none; color: var(--text-secondary);">☰</span>
+            <div style="flex: 1; min-width: 0;">
+                <strong style="word-break: break-word; display: block; color: var(--text-primary);">${pdfFile.file.name}</strong>
+                <span style="color: var(--text-secondary); font-size: 0.9rem;">${fileSizeMB} MB</span>
+            </div>
+            <button type="button" class="remove-pdf-btn" style="padding: var(--space-xs) var(--space-sm); background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-md); cursor: pointer; color: #dc2626; transition: all var(--transition-base); font-size: var(--font-size-base); font-weight: 500;">Remove</button>
+        `;
+        
+        // Re-attach file reference after innerHTML (since innerHTML clears it)
+        item._pdfFile = pdfFile;
+        
+        // Remove button handler
+        const removeBtn = item.querySelector('.remove-pdf-btn');
+        removeBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-    });
+            removePdf(pdfFile.id);
+        });
+        
+        // Drag and drop handlers
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+        
+        // Hover effects
+        item.addEventListener('mouseenter', function() {
+            this.style.boxShadow = 'var(--neu-shadow-hover)';
+            this.style.transform = 'translateY(-2px)';
+        });
+        item.addEventListener('mouseleave', function() {
+            this.style.boxShadow = 'var(--neu-shadow-inset)';
+            this.style.transform = 'translateY(0)';
+        });
+        
+        return item;
+    }
     
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            const fileCount = e.target.files.length;
-            uploadArea.querySelector('p').textContent = `Selected: ${fileCount} PDF file(s)`;
+    // Update PDF list display
+    function updatePdfList() {
+        console.log('Updating PDF list, count:', pdfFiles.length);
+        pdfList.innerHTML = '';
+        
+        pdfFiles.forEach((pdfFile, index) => {
+            pdfFile.index = index;
+            const item = createPdfItem(pdfFile);
+            pdfList.appendChild(item);
+        });
+        
+        if (pdfFiles.length >= 2) {
+            submitBtn.style.display = 'block';
+            pdfListContainer.style.display = 'block';
+            console.log('Submit button shown');
+        } else if (pdfFiles.length > 0) {
+            pdfListContainer.style.display = 'block';
+            submitBtn.style.display = 'none';
+            console.log('List shown, but need more files');
+        } else {
+            pdfListContainer.style.display = 'none';
+            submitBtn.style.display = 'none';
+            console.log('List hidden');
         }
+    }
+    
+    // Remove PDF file
+    function removePdf(id) {
+        pdfFiles = pdfFiles.filter(pf => String(pf.id) !== String(id));
+        updatePdfList();
+        // Reset file input to allow selecting the same file again
+        fileInput.value = '';
+    }
+    
+    // Drag and drop handlers
+    function handleDragStart(e) {
+        draggedElement = this;
+        this.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+    }
+    
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+    
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        
+        if (draggedElement !== this) {
+            const draggedId = draggedElement.dataset.id;
+            const targetId = this.dataset.id;
+            
+            const draggedIndex = pdfFiles.findIndex(pf => String(pf.id) === String(draggedId));
+            const targetIndex = pdfFiles.findIndex(pf => String(pf.id) === String(targetId));
+            
+            if (draggedIndex !== -1 && targetIndex !== -1) {
+                const [removed] = pdfFiles.splice(draggedIndex, 1);
+                pdfFiles.splice(targetIndex, 0, removed);
+                updatePdfList();
+            }
+        }
+        
+        return false;
+    }
+    
+    function handleDragEnd(e) {
+        this.style.opacity = '1';
+        draggedElement = null;
+    }
+    
+    // File input change handler - allows adding files one by one or multiple at once
+    // This works with both manual selection and drag-and-drop (handled by main.js)
+    fileInput.addEventListener('change', function(e) {
+        console.log('File input change event triggered');
+        const newFiles = Array.from(e.target.files);
+        console.log('Files selected:', newFiles.length);
+        
+        if (newFiles.length === 0) {
+            console.log('No files selected');
+            return;
+        }
+        
+        let addedCount = 0;
+        newFiles.forEach(file => {
+            // Only process PDF files
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                console.warn('Skipping non-PDF file:', file.name);
+                return;
+            }
+            
+            // Check if file is already added (by name and size)
+            const isDuplicate = pdfFiles.some(pf => pf.file.name === file.name && pf.file.size === file.size);
+            if (!isDuplicate) {
+                const pdfFile = createPdfFile(file, pdfFiles.length);
+                pdfFiles.push(pdfFile);
+                addedCount++;
+                console.log('Added file:', file.name);
+            } else {
+                console.log('Duplicate file skipped:', file.name);
+            }
+        });
+        
+        console.log('Total files in list:', pdfFiles.length);
+        updatePdfList();
+        // Reset file input to allow selecting the same file again or adding more
+        fileInput.value = '';
     });
     
-    // Handle form submission
-    const originalText = submitBtn.textContent;
-    form.addEventListener('submit', function() {
+    // Enhance drag and drop visual feedback (main.js handles the actual drop)
+    uploadArea.addEventListener('dragover', function(e) {
+        // Let main.js handle preventDefault, but add visual feedback
+        uploadArea.style.borderColor = 'var(--primary-accent)';
+        uploadArea.style.boxShadow = 'var(--neu-shadow-hover)';
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        uploadArea.style.borderColor = 'var(--glass-border)';
+        uploadArea.style.boxShadow = 'var(--neu-shadow-inset)';
+    });
+    
+    // After main.js handles drop, reset visual state
+    uploadArea.addEventListener('drop', function(e) {
+        setTimeout(() => {
+            uploadArea.style.borderColor = 'var(--glass-border)';
+            uploadArea.style.boxShadow = 'var(--neu-shadow-inset)';
+        }, 100);
+    });
+    
+    // Helper function to get files from DOM items (fallback)
+    function getFilesFromDOM() {
+        const items = Array.from(pdfList.querySelectorAll('.pdf-item'));
+        const files = [];
+        items.forEach(item => {
+            // Try to get file from element's stored reference first
+            if (item._pdfFile) {
+                files.push(item._pdfFile);
+            } else {
+                // Fallback: try to find in pdfFiles array by ID
+                const id = item.dataset.id;
+                const pdfFile = pdfFiles.find(pf => String(pf.id) === String(id));
+                if (pdfFile) {
+                    files.push(pdfFile);
+                }
+            }
+        });
+        return files;
+    }
+    
+    // Form submission handler - wrapped to prevent duplicates
+    const handleFormSubmit = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation(); // Prevent other handlers
+        
+        // Prevent duplicate submissions
+        if (isSubmitting) {
+            console.log('Submission already in progress, ignoring duplicate submit');
+            return false;
+        }
+        
+        isSubmitting = true;
+        console.log('=== Form submit handler called ===');
+        
+        console.log('Form submitted, pdfFiles.length:', pdfFiles.length);
+        console.log('pdfFiles array:', pdfFiles.map(pf => ({ id: pf.id, name: pf.file.name })));
+        console.log('PDF list items in DOM:', pdfList.querySelectorAll('.pdf-item').length);
+        
+        // Always try to get files from DOM first (most reliable)
+        // Then fallback to pdfFiles array if DOM doesn't have them
+        let filesToSubmit = getFilesFromDOM();
+        if (filesToSubmit.length === 0) {
+            console.warn('No files found in DOM, trying pdfFiles array');
+            filesToSubmit = pdfFiles;
+        }
+        
+        console.log('Files to submit:', filesToSubmit.length);
+        filesToSubmit.forEach((pf, idx) => {
+            console.log(`  ${idx + 1}. ${pf.file.name} (${pf.file.size} bytes)`);
+        });
+        
+        if (filesToSubmit.length < 2) {
+            console.error('Validation failed: Only', filesToSubmit.length, 'files available');
+            console.log('pdfFiles array length:', pdfFiles.length);
+            console.log('DOM items:', pdfList.querySelectorAll('.pdf-item').length);
+            isSubmitting = false; // Reset flag on validation failure
+            alert('Please add at least 2 PDF files to merge. Currently have: ' + filesToSubmit.length + ' file(s).');
+            return false;
+        }
+        
+        // Reset download flag for new submission
+        downloadTriggered = false;
+        
+        // Create FormData
+        const formData = new FormData();
+        
+        // Add CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfToken) {
+            alert('CSRF token not found. Please refresh the page.');
+            return false;
+        }
+        
+        formData.append('csrfmiddlewaretoken', csrfToken.value);
+        
+        // Add files in order (filesToSubmit array order matches display order after drag-and-drop)
+        filesToSubmit.forEach((pdfFile, index) => {
+            formData.append('pdf_files', pdfFile.file);
+            console.log(`Adding file ${index + 1}: ${pdfFile.file.name}`);
+        });
+        
+        // Update button state - capture original text before changing
+        const originalText = submitBtn.textContent || 'Merge PDFs';
         submitBtn.textContent = 'Processing...';
         submitBtn.disabled = true;
         
-        // Reset button after download starts (2 seconds should be enough)
-        setTimeout(function() {
-            submitBtn.textContent = originalText;
+        // Store original text in a way that persists
+        if (!submitBtn.dataset.originalText) {
+            submitBtn.dataset.originalText = originalText;
+        }
+        
+        // Submit form
+        const submitUrl = form.action || window.location.pathname;
+        console.log('Submitting to:', submitUrl);
+        console.log('Total files:', filesToSubmit.length);
+        
+        // Function to reset button state
+        const resetButton = () => {
+            const resetText = submitBtn.dataset.originalText || originalText || 'Merge PDFs';
+            submitBtn.textContent = resetText;
             submitBtn.disabled = false;
-        }, 2000);
+            isSubmitting = false; // Reset flag
+            // Don't reset downloadTriggered here - let it reset on next submission
+            console.log('Button reset to:', resetText);
+        };
+        
+        fetch(submitUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken.value
+            }
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
+            if (response.ok && response.headers.get('content-type')?.includes('application/pdf')) {
+                return response.blob();
+            }
+            
+            // If not OK, try to get error message
+            return response.text().then(text => {
+                console.error('Error response:', text);
+                throw new Error(text || 'Merge failed');
+            });
+        })
+        .then(blob => {
+            console.log('Received blob, size:', blob.size);
+            
+            // Prevent duplicate downloads
+            if (downloadTriggered) {
+                console.warn('Download already triggered, skipping duplicate');
+                resetButton();
+                return;
+            }
+            
+            downloadTriggered = true;
+            console.log('Triggering download...');
+            
+            // Create download link only once
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'merged.pdf';
+            a.style.display = 'none'; // Hide the link
+            a.id = 'pdf-download-link-' + Date.now(); // Unique ID
+            
+            // Remove any existing download links to prevent duplicates
+            const existingLinks = document.querySelectorAll('a[id^="pdf-download-link-"]');
+            existingLinks.forEach(link => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                }
+            });
+            
+            document.body.appendChild(a);
+            
+            // Trigger download once with a small delay to ensure link is ready
+            setTimeout(() => {
+                if (!document.body.contains(a)) {
+                    console.warn('Download link removed before click');
+                    return;
+                }
+                a.click();
+                console.log('Download triggered');
+                
+                // Cleanup immediately after click
+                setTimeout(() => {
+                    if (document.body.contains(a)) {
+                        document.body.removeChild(a);
+                    }
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }, 10);
+            
+            // Reset button immediately after triggering download
+            resetButton();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error merging PDFs: ' + (error.message || 'Please try again.'));
+            resetButton();
+        })
+        .finally(() => {
+            // Ensure button is always reset, even if something goes wrong
+            // This is a safety net
+            setTimeout(() => {
+                if (submitBtn.textContent === 'Processing...' && submitBtn.disabled) {
+                    console.warn('Button still in processing state, forcing reset');
+                    resetButton();
+                }
+            }, 5000); // After 5 seconds, force reset if still processing
+        });
+        
+        return false; // Prevent any default form submission
+    };
+    
+    // Attach event listener with capture phase to catch early
+    form.addEventListener('submit', handleFormSubmit, true); // Use capture phase
+    
+    // Also prevent double-click on submit button
+    submitBtn.addEventListener('click', function(e) {
+        if (isSubmitting) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Button click prevented - already submitting');
+            return false;
+        }
     });
 });
 </script>
+
+<style>
+.remove-pdf-btn {
+    background: rgba(239, 68, 68, 0.08) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    color: #dc2626 !important;
+    font-weight: 500 !important;
+}
+
+[data-theme="dark"] .remove-pdf-btn {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+    color: #f87171 !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .remove-pdf-btn {
+        background: rgba(239, 68, 68, 0.15) !important;
+        border-color: rgba(239, 68, 68, 0.4) !important;
+        color: #f87171 !important;
+    }
+}
+
+.remove-pdf-btn:hover {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.6) !important;
+    color: #dc2626 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2) !important;
+}
+
+[data-theme="dark"] .remove-pdf-btn:hover {
+    background: rgba(239, 68, 68, 0.25) !important;
+    border-color: rgba(239, 68, 68, 0.7) !important;
+    color: #ef4444 !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .remove-pdf-btn:hover {
+        background: rgba(239, 68, 68, 0.25) !important;
+        border-color: rgba(239, 68, 68, 0.7) !important;
+        color: #ef4444 !important;
+    }
+}
+
+.remove-pdf-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: inset 0 2px 4px rgba(239, 68, 68, 0.2) !important;
+}
+
+.pdf-item.dragging {
+    opacity: 0.5;
+}
+</style>
 {% endblock %}
 {% endblock %}
 

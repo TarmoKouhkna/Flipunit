@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}Privacy Policy - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Privacy Policy</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Last updated: {% now "F j, Y" %}</p>
+    
+    <div style="line-height: 1.8; color: var(--text-primary);">
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">1. Information We Collect</h2>
+            <p style="margin-bottom: 1rem;">
+                <strong>{{ SITE_NAME }}</strong> is designed with privacy in mind. We collect minimal information:
+            </p>
+            <ul style="margin-left: 2rem; margin-bottom: 1rem;">
+                <li><strong>Files you upload:</strong> Files are processed temporarily in memory and are never stored on our servers. All files are deleted immediately after processing.</li>
+                <li><strong>Usage data:</strong> We may collect anonymous usage statistics (page views, tool usage) to improve our services.</li>
+                <li><strong>IP addresses:</strong> IP addresses may be logged temporarily for security and abuse prevention purposes.</li>
+            </ul>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">2. How We Use Your Information</h2>
+            <p style="margin-bottom: 1rem;">We use collected information solely for:</p>
+            <ul style="margin-left: 2rem; margin-bottom: 1rem;">
+                <li>Processing your file conversions and tool requests</li>
+                <li>Improving our website and services</li>
+                <li>Preventing abuse and ensuring security</li>
+                <li>Complying with legal obligations</li>
+            </ul>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">3. File Processing and Storage</h2>
+            <div class="privacy-notice" style="margin-bottom: 1rem;">
+                <p>
+                    <span>🔒</span>
+                    <span><strong>Important:</strong> Your files are processed securely and are <strong>never stored</strong> on our servers. All conversions are processed in memory and files are deleted immediately after processing completes.</span>
+                </p>
+            </div>
+            <p style="margin-bottom: 1rem;">
+                We do not:
+            </p>
+            <ul style="margin-left: 2rem; margin-bottom: 1rem;">
+                <li>Store your uploaded files on our servers</li>
+                <li>Share your files with third parties</li>
+                <li>Access the content of your files except for processing purposes</li>
+                <li>Use your files for any purpose other than the conversion you requested</li>
+            </ul>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">4. Third-Party Services</h2>
+            <p style="margin-bottom: 1rem;">
+                We use the following third-party services that may collect information:
+            </p>
+            <ul style="margin-left: 2rem; margin-bottom: 1rem;">
+                <li><strong>Google Analytics:</strong> Collects anonymous usage statistics to help us understand how visitors use our site.</li>
+                <li><strong>Google Tag Manager:</strong> Manages tracking tags and scripts.</li>
+            </ul>
+            <p style="margin-bottom: 1rem;">
+                These services have their own privacy policies. You can opt out of Google Analytics by installing the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener" style="color: var(--primary-accent);">Google Analytics Opt-out Browser Add-on</a>.
+            </p>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">5. Cookies</h2>
+            <p style="margin-bottom: 1rem;">
+                We use cookies and similar technologies to:
+            </p>
+            <ul style="margin-left: 2rem; margin-bottom: 1rem;">
+                <li>Remember your preferences (e.g., dark mode settings)</li>
+                <li>Analyze site usage through Google Analytics</li>
+                <li>Ensure site security and prevent abuse</li>
+            </ul>
+            <p style="margin-bottom: 1rem;">
+                You can control cookies through your browser settings. However, disabling cookies may affect some functionality of our website.
+            </p>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">6. Data Security</h2>
+            <p style="margin-bottom: 1rem;">
+                We implement appropriate technical and organizational measures to protect your information:
+            </p>
+            <ul style="margin-left: 2rem; margin-bottom: 1rem;">
+                <li>All file processing happens in secure, isolated environments</li>
+                <li>Files are processed in memory and never written to disk</li>
+                <li>We use HTTPS encryption for all data transmission</li>
+                <li>Regular security audits and updates</li>
+            </ul>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">7. Your Rights</h2>
+            <p style="margin-bottom: 1rem;">You have the right to:</p>
+            <ul style="margin-left: 2rem; margin-bottom: 1rem;">
+                <li>Access any personal information we hold about you</li>
+                <li>Request deletion of your personal information</li>
+                <li>Opt out of analytics tracking</li>
+                <li>File a complaint with your local data protection authority</li>
+            </ul>
+            <p style="margin-bottom: 1rem;">
+                To exercise these rights, please contact us using the feedback form on our website.
+            </p>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">8. Children's Privacy</h2>
+            <p style="margin-bottom: 1rem;">
+                Our services are not directed to individuals under the age of 13. We do not knowingly collect personal information from children. If you believe we have collected information from a child, please contact us immediately.
+            </p>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">9. Changes to This Policy</h2>
+            <p style="margin-bottom: 1rem;">
+                We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this Privacy Policy periodically for any changes.
+            </p>
+        </section>
+        
+        <section style="margin-bottom: 2rem;">
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: 1rem; color: var(--text-primary);">10. Contact Us</h2>
+            <p style="margin-bottom: 1rem;">
+                If you have any questions about this Privacy Policy, please contact us through the feedback form on our website.
+            </p>
+        </section>
+    </div>
+    
+    <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--glass-border);">
+        <a href="{% url 'home' %}" class="btn btn-secondary">← Back to Home</a>
+    </div>
+</div>
+{% endblock %}
+
+
+
+

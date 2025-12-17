@@ -23,15 +23,18 @@
         <div class="form-group">
             <label class="form-label">Select Images (at least 2)</label>
             <div class="file-upload-area" id="uploadArea">
-                <input type="file" name="images" id="images" accept="image/*,.heic,.heif,image/heic,image/heif" multiple required>
+                <input type="file" name="images" id="images" accept="image/*,.heic,.heif,image/heic,image/heif" multiple>
                 <div id="uploadContent">
-                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop multiple images</p>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop images</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Add files one by one or select multiple at once. You need at least 2 files to merge.</p>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">Supports: JPG, JPEG, PNG, WebP, SVG, BMP, TIFF, GIF, ICO, AVIF, HEIC</p>
                 </div>
-                <div id="fileList" style="margin-top: 1rem; display: none;">
-                    <p style="font-weight: 600; margin-bottom: 0.5rem;">Selected files:</p>
-                    <ul id="fileListItems" style="list-style: none; padding: 0;"></ul>
-                </div>
+            </div>
+            
+            <!-- Image Files List -->
+            <div id="imageListContainer" style="margin-top: 1.5rem; display: none;">
+                <div style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Selected images (drag to reorder):</div>
+                <div id="imageList" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
             </div>
         </div>
         
@@ -49,7 +52,7 @@
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">Merge & Download</button>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem; display: none;">Merge & Download</button>
     </form>
 </div>
 
@@ -60,47 +63,435 @@
 document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('images');
     const uploadArea = document.getElementById('uploadArea');
-    const uploadContent = document.getElementById('uploadContent');
-    const fileList = document.getElementById('fileList');
-    const fileListItems = document.getElementById('fileListItems');
+    const form = document.getElementById('mergeForm');
+    const submitBtn = document.getElementById('submit-btn');
+    const imageListContainer = document.getElementById('imageListContainer');
+    const imageList = document.getElementById('imageList');
     
-    function updateFileList(files) {
-        if (files.length > 0) {
-            fileListItems.innerHTML = '';
-            Array.from(files).forEach((file, index) => {
-                const li = document.createElement('li');
-                li.style.cssText = 'padding: 0.5rem; background: var(--surface); margin-bottom: 0.25rem; border-radius: 4px;';
-                li.textContent = `${index + 1}. ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-                fileListItems.appendChild(li);
-            });
-            fileList.style.display = 'block';
+    // Safety checks
+    if (!fileInput || !uploadArea || !form || !submitBtn || !imageListContainer || !imageList) {
+        console.error('Required elements not found');
+        return;
+    }
+    
+    let imageFiles = [];
+    let draggedElement = null;
+    let isSubmitting = false;
+    let downloadTriggered = false;
+    
+    // Create image file object
+    function createImageFile(file, index) {
+        const id = String(Date.now()) + '_' + String(Math.random()).substring(2);
+        return {
+            file: file,
+            index: index,
+            id: id
+        };
+    }
+    
+    // Create image item HTML
+    function createImageItem(imageFile) {
+        const item = document.createElement('div');
+        item.className = 'image-item';
+        item.draggable = true;
+        item.dataset.id = String(imageFile.id);
+        item._imageFile = imageFile;
+        item.style.cssText = 'background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: var(--space-md); cursor: move; position: relative; display: flex; align-items: center; gap: var(--space-sm); box-shadow: var(--neu-shadow-inset); transition: all var(--transition-base);';
+        
+        const fileSizeMB = (imageFile.file.size / (1024 * 1024)).toFixed(2);
+        const fileSizeKB = (imageFile.file.size / 1024).toFixed(1);
+        const sizeDisplay = imageFile.file.size > 1024 * 1024 ? fileSizeMB + ' MB' : fileSizeKB + ' KB';
+        
+        item.innerHTML = `
+            <span style="font-size: 1.5rem; cursor: move; flex-shrink: 0; user-select: none; color: var(--text-secondary);">☰</span>
+            <div style="flex: 1; min-width: 0;">
+                <strong style="word-break: break-word; display: block; color: var(--text-primary);">${imageFile.file.name}</strong>
+                <span style="color: var(--text-secondary); font-size: 0.9rem;">${sizeDisplay}</span>
+            </div>
+            <button type="button" class="remove-image-btn" style="padding: var(--space-xs) var(--space-sm); background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-md); cursor: pointer; color: #dc2626; transition: all var(--transition-base); font-size: var(--font-size-base); font-weight: 500;">Remove</button>
+        `;
+        
+        // Re-attach file reference after innerHTML
+        item._imageFile = imageFile;
+        
+        // Remove button handler
+        const removeBtn = item.querySelector('.remove-image-btn');
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            removeImage(imageFile.id);
+        });
+        
+        // Drag and drop handlers
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+        
+        // Hover effects
+        item.addEventListener('mouseenter', function() {
+            this.style.boxShadow = 'var(--neu-shadow-hover)';
+            this.style.transform = 'translateY(-2px)';
+        });
+        item.addEventListener('mouseleave', function() {
+            this.style.boxShadow = 'var(--neu-shadow-inset)';
+            this.style.transform = 'translateY(0)';
+        });
+        
+        return item;
+    }
+    
+    // Update image list display
+    function updateImageList() {
+        console.log('Updating image list, count:', imageFiles.length);
+        imageList.innerHTML = '';
+        
+        imageFiles.forEach((imageFile, index) => {
+            imageFile.index = index;
+            const item = createImageItem(imageFile);
+            imageList.appendChild(item);
+        });
+        
+        if (imageFiles.length >= 2) {
+            submitBtn.style.display = 'block';
+            imageListContainer.style.display = 'block';
+            console.log('Submit button shown');
+        } else if (imageFiles.length > 0) {
+            imageListContainer.style.display = 'block';
+            submitBtn.style.display = 'none';
+            console.log('List shown, but need more files');
         } else {
-            fileList.style.display = 'none';
+            imageListContainer.style.display = 'none';
+            submitBtn.style.display = 'none';
+            console.log('List hidden');
         }
     }
     
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            updateFileList(e.target.files);
+    // Remove image file
+    function removeImage(id) {
+        imageFiles = imageFiles.filter(img => String(img.id) !== String(id));
+        updateImageList();
+        fileInput.value = '';
+    }
+    
+    // Drag and drop handlers
+    function handleDragStart(e) {
+        draggedElement = this;
+        this.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+    }
+    
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault();
         }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+    
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        
+        if (draggedElement !== this) {
+            const draggedId = draggedElement.dataset.id;
+            const targetId = this.dataset.id;
+            
+            const draggedIndex = imageFiles.findIndex(img => String(img.id) === String(draggedId));
+            const targetIndex = imageFiles.findIndex(img => String(img.id) === String(targetId));
+            
+            if (draggedIndex !== -1 && targetIndex !== -1) {
+                const [removed] = imageFiles.splice(draggedIndex, 1);
+                imageFiles.splice(targetIndex, 0, removed);
+                updateImageList();
+            }
+        }
+        
+        return false;
+    }
+    
+    function handleDragEnd(e) {
+        this.style.opacity = '1';
+        draggedElement = null;
+    }
+    
+    // File input change handler
+    fileInput.addEventListener('change', function(e) {
+        console.log('File input change event triggered');
+        const newFiles = Array.from(e.target.files);
+        console.log('Files selected:', newFiles.length);
+        
+        if (newFiles.length === 0) {
+            console.log('No files selected');
+            return;
+        }
+        
+        let addedCount = 0;
+        newFiles.forEach(file => {
+            // Check if it's an image file
+            const isImage = file.type.startsWith('image/') || 
+                          file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico|avif|heic|heif)$/i);
+            
+            if (!isImage) {
+                console.warn('Skipping non-image file:', file.name);
+                return;
+            }
+            
+            // Check if file is already added
+            const isDuplicate = imageFiles.some(img => img.file.name === file.name && img.file.size === file.size);
+            if (!isDuplicate) {
+                const imageFile = createImageFile(file, imageFiles.length);
+                imageFiles.push(imageFile);
+                addedCount++;
+                console.log('Added file:', file.name);
+            } else {
+                console.log('Duplicate file skipped:', file.name);
+            }
+        });
+        
+        console.log('Total files in list:', imageFiles.length);
+        updateImageList();
+        fileInput.value = '';
     });
     
+    // Enhance drag and drop visual feedback (main.js handles the actual drop)
     uploadArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        uploadArea.style.borderColor = 'var(--primary-color)';
+        uploadArea.style.borderColor = 'var(--primary-accent)';
+        uploadArea.style.boxShadow = 'var(--neu-shadow-hover)';
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        uploadArea.style.borderColor = 'var(--glass-border)';
+        uploadArea.style.boxShadow = 'var(--neu-shadow-inset)';
     });
     
     uploadArea.addEventListener('drop', function(e) {
+        setTimeout(() => {
+            uploadArea.style.borderColor = 'var(--glass-border)';
+            uploadArea.style.boxShadow = 'var(--neu-shadow-inset)';
+        }, 100);
+    });
+    
+    // Helper function to get files from DOM items (fallback)
+    function getFilesFromDOM() {
+        const items = Array.from(imageList.querySelectorAll('.image-item'));
+        const files = [];
+        items.forEach(item => {
+            if (item._imageFile) {
+                files.push(item._imageFile);
+            } else {
+                const id = item.dataset.id;
+                const imageFile = imageFiles.find(img => String(img.id) === String(id));
+                if (imageFile) {
+                    files.push(imageFile);
+                }
+            }
+        });
+        return files;
+    }
+    
+    // Form submission handler
+    const handleFormSubmit = function(e) {
         e.preventDefault();
-        uploadArea.style.borderColor = 'var(--border-color)';
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            fileInput.files = files;
-            updateFileList(files);
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        if (isSubmitting) {
+            console.log('Submission already in progress, ignoring duplicate submit');
+            return false;
+        }
+        
+        isSubmitting = true;
+        console.log('=== Form submit handler called ===');
+        
+        // Get files from DOM first, then fallback to array
+        let filesToSubmit = getFilesFromDOM();
+        if (filesToSubmit.length === 0) {
+            console.warn('No files found in DOM, trying imageFiles array');
+            filesToSubmit = imageFiles;
+        }
+        
+        console.log('Files to submit:', filesToSubmit.length);
+        
+        if (filesToSubmit.length < 2) {
+            console.error('Validation failed: Only', filesToSubmit.length, 'files available');
+            isSubmitting = false;
+            alert('Please add at least 2 images to merge. Currently have: ' + filesToSubmit.length + ' file(s).');
+            return false;
+        }
+        
+        downloadTriggered = false;
+        
+        // Get merge direction
+        const direction = form.querySelector('input[name="direction"]:checked')?.value || 'horizontal';
+        
+        // Create FormData
+        const formData = new FormData();
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfToken) {
+            alert('CSRF token not found. Please refresh the page.');
+            isSubmitting = false;
+            return false;
+        }
+        
+        formData.append('csrfmiddlewaretoken', csrfToken.value);
+        formData.append('direction', direction);
+        
+        // Add files in order
+        filesToSubmit.forEach((imageFile) => {
+            formData.append('images', imageFile.file);
+            console.log(`Adding file: ${imageFile.file.name}`);
+        });
+        
+        // Update button state
+        const originalText = submitBtn.textContent || 'Merge & Download';
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        
+        if (!submitBtn.dataset.originalText) {
+            submitBtn.dataset.originalText = originalText;
+        }
+        
+        // Submit form
+        const submitUrl = form.action || window.location.pathname;
+        console.log('Submitting to:', submitUrl);
+        
+        const resetButton = () => {
+            const resetText = submitBtn.dataset.originalText || originalText || 'Merge & Download';
+            submitBtn.textContent = resetText;
+            submitBtn.disabled = false;
+            isSubmitting = false;
+            console.log('Button reset to:', resetText);
+        };
+        
+        fetch(submitUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken.value
+            }
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            
+            if (response.ok && response.headers.get('content-type')?.includes('image')) {
+                return response.blob();
+            }
+            
+            return response.text().then(text => {
+                console.error('Error response:', text);
+                throw new Error(text || 'Merge failed');
+            });
+        })
+        .then(blob => {
+            console.log('Received blob, size:', blob.size);
+            
+            if (downloadTriggered) {
+                console.warn('Download already triggered, skipping duplicate');
+                resetButton();
+                return;
+            }
+            
+            downloadTriggered = true;
+            console.log('Triggering download...');
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'merged.png';
+            a.style.display = 'none';
+            a.id = 'image-download-link-' + Date.now();
+            
+            const existingLinks = document.querySelectorAll('a[id^="image-download-link-"]');
+            existingLinks.forEach(link => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                }
+            });
+            
+            document.body.appendChild(a);
+            
+            setTimeout(() => {
+                if (!document.body.contains(a)) {
+                    console.warn('Download link removed before click');
+                    return;
+                }
+                a.click();
+                console.log('Download triggered');
+                
+                setTimeout(() => {
+                    if (document.body.contains(a)) {
+                        document.body.removeChild(a);
+                    }
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }, 10);
+            
+            resetButton();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error merging images: ' + (error.message || 'Please try again.'));
+            resetButton();
+        })
+        .finally(() => {
+            setTimeout(() => {
+                if (submitBtn.textContent === 'Processing...' && submitBtn.disabled) {
+                    console.warn('Button still in processing state, forcing reset');
+                    resetButton();
+                }
+            }, 5000);
+        });
+        
+        return false;
+    };
+    
+    // Attach event listener with capture phase
+    form.addEventListener('submit', handleFormSubmit, true);
+    
+    // Prevent double-click on submit button
+    submitBtn.addEventListener('click', function(e) {
+        if (isSubmitting) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Button click prevented - already submitting');
+            return false;
         }
     });
 });
 </script>
+
+<style>
+.remove-image-btn:hover {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.6) !important;
+    color: #dc2626 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2) !important;
+}
+
+[data-theme="dark"] .remove-image-btn {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+    color: #f87171 !important;
+}
+
+[data-theme="dark"] .remove-image-btn:hover {
+    background: rgba(239, 68, 68, 0.25) !important;
+    border-color: rgba(239, 68, 68, 0.7) !important;
+    color: #ef4444 !important;
+}
+
+.remove-image-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: inset 0 2px 4px rgba(239, 68, 68, 0.2) !important;
+}
+
+.image-item.dragging {
+    opacity: 0.5;
+}
+</style>
 {% endblock %}
 {% endblock %}
 

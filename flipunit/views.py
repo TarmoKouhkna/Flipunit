@@ -363,6 +363,16 @@ def search(request):
     })
 
 
+def privacy_policy(request):
+    """Privacy Policy page"""
+    return render(request, 'privacy_policy.html')
+
+
+def terms_of_service(request):
+    """Terms of Service page"""
+    return render(request, 'terms_of_service.html')
+
+
 def favicon_view(request):
     """Serve favicon.ico at root level for Google Search"""
     # Try STATICFILES_DIRS first (development), then STATIC_ROOT (production)

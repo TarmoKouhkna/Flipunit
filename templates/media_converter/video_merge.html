@@ -133,18 +133,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span style="color: var(--text-secondary); display: block; font-size: 0.9rem; margin-top: 0.25rem;">${fileSizeMB} MB ${durationText}</span>
                 </div>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex-shrink: 0;">
-                    <button type="button" class="preview-video-btn" style="background: var(--primary-color); color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 16px; white-space: nowrap; -webkit-tap-highlight-color: transparent; touch-action: manipulation; min-height: 44px;">▶ Preview & Trim</button>
-                    <button type="button" class="remove-video-btn" style="border: none; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 16px; white-space: nowrap; -webkit-tap-highlight-color: transparent; touch-action: manipulation; min-height: 44px;">Remove</button>
+                    <button type="button" class="preview-video-btn">▶ Preview & Trim</button>
+                    <button type="button" class="remove-video-btn">Remove</button>
                 </div>
             </div>
             <div class="video-time-inputs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div>
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time (seconds)</label>
-                    <input type="number" class="start-time" step="0.1" min="0" value="${videoFile.startTime}" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; font-size: 16px; -webkit-appearance: none;">
+                    <input type="number" class="start-time" step="0.1" min="0" value="${videoFile.startTime}">
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time (seconds, leave empty for full video)</label>
-                    <input type="number" class="end-time" step="0.1" min="0" value="${videoFile.endTime || ''}" placeholder="Full video" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; font-size: 16px; -webkit-appearance: none;">
+                    <input type="number" class="end-time" step="0.1" min="0" value="${videoFile.endTime || ''}" placeholder="Full video">
                 </div>
             </div>
             <div style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
@@ -1325,22 +1325,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
-.remove-video-btn {
-    background: #ef4444 !important;
-    color: white !important;
-}
-
-.remove-video-btn:hover {
-    background: #dc2626 !important;
-}
-
-[data-theme="dark"] .remove-video-btn {
-    background: #f87171 !important;
-}
-
-[data-theme="dark"] .remove-video-btn:hover {
-    background: #ef4444 !important;
-}
+/* Remove button styling is now handled by hybrid-style.css */
 </style>
 {% endblock %}
 {% endblock %}

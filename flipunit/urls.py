@@ -93,6 +93,8 @@ urlpatterns = [
     path('favicon.ico', views.favicon_view, name='favicon'),
     path('', views.home, name='home'),
     path('search/', views.search, name='search'),
+    path('privacy/', views.privacy_policy, name='privacy'),
+    path('terms/', views.terms_of_service, name='terms'),
     path('converters/', include('converters.urls')),
     path('image-converter/', include('image_converter.urls')),
     path('media-converter/', include('media_converter.urls')),

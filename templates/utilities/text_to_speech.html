@@ -91,14 +91,148 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     const originalText = submitBtn.textContent;
-    form.addEventListener('submit', function() {
+    let isSubmitting = false;
+    let downloadTriggered = false;
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Prevent duplicate submissions
+        if (isSubmitting) {
+            console.log('Submission already in progress, ignoring duplicate submit');
+            return false;
+        }
+        
+        isSubmitting = true;
+        downloadTriggered = false;
+        
+        // Update button state
         submitBtn.textContent = 'Generating...';
         submitBtn.disabled = true;
         
-        setTimeout(function() {
+        // Store original text
+        if (!submitBtn.dataset.originalText) {
+            submitBtn.dataset.originalText = originalText;
+        }
+        
+        // Create FormData
+        const formData = new FormData(form);
+        
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfToken) {
+            alert('CSRF token not found. Please refresh the page.');
+            isSubmitting = false;
             submitBtn.textContent = originalText;
             submitBtn.disabled = false;
-        }, 2000);
+            return false;
+        }
+        
+        // Function to reset button
+        const resetButton = () => {
+            const resetText = submitBtn.dataset.originalText || originalText || 'Generate Speech';
+            submitBtn.textContent = resetText;
+            submitBtn.disabled = false;
+            isSubmitting = false;
+            console.log('Button reset to:', resetText);
+        };
+        
+        // Submit form using fetch
+        const submitUrl = form.action || window.location.pathname;
+        console.log('Submitting to:', submitUrl);
+        
+        fetch(submitUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken.value
+            }
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            
+            if (response.ok && response.headers.get('content-type')?.includes('audio')) {
+                return response.blob();
+            }
+            
+            // If not OK, try to get error message
+            return response.text().then(text => {
+                console.error('Error response:', text);
+                throw new Error(text || 'Generation failed');
+            });
+        })
+        .then(blob => {
+            console.log('Received blob, size:', blob.size);
+            
+            // Prevent duplicate downloads
+            if (downloadTriggered) {
+                console.warn('Download already triggered, skipping duplicate');
+                resetButton();
+                return;
+            }
+            
+            downloadTriggered = true;
+            console.log('Triggering download...');
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'speech.mp3';
+            a.style.display = 'none';
+            a.id = 'speech-download-link-' + Date.now();
+            
+            // Remove any existing download links
+            const existingLinks = document.querySelectorAll('a[id^="speech-download-link-"]');
+            existingLinks.forEach(link => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                }
+            });
+            
+            document.body.appendChild(a);
+            
+            // Trigger download
+            setTimeout(() => {
+                if (!document.body.contains(a)) {
+                    console.warn('Download link removed before click');
+                    resetButton();
+                    return;
+                }
+                
+                a.click();
+                console.log('Download triggered');
+                
+                // Wait for download to complete before resetting button
+                // Use a longer delay to ensure download has started
+                setTimeout(() => {
+                    if (document.body.contains(a)) {
+                        document.body.removeChild(a);
+                    }
+                    window.URL.revokeObjectURL(url);
+                    
+                    // Reset button after download has been triggered
+                    resetButton();
+                }, 500); // Increased delay to ensure download starts
+            }, 10);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error generating speech: ' + (error.message || 'Please try again.'));
+            resetButton();
+        })
+        .finally(() => {
+            // Safety net: ensure button resets even if something goes wrong
+            setTimeout(() => {
+                if (submitBtn.textContent === 'Generating...' && submitBtn.disabled) {
+                    console.warn('Button still in generating state, forcing reset');
+                    resetButton();
+                }
+            }, 10000); // After 10 seconds, force reset if still generating
+        });
+        
+        return false;
     });
 });
 </script>

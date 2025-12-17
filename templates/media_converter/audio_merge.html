@@ -24,27 +24,31 @@
         <div class="form-group">
             <label class="form-label">Select Audio Files (at least 2)</label>
             <div class="file-upload-area" id="uploadArea">
-                <input type="file" name="audio_files" id="audio_files" accept="audio/*" multiple required>
+                <input type="file" name="audio_files" id="audio_files" accept="audio/*" multiple>
                 <div id="uploadContent">
-                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop multiple files</p>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: MP3, WAV, OGG, FLAC, AAC, M4A, AIFF</p>
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop audio files</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Add files one by one or select multiple at once. You need at least 2 files to merge.</p>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">Supports: MP3, WAV, OGG, FLAC, AAC, M4A, AIFF</p>
                 </div>
-                <div id="fileList" style="margin-top: 1rem; display: none;">
-                    <p style="font-weight: 600; margin-bottom: 0.5rem;">Selected files:</p>
-                    <ul id="fileListItems" style="list-style: none; padding: 0;"></ul>
-                </div>
+            </div>
+            
+            <!-- Audio Files List -->
+            <div id="audioListContainer" style="margin-top: 1.5rem; display: none;">
+                <div style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Selected audio files (drag to reorder):</div>
+                <div id="audioList" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">Merge & Download</button>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem; display: none;">Merge & Download</button>
     </form>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
         <ol class="list-indent" style="margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.8;">
-            <li>Select multiple audio files (hold Ctrl/Cmd to select multiple)</li>
-            <li>Files will be merged in the order they were selected</li>
-            <li>Click "Merge & Download"</li>
+            <li>Add audio files one by one or select multiple at once</li>
+            <li>Drag files to reorder them (order matters for merging)</li>
+            <li>Remove files if needed</li>
+            <li>Click "Merge & Download" when you have 2 or more files</li>
             <li>Download the merged audio file</li>
         </ol>
         <p style="margin-top: 1rem; color: var(--text-secondary);">
@@ -58,103 +62,318 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('mergeForm');
     const fileInput = document.getElementById('audio_files');
     const uploadArea = document.getElementById('uploadArea');
-    const uploadContent = document.getElementById('uploadContent');
-    const fileList = document.getElementById('fileList');
-    const fileListItems = document.getElementById('fileListItems');
+    const form = document.getElementById('mergeForm');
     const submitBtn = document.getElementById('submit-btn');
+    const audioListContainer = document.getElementById('audioListContainer');
+    const audioList = document.getElementById('audioList');
     
-    function updateFileList(files) {
-        if (files.length > 0) {
-            fileListItems.innerHTML = '';
-            Array.from(files).forEach((file, index) => {
-                const li = document.createElement('li');
-                li.style.cssText = 'padding: 0.5rem; background: var(--surface); margin-bottom: 0.25rem; border-radius: 4px;';
-                li.textContent = `${index + 1}. ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-                fileListItems.appendChild(li);
-            });
-            fileList.style.display = 'block';
+    // Safety checks
+    if (!fileInput || !uploadArea || !form || !submitBtn || !audioListContainer || !audioList) {
+        console.error('Required elements not found');
+        return;
+    }
+    
+    let audioFiles = [];
+    let draggedElement = null;
+    let isSubmitting = false;
+    let downloadTriggered = false;
+    
+    // Create audio file object
+    function createAudioFile(file, index) {
+        const id = String(Date.now()) + '_' + String(Math.random()).substring(2);
+        return {
+            file: file,
+            index: index,
+            id: id
+        };
+    }
+    
+    // Create audio item HTML
+    function createAudioItem(audioFile) {
+        const item = document.createElement('div');
+        item.className = 'audio-item';
+        item.draggable = true;
+        item.dataset.id = String(audioFile.id);
+        item._audioFile = audioFile;
+        item.style.cssText = 'background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: var(--space-md); cursor: move; position: relative; display: flex; align-items: center; gap: var(--space-sm); box-shadow: var(--neu-shadow-inset); transition: all var(--transition-base);';
+        
+        const fileSizeMB = (audioFile.file.size / (1024 * 1024)).toFixed(2);
+        const fileSizeKB = (audioFile.file.size / 1024).toFixed(1);
+        const sizeDisplay = audioFile.file.size > 1024 * 1024 ? fileSizeMB + ' MB' : fileSizeKB + ' KB';
+        
+        item.innerHTML = `
+            <span style="font-size: 1.5rem; cursor: move; flex-shrink: 0; user-select: none; color: var(--text-secondary);">☰</span>
+            <div style="flex: 1; min-width: 0;">
+                <strong style="word-break: break-word; display: block; color: var(--text-primary);">${audioFile.file.name}</strong>
+                <span style="color: var(--text-secondary); font-size: 0.9rem;">${sizeDisplay}</span>
+            </div>
+            <button type="button" class="remove-audio-btn" style="padding: var(--space-xs) var(--space-sm); background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-md); cursor: pointer; color: #dc2626; transition: all var(--transition-base); font-size: var(--font-size-base); font-weight: 500;">Remove</button>
+        `;
+        
+        // Re-attach file reference after innerHTML
+        item._audioFile = audioFile;
+        
+        // Remove button handler
+        const removeBtn = item.querySelector('.remove-audio-btn');
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            removeAudio(audioFile.id);
+        });
+        
+        // Drag and drop handlers
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+        
+        // Hover effects
+        item.addEventListener('mouseenter', function() {
+            this.style.boxShadow = 'var(--neu-shadow-hover)';
+            this.style.transform = 'translateY(-2px)';
+        });
+        item.addEventListener('mouseleave', function() {
+            this.style.boxShadow = 'var(--neu-shadow-inset)';
+            this.style.transform = 'translateY(0)';
+        });
+        
+        return item;
+    }
+    
+    // Update audio list display
+    function updateAudioList() {
+        console.log('Updating audio list, count:', audioFiles.length);
+        audioList.innerHTML = '';
+        
+        audioFiles.forEach((audioFile, index) => {
+            audioFile.index = index;
+            const item = createAudioItem(audioFile);
+            audioList.appendChild(item);
+        });
+        
+        if (audioFiles.length >= 2) {
+            submitBtn.style.display = 'block';
+            audioListContainer.style.display = 'block';
+            console.log('Submit button shown');
+        } else if (audioFiles.length > 0) {
+            audioListContainer.style.display = 'block';
+            submitBtn.style.display = 'none';
+            console.log('List shown, but need more files');
         } else {
-            fileList.style.display = 'none';
+            audioListContainer.style.display = 'none';
+            submitBtn.style.display = 'none';
+            console.log('List hidden');
         }
     }
     
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            updateFileList(e.target.files);
+    // Remove audio file
+    function removeAudio(id) {
+        audioFiles = audioFiles.filter(aud => String(aud.id) !== String(id));
+        updateAudioList();
+        fileInput.value = '';
+    }
+    
+    // Drag and drop handlers
+    function handleDragStart(e) {
+        draggedElement = this;
+        this.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+    }
+    
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault();
         }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+    
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        
+        if (draggedElement !== this) {
+            const draggedId = draggedElement.dataset.id;
+            const targetId = this.dataset.id;
+            
+            const draggedIndex = audioFiles.findIndex(aud => String(aud.id) === String(draggedId));
+            const targetIndex = audioFiles.findIndex(aud => String(aud.id) === String(targetId));
+            
+            if (draggedIndex !== -1 && targetIndex !== -1) {
+                const [removed] = audioFiles.splice(draggedIndex, 1);
+                audioFiles.splice(targetIndex, 0, removed);
+                updateAudioList();
+            }
+        }
+        
+        return false;
+    }
+    
+    function handleDragEnd(e) {
+        this.style.opacity = '1';
+        draggedElement = null;
+    }
+    
+    // File input change handler
+    fileInput.addEventListener('change', function(e) {
+        console.log('File input change event triggered');
+        const newFiles = Array.from(e.target.files);
+        console.log('Files selected:', newFiles.length);
+        
+        if (newFiles.length === 0) {
+            console.log('No files selected');
+            return;
+        }
+        
+        let addedCount = 0;
+        newFiles.forEach(file => {
+            // Check if it's an audio file
+            const isAudio = file.type.startsWith('audio/') || 
+                          file.name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|aiff|aif)$/i);
+            
+            if (!isAudio) {
+                console.warn('Skipping non-audio file:', file.name);
+                return;
+            }
+            
+            // Check if file is already added
+            const isDuplicate = audioFiles.some(aud => aud.file.name === file.name && aud.file.size === file.size);
+            if (!isDuplicate) {
+                const audioFile = createAudioFile(file, audioFiles.length);
+                audioFiles.push(audioFile);
+                addedCount++;
+                console.log('Added file:', file.name);
+            } else {
+                console.log('Duplicate file skipped:', file.name);
+            }
+        });
+        
+        console.log('Total files in list:', audioFiles.length);
+        updateAudioList();
+        fileInput.value = '';
     });
     
+    // Enhance drag and drop visual feedback (main.js handles the actual drop)
     uploadArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        uploadArea.style.borderColor = 'var(--primary-color)';
+        uploadArea.style.borderColor = 'var(--primary-accent)';
+        uploadArea.style.boxShadow = 'var(--neu-shadow-hover)';
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        uploadArea.style.borderColor = 'var(--glass-border)';
+        uploadArea.style.boxShadow = 'var(--neu-shadow-inset)';
     });
     
     uploadArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        uploadArea.style.borderColor = 'var(--border-color)';
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            fileInput.files = files;
-            updateFileList(files);
-        }
+        setTimeout(() => {
+            uploadArea.style.borderColor = 'var(--glass-border)';
+            uploadArea.style.boxShadow = 'var(--neu-shadow-inset)';
+        }, 100);
     });
     
-    // Duplicate prevention state
-    let isProcessing = false;
-    let downloadTriggered = false;
-    let abortController = null;
-    
-    // Prevent multiple event listeners
-    if (window._audioMergeHandlerAttached) {
-        console.log('⚠️ Audio merge handler already attached, skipping');
-        return;
+    // Helper function to get files from DOM items (fallback)
+    function getFilesFromDOM() {
+        const items = Array.from(audioList.querySelectorAll('.audio-item'));
+        const files = [];
+        items.forEach(item => {
+            if (item._audioFile) {
+                files.push(item._audioFile);
+            } else {
+                const id = item.dataset.id;
+                const audioFile = audioFiles.find(aud => String(aud.id) === String(id));
+                if (audioFile) {
+                    files.push(audioFile);
+                }
+            }
+        });
+        return files;
     }
-    window._audioMergeHandlerAttached = true;
     
-    const submitHandler = function(e) {
+    // Form submission handler
+    const handleFormSubmit = function(e) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         
-        // Prevent duplicate submissions
-        if (isProcessing) {
-            console.log('🚫 Merge already in progress, ignoring duplicate request');
+        if (isSubmitting) {
+            console.log('Submission already in progress, ignoring duplicate submit');
             return false;
         }
         
-        if (!fileInput.files.length || fileInput.files.length < 2) {
-            alert('Please select at least 2 audio files.');
-            return;
+        isSubmitting = true;
+        console.log('=== Form submit handler called ===');
+        
+        // Get files from DOM first, then fallback to array
+        let filesToSubmit = getFilesFromDOM();
+        if (filesToSubmit.length === 0) {
+            console.warn('No files found in DOM, trying audioFiles array');
+            filesToSubmit = audioFiles;
         }
         
-        // Set lock immediately
-        isProcessing = true;
+        console.log('Files to submit:', filesToSubmit.length);
+        
+        if (filesToSubmit.length < 2) {
+            console.error('Validation failed: Only', filesToSubmit.length, 'files available');
+            isSubmitting = false;
+            alert('Please add at least 2 audio files to merge. Currently have: ' + filesToSubmit.length + ' file(s).');
+            return false;
+        }
+        
         downloadTriggered = false;
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Merging...';
-        form.style.pointerEvents = 'none';
         
-        // Abort any previous fetch
-        if (abortController) {
-            abortController.abort();
+        // Create FormData
+        const formData = new FormData();
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfToken) {
+            alert('CSRF token not found. Please refresh the page.');
+            isSubmitting = false;
+            return false;
         }
-        abortController = new AbortController();
         
-        const formData = new FormData(form);
+        formData.append('csrfmiddlewaretoken', csrfToken.value);
         
-        fetch(form.action || window.location.href, {
+        // Add files in order
+        filesToSubmit.forEach((audioFile) => {
+            formData.append('audio_files', audioFile.file);
+            console.log(`Adding file: ${audioFile.file.name}`);
+        });
+        
+        // Update button state
+        const originalText = submitBtn.textContent || 'Merge & Download';
+        submitBtn.textContent = 'Merging...';
+        submitBtn.disabled = true;
+        
+        if (!submitBtn.dataset.originalText) {
+            submitBtn.dataset.originalText = originalText;
+        }
+        
+        // Submit form
+        const submitUrl = form.action || window.location.pathname;
+        console.log('Submitting to:', submitUrl);
+        
+        const resetButton = () => {
+            const resetText = submitBtn.dataset.originalText || originalText || 'Merge & Download';
+            submitBtn.textContent = resetText;
+            submitBtn.disabled = false;
+            isSubmitting = false;
+            console.log('Button reset to:', resetText);
+        };
+        
+        fetch(submitUrl, {
             method: 'POST',
             body: formData,
-            credentials: 'same-origin',
-            signal: abortController.signal
+            headers: {
+                'X-CSRFToken': csrfToken.value
+            }
         })
         .then(response => {
+            console.log('Response status:', response.status);
             const contentType = response.headers.get('content-type') || '';
             
-            if (contentType.includes('audio/')) {
+            if (response.ok && contentType.includes('audio/')) {
                 return response.blob().then(blob => {
                     const filename = response.headers.get('x-filename') || 'merged_audio.mp3';
                     return { blob, filename };
@@ -172,67 +391,119 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             return response.text().then(text => {
-                throw new Error('Unexpected response: ' + text.substring(0, 200));
+                console.error('Error response:', text);
+                throw new Error(text || 'Merge failed');
             });
         })
         .then(({ blob, filename }) => {
-            // Prevent duplicate downloads
+            console.log('Received blob, size:', blob.size);
+            
             if (downloadTriggered) {
-                console.log('🚫 Download already triggered, skipping duplicate');
+                console.warn('Download already triggered, skipping duplicate');
+                resetButton();
                 return;
             }
+            
             downloadTriggered = true;
+            console.log('Triggering download...');
             
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
             a.style.display = 'none';
+            a.id = 'audio-download-link-' + Date.now();
+            
+            const existingLinks = document.querySelectorAll('a[id^="audio-download-link-"]');
+            existingLinks.forEach(link => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                }
+            });
+            
             document.body.appendChild(a);
-            a.click();
             
             setTimeout(() => {
-                if (document.body.contains(a)) {
-                    document.body.removeChild(a);
+                if (!document.body.contains(a)) {
+                    console.warn('Download link removed before click');
+                    resetButton();
+                    return;
                 }
-                window.URL.revokeObjectURL(url);
-            }, 100);
+                a.click();
+                console.log('Download triggered');
+                
+                setTimeout(() => {
+                    if (document.body.contains(a)) {
+                        document.body.removeChild(a);
+                    }
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }, 10);
+            
+            resetButton();
         })
         .catch(error => {
-            // Ignore abort errors (expected for duplicates)
-            if (error.name === 'AbortError') {
-                console.log('Fetch aborted (duplicate prevented)');
-                return;
-            }
             console.error('Error:', error);
-            alert('Error: ' + error.message);
+            alert('Error merging audio files: ' + (error.message || 'Please try again.'));
+            resetButton();
         })
         .finally(() => {
-            // Always reset state
-            isProcessing = false;
-            downloadTriggered = false;
-            abortController = null;
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Merge & Download';
-            form.style.pointerEvents = 'auto';
+            setTimeout(() => {
+                if (submitBtn.textContent === 'Merging...' && submitBtn.disabled) {
+                    console.warn('Button still in merging state, forcing reset');
+                    resetButton();
+                }
+            }, 10000);
         });
+        
+        return false;
     };
     
-    // Attach submit handler (only once)
-    form.addEventListener('submit', submitHandler, { once: false });
+    // Attach event listener with capture phase
+    form.addEventListener('submit', handleFormSubmit, true);
     
-    // Also prevent button double-click
+    // Prevent double-click on submit button
     submitBtn.addEventListener('click', function(e) {
-        if (isProcessing) {
+        if (isSubmitting) {
             e.preventDefault();
             e.stopPropagation();
-            e.stopImmediatePropagation();
-            console.log('🚫 Button click blocked: already processing');
+            console.log('Button click prevented - already submitting');
             return false;
         }
     });
 });
 </script>
+
+<style>
+.remove-audio-btn:hover {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.6) !important;
+    color: #dc2626 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2) !important;
+}
+
+[data-theme="dark"] .remove-audio-btn {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+    color: #f87171 !important;
+}
+
+[data-theme="dark"] .remove-audio-btn:hover {
+    background: rgba(239, 68, 68, 0.25) !important;
+    border-color: rgba(239, 68, 68, 0.7) !important;
+    color: #ef4444 !important;
+}
+
+.remove-audio-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: inset 0 2px 4px rgba(239, 68, 68, 0.2) !important;
+}
+
+.audio-item.dragging {
+    opacity: 0.5;
+}
+</style>
 {% endblock %}
 {% endblock %}
 

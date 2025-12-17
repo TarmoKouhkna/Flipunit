@@ -5,3 +5,7 @@ def index(request):
     return render(request, 'youtube_thumbnail/index.html')
 
 
+
+
+
+

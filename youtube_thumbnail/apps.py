@@ -6,3 +6,7 @@ class YoutubeThumbnailConfig(AppConfig):
     name = 'youtube_thumbnail'
 
 
+
+
+
+

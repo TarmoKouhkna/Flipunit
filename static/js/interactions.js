@@ -329,6 +329,11 @@
                 return;
             }
             
+            // Skip the amount input in currency converter (no spinners needed)
+            if (input.id === 'amount' && input.closest('#converter-form')) {
+                return;
+            }
+            
             // Create wrapper
             const wrapper = document.createElement('div');
             wrapper.className = 'number-input-wrapper';

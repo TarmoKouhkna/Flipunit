@@ -5,36 +5,29 @@
 {% block content %}
 <div class="hero">
     <h1>Currency & Crypto Converter</h1>
-    <p>Convert between major world currencies, cryptocurrencies, and gold with real-time exchange rates</p>
+    <p>Convert between major world currencies and cryptocurrencies with real-time exchange rates</p>
 </div>
 
 <div class="card container-narrow" style="margin-top: 2rem; margin-bottom: 2rem;">
     <form id="converter-form" class="converter-tool">
         {% csrf_token %}
-        <div style="display: grid; grid-template-columns: 2fr 1fr 2fr; align-items: end;" class="gap-md">
-            <div class="form-group">
-                <label class="form-label">From</label>
-                <div style="display: flex;" class="gap-xs">
-                    <input type="number" id="amount" name="amount" class="form-control" placeholder="Amount" step="0.01" min="0" value="1" required>
-                    <select id="from_currency" name="from_currency" class="form-control" required>
+        <div style="display: grid; grid-template-columns: 2fr auto 1fr; align-items: start; gap: var(--space-md);" class="gap-md">
+            <div class="form-group" style="display: flex; flex-direction: column; height: 100%;">
+                <label class="form-label" style="margin-bottom: 0.5rem;">From</label>
+                <div style="display: flex; gap: var(--space-xs); align-items: stretch; margin-top: auto;" class="gap-xs">
+                    <input type="number" id="amount" name="amount" class="form-control" placeholder="Amount" step="0.01" min="0" value="1" required style="flex: 3; min-width: 150px;">
+                    <select id="from_currency" name="from_currency" class="form-control" required style="width: 130px; max-width: 130px; flex-shrink: 0; flex-grow: 0;">
                         <optgroup label="Fiat Currencies">
                             {% for code, info in currencies.items %}
                             <option value="{{ code }}" {% if code == 'USD' %}selected{% endif %}>
-                                {{ info.flag }} {{ code }} - {{ info.name }}
+                                {{ info.flag }} {{ code }}
                             </option>
                             {% endfor %}
                         </optgroup>
                         <optgroup label="Cryptocurrencies">
                             {% for code, info in cryptocurrencies.items %}
                             <option value="{{ code }}">
-                                {{ info.symbol }} {{ code }} - {{ info.name }}
-                            </option>
-                            {% endfor %}
-                        </optgroup>
-                        <optgroup label="Gold">
-                            {% for code, info in gold_units.items %}
-                            <option value="{{ code }}">
-                                {{ info.icon }} {{ info.symbol }} - {{ info.name }}
+                                {{ info.symbol }} {{ code }}
                             </option>
                             {% endfor %}
                         </optgroup>
@@ -42,33 +35,27 @@
                 </div>
             </div>
             
-            <div style="text-align: center; margin-bottom: 1.5rem;">
-                <button type="button" id="swap-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem;" title="Swap currencies">
+            <div class="form-group" style="display: flex; flex-flow: row; align-items: center; height: 100%; text-align: center; justify-content: center;">
+                <label class="form-label" style="margin-bottom: 0.5rem; opacity: 0; pointer-events: none; user-select: none;">&nbsp;</label>
+                <button type="button" id="swap-btn" class="btn btn-secondary" style="margin-top: auto;" title="Swap currencies" aria-label="Swap currencies">
                     ⇄
                 </button>
             </div>
             
-            <div class="form-group">
-                <label class="form-label">To</label>
-                <select id="to_currency" name="to_currency" class="form-control" required>
+            <div class="form-group" style="display: flex; flex-direction: column; height: 100%;">
+                <label class="form-label" style="margin-bottom: 0.5rem;">To</label>
+                <select id="to_currency" name="to_currency" class="form-control" required style="width: 130px; max-width: 130px; margin-top: auto;">
                     <optgroup label="Fiat Currencies">
                         {% for code, info in currencies.items %}
                         <option value="{{ code }}" {% if code == 'EUR' %}selected{% endif %}>
-                            {{ info.flag }} {{ code }} - {{ info.name }}
+                            {{ info.flag }} {{ code }}
                         </option>
                         {% endfor %}
                     </optgroup>
                     <optgroup label="Cryptocurrencies">
                         {% for code, info in cryptocurrencies.items %}
                         <option value="{{ code }}">
-                            {{ info.symbol }} {{ code }} - {{ info.name }}
-                        </option>
-                        {% endfor %}
-                    </optgroup>
-                    <optgroup label="Gold">
-                        {% for code, info in gold_units.items %}
-                        <option value="{{ code }}">
-                            {{ info.icon }} {{ info.symbol }} - {{ info.name }}
+                            {{ info.symbol }} {{ code }}
                         </option>
                         {% endfor %}
                     </optgroup>
@@ -109,14 +96,6 @@
                 {% endfor %}
             </ul>
         </div>
-        <div>
-            <strong>Gold:</strong>
-            <ul class="list-indent" style="margin-top: 0.5rem;">
-                {% for code, info in gold_units.items %}
-                <li>{{ info.icon }} {{ info.symbol }} - {{ info.name }}</li>
-                {% endfor %}
-            </ul>
-        </div>
     </div>
 </div>
 
@@ -131,20 +110,163 @@ document.addEventListener('DOMContentLoaded', function() {
     const rateDisplay = document.getElementById('rate-display');
     const swapBtn = document.getElementById('swap-btn');
     
+    // Remove spinner buttons from amount input if they exist
+    const amountInput = document.getElementById('amount');
+    if (amountInput) {
+        const wrapper = amountInput.closest('.number-input-wrapper');
+        if (wrapper) {
+            // Remove spinner buttons container
+            const spinnerContainer = wrapper.querySelector('.number-spinner-buttons');
+            if (spinnerContainer) {
+                spinnerContainer.remove();
+            }
+            // Unwrap the input (move it back to parent)
+            const parent = wrapper.parentNode;
+            parent.insertBefore(amountInput, wrapper);
+            wrapper.remove();
+        }
+    }
+    
     // Swap currencies
-    swapBtn.addEventListener('click', function() {
+    swapBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
         const fromCurrency = document.getElementById('from_currency');
         const toCurrency = document.getElementById('to_currency');
         const amount = document.getElementById('amount');
         
-        const temp = fromCurrency.value;
-        fromCurrency.value = toCurrency.value;
-        toCurrency.value = temp;
-        
-        // Trigger conversion if there's a result
-        if (resultDiv.style.display !== 'none') {
-            form.dispatchEvent(new Event('submit'));
+        if (!fromCurrency || !toCurrency) {
+            console.error('Currency selects not found');
+            return false;
         }
+        
+        // Get current selected values
+        const fromValue = fromCurrency.value;
+        const toValue = toCurrency.value;
+        
+        console.log('Before swap - From:', fromValue, 'To:', toValue);
+        
+        // Don't swap if they're the same
+        if (fromValue === toValue) {
+            console.log('Currencies are the same, no swap needed');
+            return false;
+        }
+        
+        // Store whether we should trigger conversion after swap
+        const hasResult = resultDiv.style.display !== 'none' && resultDiv.style.display !== '';
+        const hasAmount = amount && amount.value && parseFloat(amount.value) > 0;
+        const shouldConvert = hasResult || hasAmount;
+        
+        // Perform the swap - use multiple methods to ensure it works
+        // First, blur any active selects to ensure clean state
+        if (document.activeElement === fromCurrency) fromCurrency.blur();
+        if (document.activeElement === toCurrency) toCurrency.blur();
+        
+        // Use requestAnimationFrame to ensure visual update happens in next frame
+        requestAnimationFrame(() => {
+            // Find the option elements first
+            const fromOption = fromCurrency.querySelector(`option[value="${toValue}"]`);
+            const toOption = toCurrency.querySelector(`option[value="${fromValue}"]`);
+            
+            if (!fromOption || !toOption) {
+                console.error('Could not find option elements for swap');
+                return;
+            }
+            
+            // Method 1: Clear all and set selected property
+            Array.from(fromCurrency.options).forEach(opt => opt.selected = false);
+            Array.from(toCurrency.options).forEach(opt => opt.selected = false);
+            
+            fromOption.selected = true;
+            toOption.selected = true;
+            
+            // Method 2: Set value property
+            fromCurrency.value = toValue;
+            toCurrency.value = fromValue;
+            
+            // Method 3: Use setAttribute (some browsers need this)
+            fromCurrency.setAttribute('value', toValue);
+            toCurrency.setAttribute('value', fromValue);
+            
+            // Method 4: Use selectedIndex as fallback
+            const fromIndex = Array.from(fromCurrency.options).indexOf(fromOption);
+            const toIndex = Array.from(toCurrency.options).indexOf(toOption);
+            if (fromIndex >= 0) fromCurrency.selectedIndex = fromIndex;
+            if (toIndex >= 0) toCurrency.selectedIndex = toIndex;
+            
+            // Verify the swap worked
+            console.log('After swap - From:', fromCurrency.value, 'To:', toCurrency.value);
+            console.log('From selectedIndex:', fromCurrency.selectedIndex, 'To selectedIndex:', toCurrency.selectedIndex);
+            console.log('From selected option text:', fromCurrency.options[fromCurrency.selectedIndex]?.textContent);
+            console.log('To selected option text:', toCurrency.options[toCurrency.selectedIndex]?.textContent);
+            
+            // Force UI update with multiple event types
+            const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+            const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+            
+            fromCurrency.dispatchEvent(inputEvent);
+            toCurrency.dispatchEvent(inputEvent);
+            fromCurrency.dispatchEvent(changeEvent);
+            toCurrency.dispatchEvent(changeEvent);
+            
+            // Force a repaint by temporarily modifying style
+            const originalDisplay = fromCurrency.style.display;
+            fromCurrency.style.display = 'none';
+            void fromCurrency.offsetHeight; // Force reflow
+            fromCurrency.style.display = originalDisplay;
+            
+            toCurrency.style.display = 'none';
+            void toCurrency.offsetHeight; // Force reflow
+            toCurrency.style.display = originalDisplay;
+            
+            // Force a reflow to ensure browser updates the display
+            void fromCurrency.offsetHeight;
+            void toCurrency.offsetHeight;
+            
+            // Double-check after a microtask
+            setTimeout(() => {
+                const finalFrom = fromCurrency.value;
+                const finalTo = toCurrency.value;
+                console.log('Final check - From:', finalFrom, 'To:', finalTo);
+                
+                if (finalFrom !== toValue || finalTo !== fromValue) {
+                    console.error('Swap failed! Retrying...');
+                    // Retry once more
+                    fromCurrency.value = toValue;
+                    toCurrency.value = fromValue;
+                    fromCurrency.dispatchEvent(new Event('change', { bubbles: true }));
+                    toCurrency.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                
+                // Only trigger conversion after ensuring swap is complete and visible
+                if (shouldConvert) {
+                    // Wait longer to ensure UI is fully updated before converting
+                    setTimeout(() => {
+                        // Double-check values are swapped
+                        const currentFrom = fromCurrency.value;
+                        const currentTo = toCurrency.value;
+                        console.log('Before conversion - From:', currentFrom, 'To:', currentTo);
+                        
+                        if (currentFrom === toValue && currentTo === fromValue) {
+                            // Swap was successful, now convert
+                            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                        } else {
+                            console.error('Swap verification failed! Expected:', toValue, fromValue, 'Got:', currentFrom, currentTo);
+                        }
+                    }, 300);
+                }
+            }, 50);
+        });
+        
+        // Add visual feedback
+        swapBtn.style.transform = 'rotate(180deg)';
+        setTimeout(() => {
+            swapBtn.style.transform = 'rotate(0deg)';
+        }, 300);
+        
+        return false;
     });
     
     // Handle form submission
@@ -205,9 +327,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const fromOption = fromCurrency.options[fromCurrency.selectedIndex];
         const toOption = toCurrency.options[toCurrency.selectedIndex];
         
-        // Extract display text (handle gold units with icons)
-        const fromText = fromOption.text.includes(' - ') ? fromOption.text.split(' - ')[0] : fromOption.text;
-        const toText = toOption.text.includes(' - ') ? toOption.text.split(' - ')[0] : toOption.text;
+        // Display text is now just flag/icon + code
+        const fromText = fromOption.text.trim();
+        const toText = toOption.text.trim();
         
         resultContent.innerHTML = `
             <div style="font-size: 1.5rem; font-weight: bold; margin-bottom: 0.5rem;">
@@ -216,9 +338,9 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
-        // Format rate display with proper unit names
-        const fromLabel = fromOption.text.includes(' - ') ? fromOption.text.split(' - ')[1] : data.from_currency;
-        const toLabel = toOption.text.includes(' - ') ? toOption.text.split(' - ')[1] : data.to_currency;
+        // Format rate display with currency codes
+        const fromLabel = data.from_currency;
+        const toLabel = data.to_currency;
         rateDisplay.textContent = `1 ${fromLabel} = ${formatNumber(data.rate)} ${toLabel}`;
         resultDiv.style.display = 'block';
         errorDiv.style.display = 'none';
@@ -243,6 +365,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<style>
+#swap-btn {
+    transition: transform 0.3s ease, box-shadow var(--transition-base) !important;
+    cursor: pointer !important;
+}
+
+#swap-btn:hover {
+    transform: scale(1.1) !important;
+    box-shadow: var(--neu-shadow-hover) !important;
+}
+
+#swap-btn:active {
+    transform: scale(0.95) !important;
+    box-shadow: var(--neu-shadow-pressed) !important;
+}
+</style>
 {% endblock %}
 {% endblock %}
 
