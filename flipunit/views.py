@@ -147,6 +147,16 @@ def _get_all_tools():
         {'name': 'Volume Converter', 'url': ('converters:tool', 'volume'), 'category': 'Unit Converters', 'description': 'Convert between liters, gallons, cups, and more'},
         {'name': 'Area Converter', 'url': ('converters:tool', 'area'), 'category': 'Unit Converters', 'description': 'Convert between square meters, square feet, acres, and more'},
         {'name': 'Speed Converter', 'url': ('converters:tool', 'speed'), 'category': 'Unit Converters', 'description': 'Convert between km/h, mph, m/s, and more'},
+        {'name': 'Time Converter', 'url': ('converters:tool', 'time'), 'category': 'Unit Converters', 'description': 'Convert between seconds, minutes, hours, days, and more'},
+        {'name': 'Data Storage Converter', 'url': ('converters:tool', 'data-storage'), 'category': 'Unit Converters', 'description': 'Convert between bytes, KB, MB, GB, TB, and more'},
+        {'name': 'Energy Converter', 'url': ('converters:tool', 'energy'), 'category': 'Unit Converters', 'description': 'Convert between joules, calories, watt-hours, and more'},
+        {'name': 'Power Converter', 'url': ('converters:tool', 'power'), 'category': 'Unit Converters', 'description': 'Convert between watts, kilowatts, horsepower, and more'},
+        {'name': 'Pressure Converter', 'url': ('converters:tool', 'pressure'), 'category': 'Unit Converters', 'description': 'Convert between Pascal, bar, PSI, atmosphere, and more'},
+        {'name': 'Force Converter', 'url': ('converters:tool', 'force'), 'category': 'Unit Converters', 'description': 'Convert between newtons, pounds-force, kilogram-force, and more'},
+        {'name': 'Angle Converter', 'url': ('converters:tool', 'angle'), 'category': 'Unit Converters', 'description': 'Convert between degrees, radians, gradians, and turns'},
+        {'name': 'Fuel Consumption Converter', 'url': ('converters:tool', 'fuel-consumption'), 'category': 'Unit Converters', 'description': 'Convert between MPG, L/100km, km/L, and more'},
+        {'name': 'Frequency Converter', 'url': ('converters:tool', 'frequency'), 'category': 'Unit Converters', 'description': 'Convert between Hertz, kilohertz, megahertz, RPM, and more'},
+        {'name': 'Data Transfer Rate Converter', 'url': ('converters:tool', 'data-transfer'), 'category': 'Unit Converters', 'description': 'Convert between Mbps, MB/s, Gbps, and more'},
     ])
     
     # Image Converters
@@ -321,6 +331,12 @@ def search(request):
             'url': 'isdown:index',
             'description': 'Check instantly if any website is online or down',
             'icon': 'website-status.svg'
+        },
+        {
+            'name': 'YouTube Thumbnail Downloader',
+            'url': 'youtube_thumbnail:index',
+            'description': 'Download YouTube thumbnails in all available qualities',
+            'icon': 'youtube-thumbnail.svg'
         },
     ]
     

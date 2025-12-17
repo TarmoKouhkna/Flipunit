@@ -676,7 +676,7 @@ header:not(.hybrid-header) {
 
 .hybrid-hero {
     max-width: var(--container-max);
-    margin: 0 auto var(--space-2xl);
+    margin: 0 auto 2.75rem;
     padding: var(--space-xl) var(--space-sm);
     text-align: center;
 }
@@ -706,15 +706,18 @@ header:not(.hybrid-header) {
 }
 
 .hybrid-hero h1 {
-    font-size: var(--font-size-4xl);
+    font-size: 40px;
     font-weight: 700;
     margin-bottom: var(--space-xs);
-    color: var(--text-primary);
+    color: rgba(68, 47, 117, 1);
+    background-clip: unset;
+    -webkit-background-clip: unset;
     line-height: 1.2;
+    height: 54px;
 }
 
 .hybrid-hero p {
-    font-size: var(--font-size-2xl);
+    font-size: 20px;
     color: var(--text-secondary);
     margin-bottom: 0;
 }
@@ -1076,7 +1079,7 @@ header:not(.hybrid-header) {
     }
     
     .hybrid-hero h1 {
-        font-size: 3.25rem;
+        font-size: 3rem;
     }
     
     .hybrid-search-form {
@@ -1091,7 +1094,7 @@ header:not(.hybrid-header) {
     }
     
     .hybrid-hero-card {
-        padding: var(--space-lg) var(--space-xl);
+        padding: 2.5rem var(--space-xl);
     }
 }
 
