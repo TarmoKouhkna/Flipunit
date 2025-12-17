@@ -11,12 +11,12 @@
 <div class="card container-narrow" style="margin-top: 2rem; margin-bottom: 2rem;">
     <form id="converter-form" class="converter-tool">
         {% csrf_token %}
-        <div style="display: grid; grid-template-columns: 2fr auto 1fr; align-items: start; gap: var(--space-md);" class="gap-md">
+        <div class="currency-converter-grid">
             <div class="form-group" style="display: flex; flex-direction: column; height: 100%;">
                 <label class="form-label" style="margin-bottom: 0.5rem;">From</label>
-                <div style="display: flex; gap: var(--space-xs); align-items: stretch; margin-top: auto;" class="gap-xs">
-                    <input type="number" id="amount" name="amount" class="form-control" placeholder="Amount" step="0.01" min="0" value="1" required style="flex: 3; min-width: 150px;">
-                    <select id="from_currency" name="from_currency" class="form-control" required style="width: 130px; max-width: 130px; flex-shrink: 0; flex-grow: 0;">
+                <div class="currency-input-group" style="margin-top: auto;">
+                    <input type="number" id="amount" name="amount" class="form-control" placeholder="Amount" step="0.01" min="0" value="1" required>
+                    <select id="from_currency" name="from_currency" class="form-control currency-select" required>
                         <optgroup label="Fiat Currencies">
                             {% for code, info in currencies.items %}
                             <option value="{{ code }}" {% if code == 'USD' %}selected{% endif %}>
@@ -35,7 +35,7 @@
                 </div>
             </div>
             
-            <div class="form-group" style="display: flex; flex-flow: row; align-items: center; height: 100%; text-align: center; justify-content: center;">
+            <div class="swap-btn-container">
                 <label class="form-label" style="margin-bottom: 0.5rem; opacity: 0; pointer-events: none; user-select: none;">&nbsp;</label>
                 <button type="button" id="swap-btn" class="btn btn-secondary" style="margin-top: auto;" title="Swap currencies" aria-label="Swap currencies">
                     ⇄
@@ -44,7 +44,7 @@
             
             <div class="form-group" style="display: flex; flex-direction: column; height: 100%;">
                 <label class="form-label" style="margin-bottom: 0.5rem;">To</label>
-                <select id="to_currency" name="to_currency" class="form-control" required style="width: 130px; max-width: 130px; margin-top: auto;">
+                <select id="to_currency" name="to_currency" class="form-control currency-select" required style="margin-top: auto;">
                     <optgroup label="Fiat Currencies">
                         {% for code, info in currencies.items %}
                         <option value="{{ code }}" {% if code == 'EUR' %}selected{% endif %}>
@@ -367,6 +367,45 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+/* Currency Converter Grid Layout - Desktop */
+.currency-converter-grid {
+    display: grid;
+    grid-template-columns: 2fr auto 1fr;
+    gap: var(--space-md);
+    align-items: start;
+}
+
+.currency-input-group {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: stretch;
+}
+
+.currency-input-group input {
+    flex: 3;
+    min-width: 150px;
+}
+
+.currency-input-group .currency-select {
+    width: 130px;
+    max-width: 130px;
+    flex-shrink: 0;
+    flex-grow: 0;
+}
+
+.form-group > .currency-select {
+    width: 130px;
+    max-width: 130px;
+}
+
+.swap-btn-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
 #swap-btn {
     transition: transform 0.3s ease, box-shadow var(--transition-base) !important;
     cursor: pointer !important;
@@ -380,6 +419,52 @@ document.addEventListener('DOMContentLoaded', function() {
 #swap-btn:active {
     transform: scale(0.95) !important;
     box-shadow: var(--neu-shadow-pressed) !important;
+}
+
+/* Mobile Layout */
+@media (max-width: 767px) {
+    .currency-converter-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+    }
+    
+    .currency-input-group {
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+    
+    .currency-input-group input,
+    .currency-input-group .currency-select,
+    .form-group > .currency-select {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+    }
+    
+    .swap-btn-container {
+        order: 2;
+        padding: 0;
+        margin: var(--space-sm) 0;
+    }
+    
+    .swap-btn-container label {
+        display: none;
+    }
+    
+    #swap-btn {
+        width: 100% !important;
+        max-width: 200px !important;
+        margin-top: 0 !important;
+    }
+    
+    .form-group:first-child {
+        order: 1;
+    }
+    
+    .form-group:last-child {
+        order: 3;
+    }
 }
 </style>
 {% endblock %}
