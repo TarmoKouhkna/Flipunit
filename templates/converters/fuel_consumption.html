@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ converter.title }} - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online {{ converter.title|lower }} - Convert between different units and calculate driving range. Fast, accurate, no registration required.{% endblock %}
+{% block og_title %}{{ converter.title }} - {{ SITE_NAME }}{% endblock %}
+{% block og_description %}Free online {{ converter.title|lower }} - Convert between different units and calculate driving range.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">{{ converter.title }}</h1>
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="value">Value</label>
+                <input type="number" step="any" class="form-control" id="value" name="value" 
+                       placeholder="Enter value" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="from_unit">From</label>
+                <select class="form-select" id="from_unit" name="from_unit" required>
+                    {% for unit, symbol, factor in converter.units %}
+                    <option value="{{ unit }}">{{ unit|capfirst }} ({{ symbol }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="to_unit">To</label>
+                <select class="form-select" id="to_unit" name="to_unit" required>
+                    {% for unit, symbol, factor in converter.units %}
+                    <option value="{{ unit }}">{{ unit|capfirst }} ({{ symbol }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" name="action" value="convert">Convert</button>
+    </form>
+    
+    {% if result is not None %}
+    <div class="converter-result">
+        <h3>Result:</h3>
+        <p style="font-size: 1.5rem; font-weight: 600; color: var(--primary-color);">
+            {{ result }} {% if result_unit_symbol %}{{ result_unit_symbol }}{% endif %}
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-top: 2rem;">
+    <h2 class="card-title">🚗 Driving Range Calculator</h2>
+    <p style="margin-bottom: 1.5rem; color: #666;">Calculate how far you can drive with a given amount of fuel</p>
+    
+    <form method="post" class="converter-tool">
+        {% csrf_token %}
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label" for="fuel_amount">Fuel Amount</label>
+                <input type="number" step="any" class="form-control" id="fuel_amount" name="fuel_amount" 
+                       placeholder="e.g., 50" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="fuel_unit">Fuel Unit</label>
+                <select class="form-select" id="fuel_unit" name="fuel_unit" required>
+                    <option value="liter">Liters (L)</option>
+                    <option value="gallon_us">Gallons (US)</option>
+                    <option value="gallon_uk">Gallons (UK)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="consumption_value">Fuel Consumption</label>
+                <input type="number" step="any" class="form-control" id="consumption_value" name="consumption_value" 
+                       placeholder="e.g., 7" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="consumption_unit">Consumption Unit</label>
+                <select class="form-select" id="consumption_unit" name="consumption_unit" required>
+                    <option value="liter per 100 km">L/100km</option>
+                    <option value="kilometer per liter">km/L</option>
+                    <option value="mile per gallon (US)">MPG (US)</option>
+                    <option value="mile per gallon (UK)">MPG (UK)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="distance_unit">Display Range In</label>
+                <select class="form-select" id="distance_unit" name="distance_unit" required>
+                    <option value="km">Kilometers (km)</option>
+                    <option value="miles">Miles (mi)</option>
+                </select>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" name="action" value="range">Calculate Range</button>
+    </form>
+    
+    {% if range_result is not None %}
+    <div class="converter-result">
+        <h3>Driving Range:</h3>
+        <p style="font-size: 1.5rem; font-weight: 600; color: var(--primary-color);">
+            {{ range_result }} {{ range_unit }}
+        </p>
+        <p style="color: #666; margin-top: 0.5rem;">
+            With {{ fuel_display }} of fuel at {{ consumption_display }}, you can drive approximately {{ range_result }} {{ range_unit }}.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<a href="{% url 'converters:index' %}" class="btn btn-secondary">← Back to Converters</a>
+{% endblock %}

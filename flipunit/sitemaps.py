@@ -36,6 +36,16 @@ class StaticViewSitemap(Sitemap):
             ('converters:tool', 'volume'),
             ('converters:tool', 'area'),
             ('converters:tool', 'speed'),
+            ('converters:tool', 'time'),
+            ('converters:tool', 'data-storage'),
+            ('converters:tool', 'energy'),
+            ('converters:tool', 'power'),
+            ('converters:tool', 'pressure'),
+            ('converters:tool', 'force'),
+            ('converters:tool', 'angle'),
+            ('converters:tool', 'fuel-consumption'),
+            ('converters:tool', 'frequency'),
+            ('converters:tool', 'data-transfer'),
             
             # Image converters
             'image_converter:universal',
