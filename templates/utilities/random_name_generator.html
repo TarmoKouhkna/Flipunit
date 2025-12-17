@@ -3,6 +3,69 @@
 {% block title %}Random Name Generator - {{ SITE_NAME }}{% endblock %}
 {% block meta_description %}Generate random names from different regions. Create random names from European, English, USA, and Spanish name databases with customizable options.{% endblock %}
 
+{% block extra_css %}
+<style>
+.region-checkbox {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+    margin-right: 0.75rem !important;
+    flex-shrink: 0 !important;
+    cursor: pointer;
+    transform: scale(1) !important;
+    -webkit-appearance: checkbox !important;
+    appearance: checkbox !important;
+    padding: 0 !important;
+}
+
+/* Custom scrollbar for names container */
+.names-scroll-container {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-accent) var(--surface);
+}
+
+.names-scroll-container::-webkit-scrollbar {
+    width: 10px;
+}
+
+.names-scroll-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.names-scroll-container::-webkit-scrollbar-thumb {
+    background: var(--primary-accent);
+    border-radius: 4px;
+}
+
+.names-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-accent);
+}
+
+@media (max-width: 767px) {
+    .region-checkbox {
+        width: 16px !important;
+        height: 16px !important;
+        min-width: 16px !important;
+        min-height: 16px !important;
+        max-width: 16px !important;
+        max-height: 16px !important;
+        margin-right: 0.75rem !important;
+        padding: 0 !important;
+        transform: scale(1) !important;
+    }
+    
+    /* Adjust max-height on mobile */
+    .names-scroll-container {
+        max-height: 300px !important;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card">
     <h1 class="card-title">Random Name Generator</h1>
@@ -17,7 +80,7 @@
     {% if result %}
         <div class="alert alert-success" style="margin-bottom: 2rem;">
             <h3 style="margin-bottom: 0.5rem;">Generated Names:</h3>
-            <div style="background: var(--surface); padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+            <div class="names-scroll-container" style="background: var(--surface); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; max-height: 400px; overflow-y: scroll; overflow-x: hidden;">
                 {% for name in result.names %}
                     <div style="display: inline-block; margin: 0.25rem; padding: 0.5rem 1rem; background: var(--card-bg); color: var(--text-primary); border-radius: 4px; font-size: 1.1rem; border: 1px solid var(--border-color);">{{ name }}</div>
                 {% endfor %}
@@ -42,7 +105,16 @@
                     {% endfor %}
                 </p>
             </div>
-            <button onclick="copyToClipboard()" class="btn btn-secondary" style="margin-top: 1rem;">Copy Names to Clipboard</button>
+            <button onclick="copyToClipboard()" class="btn btn-primary" style="margin-top: 1rem; font-size: 1.1rem; padding: 1rem 2rem;">
+                Copy Names to Clipboard
+            </button>
+            <p style="margin-top: 1rem; padding: 1rem; background: rgba(96, 165, 250, 0.1); border-radius: 6px; border-left: 4px solid var(--primary-accent); font-size: 0.95rem; line-height: 1.6;">
+                💡 <strong>How to use with Lottery:</strong><br>
+                1. Click "Copy Names to Clipboard" above<br>
+                2. Go to <a href="{% url 'utilities:word_lottery' %}" style="color: var(--primary-accent); text-decoration: underline; font-weight: bold;">Words, Names & Numbers Lottery</a><br>
+                3. Tap in the text area and paste (Ctrl+V or right-click → Paste)<br>
+                4. Click "Pick Random Winner"
+            </p>
         </div>
     {% endif %}
     
@@ -50,9 +122,9 @@
         {% csrf_token %}
         <div class="form-group">
             <label class="form-label">Number of Names</label>
-            <input type="number" name="count" id="count" class="form-control" value="5" min="1" max="100" required>
+            <input type="number" name="count" id="count" class="form-control" value="5" min="1" max="1000" required>
             <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">
-                Maximum 100 names
+                Maximum 1000 names
             </small>
         </div>
         
@@ -78,19 +150,19 @@
             <label class="form-label">Regions (select one or more)</label>
             <div style="display: flex; flex-direction: column; margin-top: 0.5rem;" class="gap-xs">
                 <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" name="regions" value="european" checked style="margin-right: 0.5rem;">
+                    <input type="checkbox" name="regions" value="european" checked class="region-checkbox">
                     <span>European (Various European countries)</span>
                 </label>
                 <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" name="regions" value="english" checked style="margin-right: 0.5rem;">
+                    <input type="checkbox" name="regions" value="english" checked class="region-checkbox">
                     <span>English (United Kingdom)</span>
                 </label>
                 <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" name="regions" value="usa" checked style="margin-right: 0.5rem;">
+                    <input type="checkbox" name="regions" value="usa" checked class="region-checkbox">
                     <span>USA (United States)</span>
                 </label>
                 <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" name="regions" value="spanish" checked style="margin-right: 0.5rem;">
+                    <input type="checkbox" name="regions" value="spanish" checked class="region-checkbox">
                     <span>Spanish (Spain & Latin America)</span>
                 </label>
             </div>
@@ -105,7 +177,7 @@
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
         <ol class="list-indent" style="margin-top: 0.5rem;">
-            <li>Specify how many names you want to generate (1-100)</li>
+            <li>Specify how many names you want to generate (1-1000)</li>
             <li>Choose the name type: full name, first name only, or last name only</li>
             <li>Select gender preference: any, male, or female</li>
             <li>Select one or more regions to generate names from</li>
@@ -121,17 +193,75 @@
 
 {% block extra_js %}
 <script>
-function copyToClipboard() {
+async function copyToClipboard() {
     const names = [];
     document.querySelectorAll('.alert-success div[style*="background: var(--card-bg)"]').forEach(function(el) {
         names.push(el.textContent.trim());
     });
     const text = names.join('\n');
-    navigator.clipboard.writeText(text).then(function() {
-        alert('Names copied to clipboard!');
-    }, function() {
-        alert('Failed to copy names');
-    });
+    
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('✅ ' + names.length + ' name' + (names.length > 1 ? 's' : '') + ' copied to clipboard!', 3000);
+    } catch (err) {
+        console.error('Failed to copy:', err);
+        
+        // Fallback: Create a temporary textarea and try the old-school way
+        const tempTextarea = document.createElement('textarea');
+        tempTextarea.value = text;
+        tempTextarea.style.position = 'fixed';
+        tempTextarea.style.left = '-9999px';
+        document.body.appendChild(tempTextarea);
+        tempTextarea.select();
+        
+        try {
+            document.execCommand('copy');
+            document.body.removeChild(tempTextarea);
+            showToast('✅ ' + names.length + ' name' + (names.length > 1 ? 's' : '') + ' copied to clipboard!', 3000);
+        } catch (err2) {
+            document.body.removeChild(tempTextarea);
+            showToast('❌ Failed to copy. Please manually select and copy the names.', 3000);
+        }
+    }
+}
+
+function showToast(message, duration = 2500) {
+    // Remove any existing toast
+    const existingToast = document.querySelector('.copy-toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Create toast notification
+    const toast = document.createElement('div');
+    toast.className = 'copy-toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--card-bg);
+        color: var(--text-primary);
+        padding: 1rem 2rem;
+        border-radius: 8px;
+        box-shadow: var(--neu-shadow);
+        border: 1px solid var(--border-color);
+        z-index: 10000;
+        font-weight: 500;
+        animation: slideUp 0.3s ease-out;
+        max-width: 90%;
+        text-align: center;
+        line-height: 1.5;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease-out';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
 }
 </script>
 {% endblock %}

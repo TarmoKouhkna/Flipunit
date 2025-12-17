@@ -470,15 +470,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show progress indicator
         const progressDiv = document.createElement('div');
         progressDiv.id = 'mergeProgress';
-        progressDiv.style.cssText = 'margin-top: 1rem; padding: 1rem; background: #f0f0f0; border-radius: 4px; text-align: center;';
+        progressDiv.className = 'merge-progress-modal';
         progressDiv.innerHTML = `
-            <div style="margin-bottom: 0.5rem;">
+            <div class="merge-progress-title">
                 <strong>Processing ${videoFiles.length} video(s)...</strong>
             </div>
-            <div style="width: 100%; height: 8px; background: #ddd; border-radius: 4px; overflow: hidden;">
-                <div id="progressBar" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.3s;"></div>
+            <div class="merge-progress-bar-container">
+                <div id="progressBar" class="merge-progress-bar"></div>
             </div>
-            <div id="progressText" style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+            <div id="progressText" class="merge-progress-text">
                 Preparing files...
             </div>
         `;
@@ -706,16 +706,18 @@ document.addEventListener('DOMContentLoaded', function() {
         // Create modal
         const modal = document.createElement('div');
         modal.id = 'videoPreviewModal';
-        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99999; display: flex; align-items: center; justify-content: center; touch-action: manipulation; -webkit-overflow-scrolling: touch;';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 99999; display: flex; align-items: center; justify-content: center; touch-action: manipulation; -webkit-overflow-scrolling: touch; animation: fadeIn 0.2s ease;';
         
         // Create blob URL for original video (reuse if exists)
-        // iOS Safari has issues with blob URLs from File objects, so we'll use server preview for iOS
+        // iOS Safari and macOS Safari have issues with blob URLs from File objects
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
-        console.log('Device detection - isIOS:', isIOS, 'isMobile:', isMobile);
+        console.log('Device detection - isIOS:', isIOS, 'isSafari:', isSafari, 'isMobile:', isMobile);
         
-        if (!videoFile.previewUrl && !isIOS && !isMobile) {
+        // Safari (all platforms) works better with server-side preview
+        if (!videoFile.previewUrl && !isIOS && !isMobile && !isSafari) {
             try {
                 videoFile.previewUrl = URL.createObjectURL(videoFile.file);
                 console.log('Created blob URL for preview');
@@ -724,43 +726,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 videoFile.previewUrl = null;
             }
         } else {
-            console.log('Skipping blob URL creation for mobile device');
+            console.log('Skipping client-side blob URL (mobile/Safari detected)');
         }
         
         modal.innerHTML = `
-            <div style="background: white; padding: 1.5rem; border-radius: 8px; max-width: 95vw; max-height: 95vh; width: 90vw; overflow-y: auto; overflow-x: hidden; position: relative; box-sizing: border-box; touch-action: manipulation; -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none;">
-                <button id="closePreview" style="position: absolute; top: 1rem; right: 1rem; background: #ccc; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; z-index: 10;">✕ Close</button>
-                <h3 style="margin-bottom: 1rem; margin-right: 4rem;">Preview & Trim: ${videoFile.file.name}</h3>
-                <div id="videoPreviewContainer" style="position: relative; margin-bottom: 1rem; background: #000; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 200px; max-height: 60vh; overflow: hidden; border-radius: 4px;">
-                    <video id="previewPlayer" controls preload="metadata" playsinline style="max-width: 100%; max-height: 60vh; width: auto; height: auto; display: block; object-fit: contain;"></video>
-                    <div id="videoError" style="display: none; padding: 2rem; text-align: center; color: #666; background: #f0f0f0; width: 100%; border-radius: 4px;">
-                        <p style="color: #333; font-weight: 600;">Video preview unavailable</p>
-                        <p style="font-size: 0.9rem; margin-top: 0.5rem; color: #666;">You can still set trim times manually below. The trim will be applied when merging.</p>
+            <div class="hybrid-modal-content">
+                <h3 class="hybrid-modal-title">Preview & Trim: ${videoFile.file.name}</h3>
+                <button id="closePreview" class="btn btn-secondary hybrid-modal-close" aria-label="Close">✕</button>
+                <div id="videoPreviewContainer" class="hybrid-video-container">
+                    <video id="previewPlayer" controls preload="metadata" playsinline class="hybrid-video-player"></video>
+                    <div id="videoError" class="hybrid-video-error" style="display: none;">
+                        <p class="error-title">Video preview unavailable</p>
+                        <p class="error-message">You can still set trim times manually below. The trim will be applied when merging.</p>
                     </div>
-                    <div id="trimOverlay" style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: rgba(255,0,0,0.3); pointer-events: none; display: none;"></div>
-                    <div id="trimStartMarker" style="position: absolute; top: 0; bottom: 0; width: 2px; background: #00ff00; pointer-events: none; display: none;"></div>
-                    <div id="trimEndMarker" style="position: absolute; top: 0; bottom: 0; width: 2px; background: #ff0000; pointer-events: none; display: none;"></div>
+                    <div id="trimOverlay" class="trim-overlay"></div>
+                    <div id="trimStartMarker" class="trim-marker trim-start"></div>
+                    <div id="trimEndMarker" class="trim-marker trim-end"></div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem;">
-                    <div>
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time (seconds)</label>
-                        <input type="number" id="previewStartTime" step="0.1" min="0" value="${videoFile.startTime}" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; -webkit-appearance: none;">
-                        <button type="button" id="setStartFromPlayer" style="margin-top: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px;">Set from Player Position</button>
+                <div class="hybrid-modal-inputs">
+                    <div class="form-group">
+                        <label class="form-label">Start Time (seconds)</label>
+                        <input type="number" id="previewStartTime" step="0.1" min="0" value="${videoFile.startTime}" class="form-control modal-input">
+                        <button type="button" id="setStartFromPlayer" class="btn btn-primary modal-btn">Set from Player Position</button>
                     </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time (seconds)</label>
-                        <input type="number" id="previewEndTime" step="0.1" min="0" value="${videoFile.endTime || ''}" placeholder="Full video" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; -webkit-appearance: none;">
-                        <button type="button" id="setEndFromPlayer" style="margin-top: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">Set from Player Position</button>
+                    <div class="form-group">
+                        <label class="form-label">End Time (seconds, leave empty for full video)</label>
+                        <input type="number" id="previewEndTime" step="0.1" min="0" value="${videoFile.endTime || ''}" placeholder="Full video" class="form-control modal-input">
+                        <button type="button" id="setEndFromPlayer" class="btn btn-primary modal-btn">Set from Player Position</button>
                     </div>
                 </div>
-                <div style="margin-bottom: 1rem; padding: 1rem; background: #f0f0f0; border-radius: 4px;">
-                    <p style="margin: 0; font-size: 0.9rem; color: #666;">
-                        <strong>Tip:</strong> Play the video and use the buttons above to set trim points from the current playback position. 
+                <div class="privacy-notice hybrid-modal-tip">
+                    <p id="modalTipText">
+                        <strong>💡 Tip:</strong> Play the video and use the buttons above to set trim points from the current playback position. 
                         The trim will be applied when you merge the videos.
                     </p>
                 </div>
-                <div style="display: flex; gap: 1rem; position: relative; z-index: 1000; justify-content: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;">
-                    <button id="applyTrim" type="button" style="background: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; position: relative; z-index: 1001; font-size: 16px; min-height: 44px; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">Apply Trim</button>
+                <div class="hybrid-modal-actions">
+                    <button id="applyTrim" type="button" class="btn btn-primary hybrid-apply-btn">Apply Trim</button>
                 </div>
             </div>
         `;
@@ -778,6 +780,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const trimEndMarker = modal.querySelector('#trimEndMarker');
         const trimOverlay = modal.querySelector('#trimOverlay');
         const videoError = modal.querySelector('#videoError');
+        const modalTipText = modal.querySelector('#modalTipText');
         
         // Set video attributes for better compatibility
         previewPlayer.setAttribute('playsinline', '');
@@ -809,67 +812,37 @@ document.addEventListener('DOMContentLoaded', function() {
         
         function tryServerPreview() {
             console.log('Starting server preview for:', videoFile.file.name);
-            videoError.innerHTML = '<p>Loading preview from server...</p>';
+            const fileSizeMB = (videoFile.file.size / (1024 * 1024)).toFixed(1);
+            videoError.innerHTML = `<p class="error-title">⏳ Loading preview from server...</p><p class="error-message">File size: ${fileSizeMB}MB. This may take a moment.</p>`;
             videoError.style.display = 'block';
             previewPlayer.style.display = 'none';
             
-            // Add timeout to prevent infinite loading - longer timeout for large files
-            const fileSizeMB = (videoFile.file.size / (1024 * 1024)).toFixed(1);
-            const timeoutDuration = Math.max(60000, Math.min(120000, fileSizeMB * 10000)); // 60-120 seconds based on file size
-            console.log(`Setting timeout to ${timeoutDuration/1000} seconds for ${fileSizeMB}MB file`);
-            
-            const timeout = setTimeout(() => {
-                console.error('Server preview timeout after', timeoutDuration/1000, 'seconds');
-                // Check if video is actually loading
-                if (previewPlayer.readyState === 0 && !previewPlayer.src) {
-                    videoError.innerHTML = `
-                        <p><strong>Preview loading timeout</strong></p>
-                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">The video file is large (${fileSizeMB}MB) and may take longer to load.</p>
-                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually. The trim will be applied when merging.</p>
-                    `;
-                } else if (previewPlayer.readyState >= 2) {
-                    // Video is loading, give it more time
-                    console.log('Video is loading (readyState:', previewPlayer.readyState, '), extending timeout');
-                    return; // Don't show error yet
-                } else {
-                    videoError.innerHTML = `
-                        <p><strong>Preview loading timeout</strong></p>
-                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually. The trim will be applied when merging.</p>
-                    `;
-                }
-                videoError.style.display = 'block';
-            }, timeoutDuration);
-            
             loadServerPreview(videoFile, previewPlayer).then(() => {
-                clearTimeout(timeout);
                 console.log('Server preview loaded successfully');
-                // Force video to show and play
+                // Force video to show
+                videoError.style.display = 'none';
                 previewPlayer.style.display = 'block';
                 previewPlayer.style.visibility = 'visible';
-                videoError.style.display = 'none';
+                previewPlayer.style.opacity = '1';
                 
-                // On mobile, ensure video is visible and can play
-                if (isMobile || isIOS) {
-                    previewPlayer.setAttribute('playsinline', '');
-                    previewPlayer.setAttribute('webkit-playsinline', '');
-                    previewPlayer.setAttribute('x5-playsinline', '');
-                    // Try to load and play
-                    previewPlayer.load();
-                    setTimeout(() => {
-                        previewPlayer.play().catch(e => {
-                            console.log('Auto-play prevented, user interaction required:', e);
-                        });
-                    }, 100);
+                // Ensure the video container is visible
+                const videoContainer = previewPlayer.closest('.hybrid-video-container');
+                if (videoContainer) {
+                    videoContainer.style.minHeight = 'auto';
                 }
+                
+                // Update trim markers with loaded duration
+                updateTrimMarkers();
             }).catch(err => {
-                clearTimeout(timeout);
                 console.error('Server preview error:', err);
+                // Show error but allow manual trimming
                 videoError.innerHTML = `
-                    <p><strong>Preview unavailable</strong></p>
-                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">Error: ${err.message || 'Unknown error'}</p>
-                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually. The trim will be applied when merging.</p>
+                    <p class="error-title">⚠️ Preview unavailable</p>
+                    <p class="error-message">${err.message || 'Could not load preview'}</p>
+                    <p class="error-message">You can still set trim times manually. The trim will be applied when merging.</p>
                 `;
                 videoError.style.display = 'block';
+                previewPlayer.style.display = 'none';
             });
         }
         
@@ -887,16 +860,19 @@ document.addEventListener('DOMContentLoaded', function() {
             
             previewPlayer.style.display = 'none';
             videoError.innerHTML = `
-                <p><strong>Video preview unavailable</strong></p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;">You can still set trim times manually below. The trim will be applied when merging.</p>
+                <p class="error-title">📹 Video preview unavailable</p>
+                <p class="error-message">You can still set trim times manually below. The trim will be applied when merging.</p>
             `;
             videoError.style.display = 'block';
         });
         
         // Handle successful load
         previewPlayer.addEventListener('loadeddata', function() {
+            console.log('Video loadeddata event fired');
             videoError.style.display = 'none';
             previewPlayer.style.display = 'block';
+            previewPlayer.style.visibility = 'visible';
+            previewPlayer.style.opacity = '1';
         });
         
         // Update trim markers when video metadata is loaded
@@ -915,19 +891,32 @@ document.addEventListener('DOMContentLoaded', function() {
             updateTrimMarkers();
         });
         
-        // For iOS, skip video preview and just show manual input
-        // iOS Safari has issues with large blob URLs and server previews
-        if (isIOS) {
-            console.log('iOS detected - showing manual trim input only (no video preview)');
+        // For iOS and Safari, skip video preview and just show manual input
+        // Safari has known issues with video blob URLs
+        if (isIOS || isSafari) {
+            console.log('iOS/Safari detected - showing manual trim input only (no video preview)');
             videoError.innerHTML = `
-                <p><strong>Manual Trim Mode</strong></p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;">On iOS, please set trim times manually below. The trim will be applied when merging.</p>
+                <p class="error-title">✏️ Manual Trim Mode (Safari)</p>
+                <p class="error-message">Video preview is not supported in Safari due to browser limitations.</p>
+                <p class="error-message"><strong>💡 Tip:</strong> Open your video in QuickTime Player or another app to find the exact start and end times you want, then enter them below.</p>
+                <p class="error-message">Leave end time empty to use the full video from the start time.</p>
             `;
             videoError.style.display = 'block';
             previewPlayer.style.display = 'none';
+            
+            // Update the tip text for manual mode
+            if (modalTipText) {
+                modalTipText.innerHTML = `
+                    <strong>📝 How to trim:</strong> Enter the start time (in seconds) where you want your clip to begin, 
+                    and optionally an end time where you want it to finish. For example, enter 5 for start and 15 for end 
+                    to keep seconds 5-15 of your video. Leave end time empty to keep everything from the start time to the end.
+                `;
+            }
+            
             // Don't try to load preview
             useServerPreview = false;
         } else if (isMobile || isMovFile) {
+            // Mobile and MOV files use server preview
             console.log('Using server preview for Mobile/MOV file');
             useServerPreview = true;
             // Small delay to ensure modal is rendered
@@ -935,7 +924,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tryServerPreview();
             }, 100);
         } else {
-            // Try client-side first for supported formats
+            // Try client-side first for supported formats (Chrome, Firefox, Edge)
             tryClientSidePreview();
             
             // Fallback to server preview if client-side fails
@@ -1020,8 +1009,32 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initial marker update
         setTimeout(updateTrimMarkers, 100);
         
+        // Close modal function - defined first so it can be used by other functions
+        const closeModal = function(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            console.log('Closing modal');
+            
+            // Clean up video
+            if (previewPlayer.src) {
+                previewPlayer.pause();
+                previewPlayer.src = '';
+            }
+            
+            // Remove modal from DOM
+            if (modal && modal.parentNode) {
+                document.body.removeChild(modal);
+            }
+        };
+        
         // Apply trim and close - use both click and touchstart for iOS compatibility
-        function applyTrim() {
+        function applyTrim(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
             console.log('Apply Trim clicked');
             // Normalize comma to dot for decimal separator
             const startValue = previewStartTime.value.replace(',', '.');
@@ -1040,178 +1053,218 @@ document.addEventListener('DOMContentLoaded', function() {
             if (endInput) endInput.value = end || '';
             updateTrimDuration(itemElement, videoFile);
             
-            // Don't revoke previewUrl - we'll reuse it
-            previewPlayer.src = '';
-            document.body.removeChild(modal);
+            // Close the modal
+            closeModal();
         }
         
         if (applyTrimBtn) {
-            applyTrimBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                applyTrim();
-            });
+            applyTrimBtn.addEventListener('click', applyTrim);
             // Also listen for touch events on iOS
             applyTrimBtn.addEventListener('touchend', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                applyTrim();
+                applyTrim(e);
             });
         } else {
             console.error('Apply Trim button not found!');
         }
         
-        // Close modal
-        closeBtn.addEventListener('click', function() {
-            previewPlayer.src = '';
-            document.body.removeChild(modal);
-        });
+        // Close button - multiple event types for better compatibility
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeModal);
+            closeBtn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                closeModal(e);
+            });
+        } else {
+            console.error('Close button not found!');
+        }
         
         // Close on outside click
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
-                previewPlayer.src = '';
-                document.body.removeChild(modal);
+                closeModal(e);
             }
         });
     }
     
     // Load server-side preview (fallback for unsupported formats like MOV)
     async function loadServerPreview(videoFile, videoElement) {
-        try {
-            console.log('loadServerPreview called for:', videoFile.file.name);
-            const formData = new FormData();
-            formData.append('video_file', videoFile.file);
-            formData.append('start_time', videoFile.startTime || 0);
-            if (videoFile.endTime !== null) {
-                formData.append('end_time', videoFile.endTime);
-            }
+        console.log('loadServerPreview called for:', videoFile.file.name);
+        
+        const formData = new FormData();
+        formData.append('video_file', videoFile.file);
+        formData.append('start_time', videoFile.startTime || 0);
+        if (videoFile.endTime !== null) {
+            formData.append('end_time', videoFile.endTime);
+        }
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfToken) {
+            throw new Error('CSRF token not found');
+        }
+        formData.append('csrfmiddlewaretoken', csrfToken.value);
+        
+        console.log('Sending preview request to server...');
+        const previewUrl = '{% url "media_converter:video_preview" %}';
+        
+        const response = await fetch(previewUrl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+        
+        console.log('Server response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Server preview failed: ${response.status}`);
+        }
+        
+        const responseBlob = await response.blob();
+        console.log('Received blob size:', responseBlob.size, 'type:', responseBlob.type);
+        
+        if (responseBlob.size === 0) {
+            throw new Error('Preview video is empty');
+        }
+        
+        // Ensure blob has correct MIME type for Safari
+        // Safari sometimes has issues if blob type is empty
+        let blob = responseBlob;
+        if (!blob.type || blob.type === '' || blob.type === 'application/octet-stream') {
+            console.log('Fixing blob MIME type to video/mp4');
+            blob = new Blob([responseBlob], { type: 'video/mp4' });
+        }
+        
+        // Revoke old URL if exists
+        if (videoElement.src && videoElement.src.startsWith('blob:')) {
+            URL.revokeObjectURL(videoElement.src);
+        }
+        if (videoFile.serverPreviewUrl) {
+            URL.revokeObjectURL(videoFile.serverPreviewUrl);
+        }
+        
+        const url = URL.createObjectURL(blob);
+        console.log('Created blob URL:', url);
+        videoFile.serverPreviewUrl = url;
+        
+        // Set up video element - Safari compatible approach
+        videoElement.preload = 'auto';
+        videoElement.setAttribute('type', 'video/mp4');
+        videoElement.src = url;
+        
+        // Force display before load
+        videoElement.style.display = 'block';
+        videoElement.style.visibility = 'visible';
+        
+        // Safari-specific: remove any existing source elements
+        while (videoElement.firstChild) {
+            videoElement.removeChild(videoElement.firstChild);
+        }
+        
+        // Safari-compatible loading - use simpler approach
+        return new Promise((resolve, reject) => {
+            let resolved = false;
+            let checkInterval = null;
+            let timeoutId = null;
             
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-            if (!csrfToken) {
-                throw new Error('CSRF token not found');
-            }
-            formData.append('csrfmiddlewaretoken', csrfToken.value);
+            const cleanup = () => {
+                if (checkInterval) {
+                    clearInterval(checkInterval);
+                    checkInterval = null;
+                }
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+            };
             
-            console.log('Sending preview request to server...');
-            const previewUrl = '{% url "media_converter:video_preview" %}';
-            console.log('Preview URL:', previewUrl);
+            const doResolve = () => {
+                if (resolved) return;
+                resolved = true;
+                cleanup();
+                
+                if (videoElement.duration && isFinite(videoElement.duration)) {
+                    videoFile.duration = videoElement.duration;
+                }
+                videoElement.style.display = 'block';
+                videoElement.style.visibility = 'visible';
+                console.log('Video loaded, duration:', videoElement.duration, 'readyState:', videoElement.readyState);
+                resolve();
+            };
             
-            const response = await fetch(previewUrl, {
-                method: 'POST',
-                body: formData,
-                credentials: 'same-origin'
-            });
+            const doReject = (error) => {
+                if (resolved) return;
+                resolved = true;
+                cleanup();
+                reject(error);
+            };
             
-            console.log('Server response status:', response.status);
+            // Event handlers
+            const onCanPlay = () => {
+                console.log('canplay event fired');
+                doResolve();
+            };
+            const onLoadedData = () => {
+                console.log('loadeddata fired, readyState:', videoElement.readyState);
+                if (videoElement.readyState >= 2) doResolve();
+            };
+            const onLoadedMetadata = () => {
+                console.log('loadedmetadata fired, duration:', videoElement.duration);
+                // For Safari, loadedmetadata is often enough
+                if (videoElement.duration && isFinite(videoElement.duration)) {
+                    doResolve();
+                }
+            };
+            const onError = () => {
+                console.error('Video error:', videoElement.error);
+                doReject(new Error('Video failed to load'));
+            };
             
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Server preview failed: ${response.status} ${errorText.substring(0, 100)}`);
-            }
+            videoElement.addEventListener('canplay', onCanPlay, { once: true });
+            videoElement.addEventListener('loadeddata', onLoadedData, { once: true });
+            videoElement.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+            videoElement.addEventListener('error', onError, { once: true });
             
-            const blob = await response.blob();
-            if (blob.size === 0) {
-                throw new Error('Preview video is empty');
-            }
-            
-            // Revoke old URL if exists
-            if (videoElement.src && videoElement.src.startsWith('blob:')) {
-                URL.revokeObjectURL(videoElement.src);
-            }
-            if (videoFile.serverPreviewUrl) {
-                URL.revokeObjectURL(videoFile.serverPreviewUrl);
-            }
-            
-            const url = URL.createObjectURL(blob);
-            videoElement.src = url;
-            
-            // Ensure video is visible
-            videoElement.style.display = 'block';
-            videoElement.style.visibility = 'visible';
+            // Start loading
             videoElement.load();
             
-            // Store URL for cleanup
-            videoFile.serverPreviewUrl = url;
+            // Safari fallback: Poll readyState every 500ms
+            // Safari sometimes doesn't fire events properly
+            let pollCount = 0;
+            checkInterval = setInterval(() => {
+                pollCount++;
+                console.log(`Poll ${pollCount}: readyState=${videoElement.readyState}, networkState=${videoElement.networkState}, duration=${videoElement.duration}`);
+                
+                // Check if video has metadata (readyState >= 1) and duration
+                if (videoElement.readyState >= 1 && videoElement.duration && isFinite(videoElement.duration)) {
+                    console.log('Video has metadata, resolving');
+                    doResolve();
+                } else if (videoElement.readyState >= 2) {
+                    console.log('Video readyState >= 2, resolving');
+                    doResolve();
+                } else if (videoElement.error) {
+                    doReject(new Error('Video loading failed: ' + (videoElement.error.message || 'Unknown error')));
+                } else if (videoElement.networkState === 3) {
+                    // NETWORK_NO_SOURCE - no valid source
+                    doReject(new Error('Video source not supported'));
+                }
+            }, 500);
             
-            // Wait for metadata to load - longer timeout for large files
-            const fileSizeMB = (videoFile.file.size / (1024 * 1024)).toFixed(1);
-            const loadTimeout = Math.max(60000, Math.min(120000, fileSizeMB * 10000)); // 60-120 seconds based on file size
-            console.log(`Waiting for video metadata, timeout: ${loadTimeout/1000}s`);
-            
-            return new Promise((resolve, reject) => {
-                let resolved = false;
-                const timeout = setTimeout(() => {
-                    if (!resolved) {
-                        if (videoElement.readyState === 0) {
-                            console.error('Video metadata load timeout, readyState:', videoElement.readyState);
-                            reject(new Error(`Preview load timeout after ${loadTimeout/1000}s. Video readyState: ${videoElement.readyState}`));
-                        } else {
-                            // Video is loading, resolve anyway
-                            console.log('Video is loading (readyState:', videoElement.readyState, '), resolving');
-                            resolved = true;
-                            if (videoElement.duration && isFinite(videoElement.duration)) {
-                                videoFile.duration = videoElement.duration;
-                            }
-                            videoElement.style.display = 'block';
-                            videoElement.style.visibility = 'visible';
-                            resolve();
-                        }
+            // Timeout after 60 seconds (increased for larger files)
+            timeoutId = setTimeout(() => {
+                if (!resolved) {
+                    console.log('Timeout reached. readyState:', videoElement.readyState, 'duration:', videoElement.duration);
+                    // If video has any data at all, resolve anyway
+                    if (videoElement.readyState >= 1 || (videoElement.duration && isFinite(videoElement.duration))) {
+                        console.log('Timeout but video has some data, resolving');
+                        doResolve();
+                    } else {
+                        doReject(new Error('Video load timeout'));
                     }
-                }, loadTimeout);
-                
-                const onLoaded = () => {
-                    if (resolved) return;
-                    resolved = true;
-                    clearTimeout(timeout);
-                    if (videoElement.duration && isFinite(videoElement.duration)) {
-                        videoFile.duration = videoElement.duration;
-                    }
-                    // Ensure video is visible after loading
-                    videoElement.style.display = 'block';
-                    videoElement.style.visibility = 'visible';
-                    console.log('Video metadata loaded, duration:', videoElement.duration, 'readyState:', videoElement.readyState);
-                    resolve();
-                };
-                
-                // Track loading progress
-                videoElement.addEventListener('loadstart', () => {
-                    console.log('Video load started');
-                });
-                
-                videoElement.addEventListener('progress', () => {
-                    console.log('Video loading progress, readyState:', videoElement.readyState, 'buffered:', videoElement.buffered.length);
-                });
-                
-                videoElement.addEventListener('loadedmetadata', onLoaded, { once: true });
-                videoElement.addEventListener('loadeddata', () => {
-                    console.log('Video data loaded, readyState:', videoElement.readyState);
-                    if (!resolved && videoElement.readyState >= 2) {
-                        onLoaded();
-                    }
-                }, { once: true });
-                
-                videoElement.addEventListener('canplay', () => {
-                    console.log('Video can play, readyState:', videoElement.readyState);
-                    videoElement.style.display = 'block';
-                    videoElement.style.visibility = 'visible';
-                    if (!resolved) {
-                        onLoaded();
-                    }
-                }, { once: true });
-                
-                videoElement.addEventListener('error', (e) => {
-                    if (resolved) return;
-                    resolved = true;
-                    clearTimeout(timeout);
-                    console.error('Video element error:', videoElement.error, 'readyState:', videoElement.readyState);
-                    reject(new Error('Video failed to load: ' + (videoElement.error ? videoElement.error.message : 'Unknown error')));
-                }, { once: true });
-            });
-        } catch (error) {
-            console.error('Server preview error:', error);
-            throw error;
-        }
+                }
+            }, 60000);
+        });
     }
     
     // Cleanup blob URLs when removing videos
@@ -1227,16 +1280,286 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+/* Video item transitions */
 .video-item {
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, border-color var(--transition-base);
 }
 
 .video-item:hover {
-    border-color: var(--primary-color) !important;
+    border-color: var(--primary-accent) !important;
 }
 
 .video-item.dragging {
     opacity: 0.5;
+}
+
+/* Modal animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Modal Content Styles */
+.hybrid-modal-content {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 3rem 2rem 2rem 2rem;
+    border-radius: 1.5rem;
+    max-width: 90vw;
+    max-height: 90vh;
+    width: 800px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    box-sizing: border-box;
+    box-shadow: 8px 8px 16px rgba(163, 177, 198, 0.6), -8px -8px 16px rgba(255, 255, 255, 0.9);
+    touch-action: manipulation;
+    -webkit-overflow-scrolling: touch;
+    animation: slideUp 0.3s ease;
+}
+
+[data-theme="dark"] .hybrid-modal-content {
+    background: rgba(26, 26, 46, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.5), -8px -8px 16px rgba(40, 40, 60, 0.3);
+}
+
+.hybrid-modal-close {
+    position: absolute !important;
+    top: 1rem !important;
+    right: 1rem !important;
+    left: auto !important;
+    z-index: 100 !important;
+    padding: 0.5rem 1rem !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    font-size: 1.5rem !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 0.5rem !important;
+    cursor: pointer !important;
+}
+
+.hybrid-modal-title {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    margin-right: 3rem;
+    padding-right: 1rem;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.hybrid-video-container {
+    position: relative;
+    margin-bottom: 1.5rem;
+    background: var(--bg-base);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 200px;
+    max-height: 60vh;
+    overflow: hidden;
+    border-radius: 1rem;
+    box-shadow: inset 4px 4px 8px rgba(163, 177, 198, 0.6), inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .hybrid-video-container {
+    box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.6), inset -4px -4px 8px rgba(60, 60, 80, 0.3);
+}
+
+.hybrid-video-player {
+    max-width: 100%;
+    max-height: 60vh;
+    width: auto;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    border-radius: 0.5rem;
+    background: #000;
+    position: relative;
+    z-index: 1;
+}
+
+.hybrid-video-error {
+    padding: 3rem;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    width: 100%;
+    border-radius: 1rem;
+}
+
+[data-theme="dark"] .hybrid-video-error {
+    background: rgba(26, 26, 46, 0.4);
+}
+
+.hybrid-video-error .error-title {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+}
+
+.hybrid-video-error .error-message {
+    font-size: 1rem;
+    margin-top: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.trim-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(96, 165, 250, 0.3);
+    pointer-events: none;
+    display: none;
+}
+
+.trim-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    pointer-events: none;
+    display: none;
+}
+
+.trim-start {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.trim-end {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.hybrid-modal-inputs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.hybrid-modal-inputs .form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.hybrid-modal-inputs .modal-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 0.75rem;
+    font-size: 16px;
+    -webkit-appearance: none;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    box-shadow: inset 4px 4px 8px rgba(163, 177, 198, 0.6), inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+[data-theme="dark"] .hybrid-modal-inputs .modal-input {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.6), inset -4px -4px 8px rgba(60, 60, 80, 0.3);
+}
+
+.hybrid-modal-inputs .modal-input:focus {
+    outline: none;
+    box-shadow: 8px 8px 16px rgba(163, 177, 198, 0.6), -8px -8px 16px rgba(255, 255, 255, 0.9);
+    border-color: #60A5FA;
+}
+
+[data-theme="dark"] .hybrid-modal-inputs .modal-input:focus {
+    box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.5), -8px -8px 16px rgba(40, 40, 60, 0.3);
+}
+
+.hybrid-modal-inputs .modal-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.hybrid-modal-inputs .modal-btn {
+    margin-top: 0.75rem;
+    width: 100%;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.hybrid-modal-tip {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+[data-theme="dark"] .hybrid-modal-tip {
+    background: rgba(26, 26, 46, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hybrid-modal-tip p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.hybrid-modal-tip strong {
+    color: var(--text-primary);
+}
+
+.hybrid-modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+[data-theme="dark"] .hybrid-modal-actions {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hybrid-apply-btn {
+    padding: 0.75rem 2rem;
+    font-size: 16px;
+    min-height: 44px;
+    font-weight: 600;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 /* Mobile responsive adjustments */
@@ -1276,35 +1599,39 @@ document.addEventListener('DOMContentLoaded', function() {
         grid-template-columns: 1fr !important;
     }
     
-    #videoPreviewModal > div {
+    .hybrid-modal-content {
         width: 95vw !important;
         max-width: 95vw !important;
-        padding: 1rem !important;
-        margin: 0 !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
+        padding: 2.5rem 1rem 1.5rem 1rem !important;
+        margin: 0.5rem !important;
     }
     
-    #videoPreviewModal input[type="number"] {
-        font-size: 16px !important;
-        padding: 0.75rem !important;
+    .hybrid-modal-close {
+        top: 0.5rem !important;
+        right: 0.5rem !important;
+        padding: 0.5rem !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+        font-size: 1.25rem !important;
     }
     
-    #videoPreviewModal button {
-        font-size: 16px !important;
-        min-height: 44px !important;
-        -webkit-tap-highlight-color: transparent !important;
+    .hybrid-modal-title {
+        font-size: 1.125rem !important;
+        margin-right: 3rem !important;
+        margin-top: 0 !important;
     }
     
-    #applyTrim {
-        position: sticky !important;
-        bottom: 0 !important;
-        background: var(--primary-color) !important;
-        z-index: 10000 !important;
-    }
-    
-    #videoPreviewModal > div > div:nth-of-type(2) {
+    .hybrid-modal-inputs {
         grid-template-columns: 1fr !important;
+    }
+    
+    .hybrid-apply-btn {
+        width: 100% !important;
+    }
+    
+    .hybrid-video-player {
+        width: 100% !important;
+        max-width: 100% !important;
     }
     
     .preview-video-btn,
@@ -1312,17 +1639,69 @@ document.addEventListener('DOMContentLoaded', function() {
         flex: 1;
         min-width: 0;
         width: 100%;
-        padding: 0.6rem 1rem !important;
+        padding: 0.75rem 1rem !important;
         font-size: 16px !important;
         min-height: 44px !important;
         -webkit-tap-highlight-color: transparent !important;
         touch-action: manipulation !important;
     }
-    
-    #previewPlayer {
-        width: 100% !important;
-        max-width: 100% !important;
-    }
+}
+
+/* Dark mode compatibility */
+[data-theme="dark"] #videoPreviewModal {
+    background: rgba(15, 23, 42, 0.85);
+}
+
+/* Merge Progress Modal - Theme Aware */
+.merge-progress-modal {
+    margin-top: 1rem;
+    padding: 1.5rem;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--neu-shadow);
+    text-align: center;
+}
+
+.merge-progress-title {
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.merge-progress-title strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.merge-progress-bar-container {
+    width: 100%;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .merge-progress-bar-container {
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.merge-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-accent), var(--secondary-accent));
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+}
+
+.merge-progress-text {
+    margin-top: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
 }
 
 /* Remove button styling is now handled by hybrid-style.css */

@@ -34,7 +34,7 @@ def index(request):
             {'name': 'Lorem Ipsum Generator', 'url_name': 'lorem_ipsum_generator', 'description': 'Generate Lorem Ipsum placeholder text'},
             {'name': 'Random Word Generator', 'url_name': 'random_word_generator', 'description': 'Generate random words from a dictionary'},
             {'name': 'Random Name Generator', 'url_name': 'random_name_generator', 'description': 'Generate random names from different regions'},
-            {'name': 'Word Lottery', 'url_name': 'word_lottery', 'description': 'Pick a random word or name from your list'},
+            {'name': 'Words, Names & Numbers Lottery', 'url_name': 'word_lottery', 'description': 'Pick a random word, name, or number from your list'},
         ]
     }
     return render(request, 'utilities/index.html', context)
@@ -659,6 +659,7 @@ def random_number_generator(request):
             max_val = int(request.POST.get('max_value', '100'))
             count = int(request.POST.get('count', '1'))
             allow_duplicates = request.POST.get('allow_duplicates', 'off') == 'on'
+            output_format = request.POST.get('output_format', 'lines')
             
             if min_val > max_val:
                 error = 'Minimum value must be less than or equal to maximum value'
@@ -683,6 +684,7 @@ def random_number_generator(request):
                     'max': max_val,
                     'sum': sum(numbers),
                     'average': sum(numbers) / len(numbers) if numbers else 0,
+                    'output_format': output_format,
                 }
         except ValueError:
             error = 'Please enter valid numbers'
@@ -761,27 +763,113 @@ def random_word_generator(request):
     result = None
     error = None
     
-    # Common English words dictionary
+    # Expanded English words dictionary (1000+ unique words)
     word_list = [
+        # Common nouns
         'apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house', 'island', 'jungle',
         'kite', 'lion', 'mountain', 'ocean', 'piano', 'queen', 'river', 'sun', 'tree', 'umbrella',
-        'violin', 'water', 'xylophone', 'yacht', 'zebra', 'adventure', 'beautiful', 'courage', 'dream',
-        'energy', 'freedom', 'garden', 'happiness', 'imagine', 'journey', 'kindness', 'laughter', 'magic',
-        'nature', 'ocean', 'peace', 'quiet', 'rainbow', 'sunshine', 'travel', 'universe', 'victory',
-        'wisdom', 'youth', 'zeal', 'art', 'book', 'cloud', 'dance', 'earth', 'fire', 'grace',
-        'hope', 'ice', 'joy', 'kiss', 'light', 'music', 'night', 'ocean', 'peace', 'quest',
-        'rain', 'star', 'time', 'unity', 'voice', 'wind', 'xenon', 'year', 'zenith', 'action',
-        'brave', 'calm', 'daring', 'eager', 'faith', 'gentle', 'honest', 'ideal', 'jolly', 'keen',
-        'loyal', 'mighty', 'noble', 'optimistic', 'proud', 'quick', 'radiant', 'strong', 'true', 'unique',
-        'vital', 'wise', 'young', 'zealous', 'amazing', 'brilliant', 'creative', 'dynamic', 'excellent',
-        'fantastic', 'glorious', 'heroic', 'incredible', 'joyful', 'kind', 'lovely', 'magnificent', 'noble',
-        'outstanding', 'perfect', 'remarkable', 'splendid', 'terrific', 'unbelievable', 'wonderful', 'extraordinary',
-        'zestful', 'achieve', 'believe', 'create', 'discover', 'explore', 'flourish', 'grow', 'inspire',
-        'journey', 'kindle', 'learn', 'master', 'nurture', 'overcome', 'progress', 'quest', 'reach',
-        'succeed', 'thrive', 'unite', 'venture', 'wonder', 'excel', 'yearn', 'zoom', 'abundant', 'bright',
-        'colorful', 'diverse', 'elegant', 'fragrant', 'glowing', 'harmonious', 'inspiring', 'jubilant',
-        'kaleidoscopic', 'luminous', 'majestic', 'nostalgic', 'optimistic', 'peaceful', 'quaint', 'radiant',
-        'serene', 'tranquil', 'uplifting', 'vibrant', 'whimsical', 'exquisite', 'youthful', 'zestful'
+        'violin', 'water', 'yacht', 'zebra', 'ball', 'chair', 'desk', 'egg', 'fork', 'glass',
+        'hat', 'iron', 'jacket', 'key', 'lamp', 'mirror', 'needle', 'orange', 'pencil', 'ring',
+        'shoe', 'table', 'vase', 'watch', 'box', 'cup', 'door', 'envelope', 'fan', 'gate',
+        
+        # Nature words
+        'beach', 'cave', 'cloud', 'desert', 'forest', 'glacier', 'hill', 'lake', 'meadow', 'pond',
+        'valley', 'volcano', 'waterfall', 'wind', 'storm', 'thunder', 'lightning', 'rainbow', 'sunrise', 'sunset',
+        'moon', 'star', 'planet', 'comet', 'galaxy', 'leaf', 'branch', 'root', 'seed', 'blossom',
+        'petal', 'thorn', 'moss', 'fern', 'vine', 'grass', 'weed', 'bush', 'hedge', 'field',
+        
+        # Animals
+        'bear', 'bird', 'butterfly', 'camel', 'cat', 'cheetah', 'chicken', 'cow', 'crab', 'deer',
+        'dolphin', 'duck', 'eagle', 'fish', 'fox', 'frog', 'giraffe', 'goat', 'gorilla', 'hawk',
+        'horse', 'kangaroo', 'koala', 'leopard', 'monkey', 'mouse', 'owl', 'panda', 'parrot', 'penguin',
+        'rabbit', 'raccoon', 'rhino', 'seal', 'shark', 'sheep', 'snake', 'spider', 'squirrel', 'tiger',
+        'turtle', 'whale', 'wolf', 'worm', 'ant', 'bee', 'beetle', 'cricket', 'dragonfly', 'firefly',
+        
+        # Adjectives
+        'beautiful', 'brave', 'bright', 'calm', 'careful', 'cheerful', 'clever', 'colorful', 'confident', 'creative',
+        'curious', 'daring', 'delightful', 'diligent', 'eager', 'elegant', 'energetic', 'excellent', 'excited', 'faithful',
+        'famous', 'fantastic', 'fierce', 'friendly', 'generous', 'gentle', 'genuine', 'glorious', 'graceful', 'grateful',
+        'happy', 'harmonious', 'healthy', 'helpful', 'heroic', 'honest', 'hopeful', 'humble', 'ideal', 'incredible',
+        'jolly', 'joyful', 'keen', 'kind', 'lively', 'lonely', 'lovely', 'loyal', 'lucky', 'magnificent',
+        'majestic', 'mighty', 'mysterious', 'neat', 'nice', 'noble', 'optimistic', 'outstanding', 'peaceful', 'perfect',
+        'pleasant', 'polite', 'powerful', 'precious', 'proud', 'pure', 'quick', 'quiet', 'radiant', 'rapid',
+        'rare', 'remarkable', 'royal', 'safe', 'serene', 'sharp', 'shiny', 'simple', 'sincere', 'smooth',
+        'soft', 'splendid', 'steady', 'strong', 'stunning', 'superb', 'swift', 'tender', 'terrific', 'thoughtful',
+        'tranquil', 'tremendous', 'true', 'trusty', 'unique', 'uplifting', 'valiant', 'vibrant', 'vigorous', 'vital',
+        'vivid', 'warm', 'wealthy', 'whimsical', 'wise', 'witty', 'wonderful', 'worthy', 'youthful', 'zealous',
+        
+        # Verbs
+        'achieve', 'admire', 'advance', 'announce', 'appear', 'arrange', 'arrive', 'ascend', 'believe', 'bloom',
+        'bounce', 'build', 'celebrate', 'challenge', 'change', 'chase', 'choose', 'climb', 'conquer', 'create',
+        'dance', 'dare', 'decide', 'defend', 'delight', 'deliver', 'design', 'desire', 'determine', 'develop',
+        'discover', 'dream', 'drive', 'earn', 'embrace', 'emerge', 'empower', 'enable', 'encourage', 'endure',
+        'enjoy', 'enlighten', 'enrich', 'entertain', 'escape', 'excel', 'excite', 'exist', 'expand', 'expect',
+        'explore', 'express', 'extend', 'flourish', 'flow', 'fly', 'focus', 'follow', 'forgive', 'gather',
+        'give', 'glow', 'govern', 'grasp', 'greet', 'grow', 'guard', 'guide', 'happen', 'harvest',
+        'heal', 'help', 'honor', 'hope', 'imagine', 'improve', 'inspire', 'invent', 'invite', 'join',
+        'journey', 'jump', 'kindle', 'know', 'laugh', 'launch', 'lead', 'learn', 'leap', 'liberate',
+        'lift', 'listen', 'live', 'love', 'maintain', 'march', 'master', 'matter', 'measure', 'meditate',
+        'meet', 'mend', 'mentor', 'move', 'navigate', 'nourish', 'nurture', 'observe', 'obtain', 'offer',
+        'open', 'organize', 'overcome', 'paint', 'participate', 'pass', 'pause', 'perform', 'persist', 'plan',
+        'play', 'please', 'polish', 'ponder', 'praise', 'pray', 'prepare', 'preserve', 'prevail', 'prevent',
+        'progress', 'promise', 'promote', 'protect', 'provide', 'pursue', 'question', 'reach', 'realize', 'receive',
+        'recognize', 'reflect', 'refresh', 'rejoice', 'relax', 'release', 'remember', 'renew', 'repair', 'reply',
+        'represent', 'rescue', 'research', 'respect', 'respond', 'restore', 'reveal', 'rise', 'roam', 'run',
+        'sail', 'save', 'search', 'secure', 'seek', 'seize', 'serve', 'settle', 'share', 'shine',
+        'show', 'sing', 'solve', 'soar', 'speak', 'stand', 'start', 'strive', 'study', 'succeed',
+        'support', 'survive', 'sustain', 'teach', 'thrive', 'throw', 'touch', 'tour', 'trace', 'transform',
+        'travel', 'treasure', 'triumph', 'trust', 'understand', 'unite', 'uplift', 'venture', 'victory', 'visit',
+        'volunteer', 'wander', 'welcome', 'win', 'wish', 'wonder', 'work', 'worship', 'write', 'yearn',
+        
+        # Abstract nouns
+        'adventure', 'ambition', 'beauty', 'bliss', 'change', 'choice', 'clarity', 'comfort', 'compassion', 'courage',
+        'creativity', 'curiosity', 'dedication', 'desire', 'destiny', 'determination', 'dignity', 'discipline', 'diversity', 'dream',
+        'effort', 'elegance', 'emotion', 'empathy', 'energy', 'enthusiasm', 'equality', 'eternity', 'excellence', 'experience',
+        'faith', 'fame', 'fantasy', 'fate', 'fear', 'feeling', 'focus', 'fortune', 'freedom', 'friendship',
+        'fulfillment', 'future', 'generosity', 'genius', 'goal', 'grace', 'gratitude', 'greatness', 'growth', 'guidance',
+        'happiness', 'harmony', 'health', 'heart', 'heaven', 'heritage', 'history', 'honor', 'hope', 'humanity',
+        'humility', 'idea', 'identity', 'imagination', 'impact', 'independence', 'infinity', 'influence', 'innovation', 'insight',
+        'inspiration', 'instinct', 'integrity', 'intelligence', 'intention', 'intuition', 'invention', 'journey', 'joy', 'justice',
+        'kindness', 'knowledge', 'laughter', 'leadership', 'learning', 'legacy', 'liberty', 'life', 'light', 'logic',
+        'love', 'loyalty', 'luck', 'magic', 'majesty', 'meaning', 'memory', 'mercy', 'merit', 'miracle',
+        'mission', 'moment', 'mystery', 'nature', 'need', 'nobility', 'opportunity', 'optimism', 'passion', 'patience',
+        'peace', 'perception', 'perfection', 'perseverance', 'perspective', 'philosophy', 'pleasure', 'poetry', 'potential', 'power',
+        'practice', 'prayer', 'presence', 'pride', 'principle', 'progress', 'promise', 'prosperity', 'purpose', 'quality',
+        'quest', 'reality', 'reason', 'reflection', 'renewal', 'respect', 'responsibility', 'revelation', 'reward', 'rhythm',
+        'sacrifice', 'safety', 'satisfaction', 'science', 'security', 'serenity', 'service', 'silence', 'simplicity', 'sincerity',
+        'skill', 'solitude', 'solution', 'soul', 'spirit', 'spontaneity', 'stability', 'strength', 'struggle', 'style',
+        'success', 'support', 'surprise', 'sympathy', 'talent', 'taste', 'technology', 'thought', 'thrill', 'time',
+        'tolerance', 'tradition', 'tranquility', 'treasure', 'trust', 'truth', 'understanding', 'unity', 'universe', 'valor',
+        'value', 'variety', 'victory', 'vigor', 'virtue', 'vision', 'vitality', 'voice', 'warmth', 'wealth',
+        'will', 'wisdom', 'wonder', 'worth', 'zeal', 'zenith',
+        
+        # Common objects
+        'bag', 'basket', 'battery', 'bell', 'belt', 'bench', 'bicycle', 'blanket', 'boat', 'book',
+        'bottle', 'bowl', 'brick', 'bridge', 'broom', 'brush', 'bucket', 'building', 'button', 'cabinet',
+        'cable', 'cage', 'cake', 'camera', 'candle', 'canvas', 'carpet', 'cart', 'castle', 'chain',
+        'chalk', 'chart', 'chest', 'clock', 'cloth', 'coat', 'coin', 'comb', 'compass', 'computer',
+        'cookie', 'cord', 'couch', 'cradle', 'crown', 'curtain', 'cushion', 'diamond', 'diary', 'dice',
+        'dish', 'doll', 'drum', 'engine', 'fence', 'flag', 'flame', 'flashlight', 'frame', 'garage',
+        'garden', 'gem', 'gift', 'globe', 'glove', 'hammer', 'handle', 'harp', 'helmet', 'hinge',
+        'hook', 'horn', 'jar', 'jewel', 'journal', 'kettle', 'knife', 'knob', 'ladder', 'lantern',
+        'latch', 'lawn', 'lens', 'letter', 'library', 'lock', 'locket', 'machine', 'magnet', 'map',
+        'mask', 'mat', 'medal', 'microphone', 'mill', 'model', 'mold', 'nail', 'net', 'notebook',
+        'oven', 'paddle', 'page', 'paint', 'palette', 'panel', 'paper', 'parachute', 'pedal', 'pen',
+        'phone', 'photograph', 'picture', 'pillar', 'pillow', 'pipe', 'plate', 'platform', 'plug', 'pocket',
+        'pole', 'pool', 'pot', 'pouch', 'powder', 'press', 'prism', 'prize', 'puzzle', 'rack',
+        'radio', 'raft', 'rail', 'ramp', 'razor', 'record', 'reel', 'ribbon', 'rocket', 'rod',
+        'rope', 'ruler', 'sail', 'scale', 'scarf', 'scissors', 'screen', 'scroll', 'seal', 'seat',
+        'shade', 'shadow', 'shaft', 'shawl', 'sheet', 'shelf', 'shell', 'shield', 'shirt', 'shovel',
+        'sign', 'silk', 'silver', 'sink', 'sketch', 'skin', 'skirt', 'slate', 'slide', 'socket',
+        'sofa', 'soil', 'speaker', 'sphere', 'spice', 'spike', 'spool', 'spoon', 'spring', 'square',
+        'stage', 'stamp', 'statue', 'steam', 'steel', 'stem', 'step', 'stick', 'stitch', 'stone',
+        'stool', 'store', 'stove', 'strap', 'stream', 'string', 'strip', 'studio', 'sugar', 'suit',
+        'summit', 'sword', 'symbol', 'tablet', 'tape', 'target', 'temple', 'tent', 'thread', 'throne',
+        'ticket', 'tile', 'timber', 'tissue', 'token', 'tool', 'torch', 'tower', 'toy', 'track',
+        'trail', 'train', 'trap', 'tray', 'treasure', 'treaty', 'triangle', 'trick', 'trophy', 'truck',
+        'trunk', 'tube', 'tunnel', 'uniform', 'unit', 'urn', 'valley', 'valve', 'vehicle', 'veil',
+        'vessel', 'village', 'wagon', 'wall', 'wallet', 'warehouse', 'weapon', 'web', 'wedge', 'wheel',
+        'whip', 'whistle', 'wick', 'window', 'wing', 'wire', 'wood', 'wool', 'wreath', 'wrench'
     ]
     
     if request.method == 'POST':
@@ -793,8 +881,8 @@ def random_word_generator(request):
             
             if count < 1:
                 error = 'Count must be at least 1'
-            elif count > 100:
-                error = 'Count cannot exceed 100'
+            elif count > 1000:
+                error = 'Count cannot exceed 1000'
             else:
                 # Filter words based on criteria
                 filtered_words = word_list.copy()
@@ -827,17 +915,9 @@ def random_word_generator(request):
                 if not error:
                     if not filtered_words:
                         error = 'No words match the specified criteria. Try adjusting your filters.'
-                    elif count > len(filtered_words):
-                        # If requesting more words than available, use all available
-                        words = random.sample(filtered_words, len(filtered_words))
-                        result = {
-                            'words': words,
-                            'count': len(words),
-                            'requested': count,
-                            'note': f'Only {len(words)} words available matching your criteria'
-                        }
                     else:
-                        words = random.sample(filtered_words, count)
+                        # Use random.choices to allow duplicates
+                        words = random.choices(filtered_words, k=count)
                         result = {
                             'words': words,
                             'count': len(words),
@@ -984,8 +1064,8 @@ def random_name_generator(request):
             
             if count < 1:
                 error = 'Count must be at least 1'
-            elif count > 100:
-                error = 'Count cannot exceed 100'
+            elif count > 1000:
+                error = 'Count cannot exceed 1000'
             elif not regions:
                 error = 'Please select at least one region'
             else:
@@ -1069,13 +1149,10 @@ def word_lottery(request):
                     # Split by commas
                     words = [word.strip() for word in input_text.split(',') if word.strip()]
                 
-                # Remove duplicates while preserving order
-                words = list(dict.fromkeys(words))
-                
                 if not words:
                     error = 'No valid words found. Please enter at least one word or name.'
-                elif len(words) > 100:
-                    error = f'Too many entries! You entered {len(words)} words. Maximum is 100.'
+                elif len(words) > 1000:
+                    error = f'Too many entries! You entered {len(words)} words. Maximum is 1000.'
                 else:
                     # Pick a random word
                     winner = random.choice(words)

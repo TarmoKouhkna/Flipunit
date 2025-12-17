@@ -378,9 +378,9 @@ header:not(.hybrid-header) {
 
 .hybrid-logo-img {
     display: block !important;
-    height: 6rem !important;
+    height: 4.8rem !important;
     width: auto !important;
-    max-width: 6rem !important;
+    max-width: 4.8rem !important;
     background: transparent !important;
     background-color: transparent !important;
     background-image: none !important;
@@ -714,7 +714,7 @@ header:not(.hybrid-header) {
 }
 
 .hybrid-hero p {
-    font-size: var(--font-size-xl);
+    font-size: var(--font-size-2xl);
     color: var(--text-secondary);
     margin-bottom: 0;
 }
@@ -1076,7 +1076,7 @@ header:not(.hybrid-header) {
     }
     
     .hybrid-hero h1 {
-        font-size: 3.5rem;
+        font-size: 3.25rem;
     }
     
     .hybrid-search-form {
@@ -1104,6 +1104,12 @@ header:not(.hybrid-header) {
 
 /* Small Mobile: < 768px */
 @media (max-width: 767px) {
+    /* Prevent any horizontal overflow */
+    * {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
     .hybrid-hero h1 {
         font-size: var(--font-size-3xl);
     }
@@ -1130,6 +1136,280 @@ header:not(.hybrid-header) {
     .hybrid-modal {
         padding: var(--space-lg);
         margin: var(--space-sm);
+    }
+    
+    /* ============================================
+       MOBILE: Form Fields & Inputs Optimization
+       ============================================ */
+    
+    /* All form inputs - larger tap targets for mobile */
+    .form-control:not([type="checkbox"]):not([type="radio"]),
+    input.form-control:not([type="checkbox"]):not([type="radio"]),
+    textarea.form-control,
+    select.form-control,
+    .form-select {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+        min-height: 44px !important; /* Apple's recommended minimum tap target */
+        padding: 0.75rem 1rem !important;
+    }
+    
+    /* Checkboxes and radios should stay small */
+    input[type="checkbox"],
+    input[type="radio"] {
+        min-height: auto !important;
+        padding: 0 !important;
+    }
+    
+    /* Textareas */
+    textarea.form-control {
+        min-height: 120px !important;
+    }
+    
+    /* Number inputs */
+    input[type="number"].form-control {
+        font-size: 16px !important;
+        padding-right: 3rem !important;
+    }
+    
+    /* Select dropdowns */
+    select.form-control,
+    .form-select {
+        font-size: 16px !important;
+        padding-right: 2.5rem !important;
+    }
+    
+    /* Buttons - larger tap targets */
+    .btn,
+    .btn-primary,
+    .btn-secondary {
+        min-height: 44px !important;
+        padding: 0.75rem 1.5rem !important;
+        font-size: 16px !important;
+    }
+    
+    /* Block buttons on mobile */
+    .btn-block {
+        width: 100% !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Form labels */
+    .form-label {
+        font-size: 0.9rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Form groups - more spacing */
+    .form-group {
+        margin-bottom: 1.5rem !important;
+    }
+    
+    /* Cards - better mobile padding */
+    .card {
+        padding: 1.5rem !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    .card-title {
+        font-size: 1.5rem !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    /* Checkbox and radio - larger tap targets (except region checkboxes) */
+    input[type="checkbox"]:not(.region-checkbox),
+    input[type="radio"]:not(.region-checkbox) {
+        width: 1.5rem !important;
+        height: 1.5rem !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+    
+    /* Region checkboxes stay small */
+    input[type="checkbox"].region-checkbox {
+        width: 16px !important;
+        height: 16px !important;
+        min-width: 16px !important;
+        min-height: 16px !important;
+        max-width: 16px !important;
+        max-height: 16px !important;
+    }
+    
+    /* File upload areas */
+    .file-upload-area {
+        padding: 2rem 1rem !important;
+        min-height: 120px !important;
+    }
+    
+    /* Alert messages */
+    .alert {
+        padding: 1rem !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* Category cards on mobile */
+    .category-card,
+    .hybrid-category-card {
+        padding: 1.5rem !important;
+        min-height: 150px !important;
+    }
+    
+    .category-card h3,
+    .hybrid-category-card h3 {
+        font-size: 1.25rem !important;
+    }
+    
+    /* Navigation buttons */
+    .hybrid-nav-menu-inline a {
+        padding: 0.5rem 0.75rem !important;
+        font-size: 0.875rem !important;
+        min-height: 36px !important;
+    }
+    
+    /* Color input fields */
+    input[type="color"] {
+        min-height: 44px !important;
+        min-width: 44px !important;
+        padding: 0.25rem !important;
+    }
+    
+    /* Range sliders */
+    input[type="range"] {
+        min-height: 44px !important;
+        -webkit-appearance: none !important;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+        width: 24px !important;
+        height: 24px !important;
+        -webkit-appearance: none !important;
+    }
+    
+    /* Grid layouts - single column on mobile */
+    .grid,
+    .grid-2,
+    .grid-3,
+    .grid-4 {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+    
+    /* Results and info boxes */
+    .result-container,
+    div[style*="background: var(--surface)"] {
+        padding: 1rem !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* Copy buttons and action buttons */
+    .copy-btn,
+    .refresh-btn {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        padding: 0.75rem !important;
+    }
+    
+    /* Privacy notices */
+    .privacy-notice {
+        padding: 1rem !important;
+        font-size: 0.85rem !important;
+    }
+    
+    /* Hex input fields and similar */
+    .hex-input {
+        font-size: 16px !important;
+        padding: 0.75rem 1rem !important;
+        min-height: 44px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Hex input group container */
+    .hex-input-group {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Hex input inside group - constrain flex growth */
+    .hex-input-group .hex-input {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        max-width: calc(100% - 60px) !important; /* Leave space for refresh button */
+    }
+    
+    /* Refresh button in hex input group */
+    .hex-input-group .refresh-btn {
+        flex: 0 0 auto !important;
+        width: 44px !important;
+        min-width: 44px !important;
+        max-width: 44px !important;
+    }
+    
+    /* All form controls should respect boundaries */
+    .form-control,
+    input.form-control,
+    textarea.form-control,
+    select.form-control {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Form validation messages */
+    small,
+    .form-text {
+        font-size: 0.8rem !important;
+        line-height: 1.4 !important;
+    }
+    
+    /* Logo sizing on mobile */
+    .hybrid-logo-img {
+        height: 3.5rem !important;
+        max-width: 3.5rem !important;
+    }
+    
+    .hybrid-logo-text {
+        font-size: 2rem !important;
+    }
+    
+    /* Dark mode toggle on mobile */
+    .dark-mode-toggle-hybrid {
+        padding: 0.5rem !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+    
+    /* Container constraints */
+    .container,
+    .container-medium {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    
+    /* Prevent horizontal overflow */
+    body {
+        overflow-x: hidden !important;
+    }
+    
+    /* All cards should fit within viewport */
+    .card,
+    .hybrid-category-card,
+    .category-card {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Input groups and form rows */
+    .form-row,
+    .input-group,
+    div[style*="display: flex"] {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
 }
 
@@ -2106,8 +2386,16 @@ input[type="radio"]:disabled {
 
 .form-label input[type="checkbox"],
 .form-label input[type="radio"] {
-    margin-right: var(--space-xs) !important;
+    margin-right: var(--space-md) !important;
     vertical-align: middle !important;
+}
+
+/* Additional spacing for checkbox/radio labels - more generous spacing */
+label input[type="checkbox"],
+label input[type="radio"],
+.form-check input[type="checkbox"],
+.form-check input[type="radio"] {
+    margin-right: var(--space-md) !important;
 }
 
 /* ============================================
