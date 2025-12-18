@@ -23,6 +23,7 @@ services:
       - ./staticfiles:/app/staticfiles
       - ./static:/app/static  # Mount static source files so changes are immediate without rebuild
       - ./templates:/app/templates  # Mount templates so changes are immediate without rebuild
+      - ./flipunit:/app/flipunit  # Mount source code so Python changes are immediate without rebuild
     depends_on:
       - postgres
     networks:
