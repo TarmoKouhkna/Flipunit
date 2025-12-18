@@ -40,7 +40,12 @@ def sitemap(request):
         
         # Build XML as a list of lines to preserve formatting
         # Add XSL stylesheet reference for better browser display
-        xsl_url = request.build_absolute_uri('/static/sitemap.xsl')
+        # Force HTTPS for XSL URL (same as sitemap URLs)
+        sitemap_instance = StaticViewSitemap()
+        if hasattr(sitemap_instance, 'protocol') and sitemap_instance.protocol:
+            xsl_url = f"{sitemap_instance.protocol}://{request.get_host()}/static/sitemap.xsl"
+        else:
+            xsl_url = request.build_absolute_uri('/static/sitemap.xsl').replace('http://', 'https://')
         xml_lines = [
             '<?xml version="1.0" encoding="UTF-8"?>',
             f'<?xml-stylesheet type="text/xsl" href="{xsl_url}"?>',
@@ -48,7 +53,6 @@ def sitemap(request):
         ]
         
         # Get all URLs from the sitemap
-        sitemap_instance = StaticViewSitemap()
         items = sitemap_instance.items()
         
         # Format each URL entry with proper indentation
