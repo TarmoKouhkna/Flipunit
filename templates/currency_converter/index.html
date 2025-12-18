@@ -344,6 +344,11 @@ document.addEventListener('DOMContentLoaded', function() {
         rateDisplay.textContent = `1 ${fromLabel} = ${formatNumber(data.rate)} ${toLabel}`;
         resultDiv.style.display = 'block';
         errorDiv.style.display = 'none';
+        
+        // Auto-scroll to result
+        setTimeout(() => {
+            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
     }
     
     function showError(message) {

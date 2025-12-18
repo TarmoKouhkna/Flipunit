@@ -41,7 +41,7 @@
     </form>
     
     {% if result is not None %}
-    <div class="converter-result">
+    <div class="converter-result" id="converter-result">
         <h3>Result:</h3>
         <p style="font-size: 1.5rem; font-weight: 600; color: var(--primary-color);">
             {{ result }} {% if result_unit_symbol %}{{ result_unit_symbol }}{% endif %}
@@ -51,5 +51,29 @@
 </div>
 
 <a href="{% url 'converters:index' %}" class="btn btn-secondary">← Back to Converters</a>
-{% endblock %}
 
+{% if result is not None %}
+<script>
+// Scroll to result and center it in the viewport when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const resultElement = document.getElementById('converter-result');
+    if (resultElement) {
+        // Calculate position to center the result in viewport
+        const elementRect = resultElement.getBoundingClientRect();
+        const absoluteElementTop = elementRect.top + window.pageYOffset;
+        const viewportHeight = window.innerHeight;
+        const elementHeight = elementRect.height;
+        
+        // Calculate scroll position to center the element
+        const scrollPosition = absoluteElementTop - (viewportHeight / 2) + (elementHeight / 2);
+        
+        // Smooth scroll to center the result
+        window.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+        });
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
