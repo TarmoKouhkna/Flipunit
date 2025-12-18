@@ -98,6 +98,7 @@ def sitemap(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('favicon.ico', views.favicon_view, name='favicon'),
+    path('BingSiteAuth.xml', views.bing_site_auth_view, name='bing_site_auth'),
     path('', views.home, name='home'),
     path('search/', views.search, name='search'),
     path('privacy/', views.privacy_policy, name='privacy'),

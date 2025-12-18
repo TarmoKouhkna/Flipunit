@@ -412,3 +412,30 @@ def favicon_view(request):
             return response
     return HttpResponse(status=404)
 
+def bing_site_auth_view(request):
+    """Serve BingSiteAuth.xml at root level for Bing Webmaster Tools verification"""
+    # Try multiple locations for the verification file
+    bing_auth_path = None
+    
+    # First, try in static directory (development)
+    if settings.STATICFILES_DIRS:
+        bing_auth_path = os.path.join(settings.STATICFILES_DIRS[0], 'BingSiteAuth.xml')
+        if not os.path.exists(bing_auth_path):
+            bing_auth_path = None
+    
+    # Try STATIC_ROOT (production with collected static files)
+    if not bing_auth_path or not os.path.exists(bing_auth_path):
+        bing_auth_path = os.path.join(settings.STATIC_ROOT, 'BingSiteAuth.xml')
+    
+    # Try in project root as fallback
+    if not bing_auth_path or not os.path.exists(bing_auth_path):
+        bing_auth_path = os.path.join(settings.BASE_DIR, 'BingSiteAuth.xml')
+    
+    if bing_auth_path and os.path.exists(bing_auth_path):
+        with open(bing_auth_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/xml; charset=utf-8')
+            # Cache for a shorter time than favicon (verification files may change)
+            response['Cache-Control'] = 'public, max-age=3600'
+            return response
+    return HttpResponse(status=404)
+
