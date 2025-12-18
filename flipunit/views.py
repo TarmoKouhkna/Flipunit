@@ -124,7 +124,7 @@ def _get_all_tools():
         {'name': 'PDF Tools', 'url': 'pdf_tools:index', 'category': 'PDF Tools', 'description': 'Merge, split, and convert PDF files', 'keywords': 'PDF'},
         {'name': 'Unit Converters', 'url': 'converters:index', 'category': 'Unit Converters', 'description': 'Convert between different units of measurement', 'keywords': 'meter kg pound watt kW'},
         {'name': 'Utilities', 'url': 'utilities:index', 'category': 'Utilities', 'description': 'Calculators, text utilities, QR codes and more', 'keywords': 'calculator QR code'},
-        {'name': 'Currency & Crypto', 'url': 'currency_converter:index', 'category': 'Currency & Crypto', 'description': 'Convert between currencies and cryptocurrencies with real-time rates', 'keywords': 'currency crypto Bitcoin'},
+        {'name': 'Currency & Crypto', 'url': 'currency_converter:index', 'category': 'Currency & Crypto', 'description': 'Convert between currencies and cryptocurrencies with real-time rates', 'keywords': 'currency crypto Bitcoin EUR USD GBP JPY AUD CAD CHF CNY INR BRL RUB ZAR MXN SGD HKD NZD SEK NOK DKK PLN TRY KRW THB AED SAR Euro Dollar Pound Yen'},
         {'name': 'Archive Converters', 'url': 'archive_converter:index', 'category': 'Archive Converters', 'description': 'Convert between ZIP, RAR, 7Z, and TAR.GZ formats', 'keywords': 'ZIP RAR 7Z TAR.GZ archive'},
         {'name': 'Text & String Converters', 'url': 'text_converter:index', 'category': 'Text Converters', 'description': 'Convert text between formats', 'keywords': 'JSON XML YAML HTML'},
         {'name': 'Developer Converters', 'url': 'developer_converter:index', 'category': 'Developer Converters', 'description': 'Developer tools and code utilities', 'keywords': 'HTML CSS JavaScript JSON CSV'},
