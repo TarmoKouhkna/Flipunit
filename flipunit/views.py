@@ -118,87 +118,87 @@ def _get_all_tools():
     
     # Categories (main pages)
     categories = [
-        {'name': 'Color Code Generator & Picker', 'url': 'color_picker:index', 'category': 'Color Picker', 'description': 'Pick colors from screen, convert between color formats, and generate color codes'},
-        {'name': 'Image Conversion & Editing', 'url': 'image_converter:index', 'category': 'Image Converters', 'description': 'Convert images between different formats and edit them'},
-        {'name': 'Media Converters', 'url': 'media_converter:index', 'category': 'Media Converters', 'description': 'Convert media files and download audio'},
-        {'name': 'PDF Tools', 'url': 'pdf_tools:index', 'category': 'PDF Tools', 'description': 'Merge, split, and convert PDF files'},
-        {'name': 'Unit Converters', 'url': 'converters:index', 'category': 'Unit Converters', 'description': 'Convert between different units of measurement'},
-        {'name': 'Utilities', 'url': 'utilities:index', 'category': 'Utilities', 'description': 'Calculators, text utilities, QR codes and more'},
-        {'name': 'Currency & Crypto', 'url': 'currency_converter:index', 'category': 'Currency & Crypto', 'description': 'Convert between currencies and cryptocurrencies with real-time rates'},
-        {'name': 'Archive Converters', 'url': 'archive_converter:index', 'category': 'Archive Converters', 'description': 'Convert between ZIP, RAR, 7Z, and TAR.GZ formats'},
-        {'name': 'Text & String Converters', 'url': 'text_converter:index', 'category': 'Text Converters', 'description': 'Convert text between formats'},
-        {'name': 'Developer Converters', 'url': 'developer_converter:index', 'category': 'Developer Converters', 'description': 'Developer tools and code utilities'},
-        {'name': 'Website Status Checker', 'url': 'isdown:index', 'category': 'Network Tools', 'description': 'Check instantly if any website is online or down'},
-        {'name': 'YouTube Thumbnail Downloader', 'url': 'youtube_thumbnail:index', 'category': 'Media Converters', 'description': 'Download YouTube thumbnails (HD, HQ, MQ, Default)'},
+        {'name': 'Color Code Generator & Picker', 'url': 'color_picker:index', 'category': 'Color Picker', 'description': 'Pick colors from screen, convert between color formats, and generate color codes', 'keywords': 'color RGB HEX'},
+        {'name': 'Image Conversion & Editing', 'url': 'image_converter:index', 'category': 'Image Converters', 'description': 'Convert images between different formats and edit them', 'keywords': 'JPEG JPG PNG WEBP BMP TIFF GIF'},
+        {'name': 'Media Converters', 'url': 'media_converter:index', 'category': 'Media Converters', 'description': 'Convert media files and download audio', 'keywords': 'MP3 WAV FLAC MP4 AVI video audio'},
+        {'name': 'PDF Tools', 'url': 'pdf_tools:index', 'category': 'PDF Tools', 'description': 'Merge, split, and convert PDF files', 'keywords': 'PDF'},
+        {'name': 'Unit Converters', 'url': 'converters:index', 'category': 'Unit Converters', 'description': 'Convert between different units of measurement', 'keywords': 'meter kg pound watt kW'},
+        {'name': 'Utilities', 'url': 'utilities:index', 'category': 'Utilities', 'description': 'Calculators, text utilities, QR codes and more', 'keywords': 'calculator QR code'},
+        {'name': 'Currency & Crypto', 'url': 'currency_converter:index', 'category': 'Currency & Crypto', 'description': 'Convert between currencies and cryptocurrencies with real-time rates', 'keywords': 'currency crypto Bitcoin'},
+        {'name': 'Archive Converters', 'url': 'archive_converter:index', 'category': 'Archive Converters', 'description': 'Convert between ZIP, RAR, 7Z, and TAR.GZ formats', 'keywords': 'ZIP RAR 7Z TAR.GZ archive'},
+        {'name': 'Text & String Converters', 'url': 'text_converter:index', 'category': 'Text Converters', 'description': 'Convert text between formats', 'keywords': 'JSON XML YAML HTML'},
+        {'name': 'Developer Converters', 'url': 'developer_converter:index', 'category': 'Developer Converters', 'description': 'Developer tools and code utilities', 'keywords': 'HTML CSS JavaScript JSON CSV'},
+        {'name': 'Website Status Checker', 'url': 'isdown:index', 'category': 'Network Tools', 'description': 'Check instantly if any website is online or down', 'keywords': 'website status down online'},
+        {'name': 'YouTube Thumbnail Downloader', 'url': 'youtube_thumbnail:index', 'category': 'Media Converters', 'description': 'Download YouTube thumbnails (HD, HQ, MQ, Default)', 'keywords': 'YouTube thumbnail'},
     ]
     tools.extend(categories)
     
     # Color Picker tools
     tools.extend([
-        {'name': 'Color Picker', 'url': 'color_picker:picker', 'category': 'Color Picker', 'description': 'Pick colors from screen'},
-        {'name': 'Pick Color from Image', 'url': 'color_picker:pick_from_image', 'category': 'Color Picker', 'description': 'Extract colors from images'},
+        {'name': 'Color Picker', 'url': 'color_picker:picker', 'category': 'Color Picker', 'description': 'Pick colors from screen', 'keywords': 'color picker RGB HEX'},
+        {'name': 'Pick Color from Image', 'url': 'color_picker:pick_from_image', 'category': 'Color Picker', 'description': 'Extract colors from images', 'keywords': 'color picker image RGB HEX'},
     ])
     
     # Unit Converters
     tools.extend([
-        {'name': 'Length Converter', 'url': ('converters:tool', 'length'), 'category': 'Unit Converters', 'description': 'Convert between meters, feet, inches, and more'},
-        {'name': 'Weight Converter', 'url': ('converters:tool', 'weight'), 'category': 'Unit Converters', 'description': 'Convert between kilograms, pounds, ounces, and more'},
-        {'name': 'Temperature Converter', 'url': ('converters:tool', 'temperature'), 'category': 'Unit Converters', 'description': 'Convert between Celsius, Fahrenheit, and Kelvin'},
-        {'name': 'Volume Converter', 'url': ('converters:tool', 'volume'), 'category': 'Unit Converters', 'description': 'Convert between liters, gallons, cups, and more'},
-        {'name': 'Area Converter', 'url': ('converters:tool', 'area'), 'category': 'Unit Converters', 'description': 'Convert between square meters, square feet, acres, and more'},
-        {'name': 'Speed Converter', 'url': ('converters:tool', 'speed'), 'category': 'Unit Converters', 'description': 'Convert between km/h, mph, m/s, and more'},
-        {'name': 'Time Converter', 'url': ('converters:tool', 'time'), 'category': 'Unit Converters', 'description': 'Convert between seconds, minutes, hours, days, and more'},
-        {'name': 'Data Storage Converter', 'url': ('converters:tool', 'data-storage'), 'category': 'Unit Converters', 'description': 'Convert between bytes, KB, MB, GB, TB, and more'},
-        {'name': 'Energy Converter', 'url': ('converters:tool', 'energy'), 'category': 'Unit Converters', 'description': 'Convert between joules, calories, watt-hours, and more'},
-        {'name': 'Power Converter', 'url': ('converters:tool', 'power'), 'category': 'Unit Converters', 'description': 'Convert between watts, kilowatts, horsepower, and more'},
-        {'name': 'Pressure Converter', 'url': ('converters:tool', 'pressure'), 'category': 'Unit Converters', 'description': 'Convert between Pascal, bar, PSI, atmosphere, and more'},
-        {'name': 'Force Converter', 'url': ('converters:tool', 'force'), 'category': 'Unit Converters', 'description': 'Convert between newtons, pounds-force, kilogram-force, and more'},
-        {'name': 'Angle Converter', 'url': ('converters:tool', 'angle'), 'category': 'Unit Converters', 'description': 'Convert between degrees, radians, gradians, and turns'},
-        {'name': 'Fuel Consumption Converter', 'url': ('converters:tool', 'fuel-consumption'), 'category': 'Unit Converters', 'description': 'Convert between MPG, L/100km, km/L, and more'},
-        {'name': 'Frequency Converter', 'url': ('converters:tool', 'frequency'), 'category': 'Unit Converters', 'description': 'Convert between Hertz, kilohertz, megahertz, RPM, and more'},
-        {'name': 'Data Transfer Rate Converter', 'url': ('converters:tool', 'data-transfer'), 'category': 'Unit Converters', 'description': 'Convert between Mbps, MB/s, Gbps, and more'},
+        {'name': 'Length Converter', 'url': ('converters:tool', 'length'), 'category': 'Unit Converters', 'description': 'Convert between meters, feet, inches, and more', 'keywords': 'meter m kilometer km centimeter cm millimeter mm mile mi foot ft inch in yard yd'},
+        {'name': 'Weight Converter', 'url': ('converters:tool', 'weight'), 'category': 'Unit Converters', 'description': 'Convert between kilograms, pounds, ounces, and more', 'keywords': 'kilogram kg gram g pound lb ounce oz ton t stone st'},
+        {'name': 'Temperature Converter', 'url': ('converters:tool', 'temperature'), 'category': 'Unit Converters', 'description': 'Convert between Celsius, Fahrenheit, and Kelvin', 'keywords': 'celsius fahrenheit kelvin C F K'},
+        {'name': 'Volume Converter', 'url': ('converters:tool', 'volume'), 'category': 'Unit Converters', 'description': 'Convert between liters, gallons, cups, and more', 'keywords': 'liter L milliliter mL gallon gal quart qt pint pt cup fluid ounce fl oz'},
+        {'name': 'Area Converter', 'url': ('converters:tool', 'area'), 'category': 'Unit Converters', 'description': 'Convert between square meters, square feet, acres, and more', 'keywords': 'square meter m² square foot ft² acre hectare'},
+        {'name': 'Speed Converter', 'url': ('converters:tool', 'speed'), 'category': 'Unit Converters', 'description': 'Convert between km/h, mph, m/s, and more', 'keywords': 'km/h mph m/s ft/s knot'},
+        {'name': 'Time Converter', 'url': ('converters:tool', 'time'), 'category': 'Unit Converters', 'description': 'Convert between seconds, minutes, hours, days, and more', 'keywords': 'second minute hour day week month year millisecond microsecond nanosecond'},
+        {'name': 'Data Storage Converter', 'url': ('converters:tool', 'data-storage'), 'category': 'Unit Converters', 'description': 'Convert between bytes, KB, MB, GB, TB, and more', 'keywords': 'byte B kilobyte KB megabyte MB gigabyte GB terabyte TB petabyte PB kibibyte KiB mebibyte MiB gibibyte GiB tebibyte TiB bit'},
+        {'name': 'Energy Converter', 'url': ('converters:tool', 'energy'), 'category': 'Unit Converters', 'description': 'Convert between joules, calories, watt-hours, and more', 'keywords': 'joule J kilojoule kJ calorie cal kilocalorie kcal watt-hour Wh kilowatt-hour kWh electronvolt eV BTU foot-pound ft-lb'},
+        {'name': 'Power Converter', 'url': ('converters:tool', 'power'), 'category': 'Unit Converters', 'description': 'Convert between watts, kilowatts, horsepower, and more', 'keywords': 'watt W kilowatt kW megawatt MW horsepower hp PS BTU/h foot-pound per second ft-lb/s'},
+        {'name': 'Pressure Converter', 'url': ('converters:tool', 'pressure'), 'category': 'Unit Converters', 'description': 'Convert between Pascal, bar, PSI, atmosphere, and more', 'keywords': 'pascal Pa kilopascal kPa bar atmosphere atm PSI torr mmHg inHg'},
+        {'name': 'Force Converter', 'url': ('converters:tool', 'force'), 'category': 'Unit Converters', 'description': 'Convert between newtons, pounds-force, kilogram-force, and more', 'keywords': 'newton N kilonewton kN pound-force lbf kilogram-force kgf dyne ounce-force ozf'},
+        {'name': 'Angle Converter', 'url': ('converters:tool', 'angle'), 'category': 'Unit Converters', 'description': 'Convert between degrees, radians, gradians, and turns', 'keywords': 'degree radian gradian turn arcminute arcsecond'},
+        {'name': 'Fuel Consumption Converter', 'url': ('converters:tool', 'fuel-consumption'), 'category': 'Unit Converters', 'description': 'Convert between MPG, L/100km, km/L, and more', 'keywords': 'MPG L/100km km/L mi/L'},
+        {'name': 'Frequency Converter', 'url': ('converters:tool', 'frequency'), 'category': 'Unit Converters', 'description': 'Convert between Hertz, kilohertz, megahertz, RPM, and more', 'keywords': 'hertz Hz kilohertz kHz megahertz MHz gigahertz GHz RPM RPS'},
+        {'name': 'Data Transfer Rate Converter', 'url': ('converters:tool', 'data-transfer'), 'category': 'Unit Converters', 'description': 'Convert between Mbps, MB/s, Gbps, and more', 'keywords': 'bps Kbps Mbps Gbps B/s KB/s MB/s GB/s'},
     ])
     
     # Image Converters
     tools.extend([
-        {'name': 'Universal Image Converter', 'url': 'image_converter:universal', 'category': 'Image Converters', 'description': 'Convert images to any format'},
-        {'name': 'JPEG to PNG', 'url': ('image_converter:convert', 'jpeg-to-png'), 'category': 'Image Converters', 'description': 'Convert JPEG images to PNG'},
-        {'name': 'PNG to JPG', 'url': ('image_converter:convert', 'png-to-jpg'), 'category': 'Image Converters', 'description': 'Convert PNG images to JPG'},
-        {'name': 'Image Resizer', 'url': 'image_converter:resize', 'category': 'Image Converters', 'description': 'Resize images to custom dimensions'},
-        {'name': 'Rotate & Flip', 'url': 'image_converter:rotate_flip', 'category': 'Image Converters', 'description': 'Rotate or flip images'},
-        {'name': 'Remove EXIF', 'url': 'image_converter:remove_exif', 'category': 'Image Converters', 'description': 'Remove EXIF metadata from images'},
-        {'name': 'Grayscale', 'url': 'image_converter:grayscale', 'category': 'Image Converters', 'description': 'Convert images to grayscale'},
-        {'name': 'Merge Images', 'url': 'image_converter:merge', 'category': 'Image Converters', 'description': 'Merge multiple images'},
-        {'name': 'Watermark', 'url': 'image_converter:watermark', 'category': 'Image Converters', 'description': 'Add watermark to images'},
+        {'name': 'Universal Image Converter', 'url': 'image_converter:universal', 'category': 'Image Converters', 'description': 'Convert images to any format', 'keywords': 'JPEG JPG PNG WEBP BMP TIFF GIF ICO SVG AVIF HEIC'},
+        {'name': 'JPEG to PNG', 'url': ('image_converter:convert', 'jpeg-to-png'), 'category': 'Image Converters', 'description': 'Convert JPEG images to PNG', 'keywords': 'JPEG JPG PNG'},
+        {'name': 'PNG to JPG', 'url': ('image_converter:convert', 'png-to-jpg'), 'category': 'Image Converters', 'description': 'Convert PNG images to JPG', 'keywords': 'PNG JPEG JPG'},
+        {'name': 'Image Resizer', 'url': 'image_converter:resize', 'category': 'Image Converters', 'description': 'Resize images to custom dimensions', 'keywords': 'JPEG JPG PNG WEBP BMP TIFF GIF resize'},
+        {'name': 'Rotate & Flip', 'url': 'image_converter:rotate_flip', 'category': 'Image Converters', 'description': 'Rotate or flip images', 'keywords': 'JPEG JPG PNG rotate flip'},
+        {'name': 'Remove EXIF', 'url': 'image_converter:remove_exif', 'category': 'Image Converters', 'description': 'Remove EXIF metadata from images', 'keywords': 'EXIF metadata JPEG JPG PNG'},
+        {'name': 'Grayscale', 'url': 'image_converter:grayscale', 'category': 'Image Converters', 'description': 'Convert images to grayscale', 'keywords': 'grayscale JPEG JPG PNG'},
+        {'name': 'Merge Images', 'url': 'image_converter:merge', 'category': 'Image Converters', 'description': 'Merge multiple images', 'keywords': 'JPEG JPG PNG merge combine'},
+        {'name': 'Watermark', 'url': 'image_converter:watermark', 'category': 'Image Converters', 'description': 'Add watermark to images', 'keywords': 'watermark JPEG JPG PNG'},
     ])
     
     # Media Converters
     tools.extend([
-        {'name': 'Audio Converter', 'url': 'media_converter:audio_converter', 'category': 'Media Converters', 'description': 'Convert between audio formats'},
-        {'name': 'Video Converter', 'url': 'media_converter:video_converter', 'category': 'Media Converters', 'description': 'Convert between video formats'},
-        {'name': 'MP4 to MP3', 'url': 'media_converter:mp4_to_mp3', 'category': 'Media Converters', 'description': 'Extract audio from MP4 videos'},
-        {'name': 'Video to GIF', 'url': 'media_converter:video_to_gif', 'category': 'Media Converters', 'description': 'Convert video to animated GIF'},
-        {'name': 'Audio Splitter', 'url': 'media_converter:audio_splitter', 'category': 'Media Converters', 'description': 'Split audio files into segments'},
-        {'name': 'Audio Merge', 'url': 'media_converter:audio_merge', 'category': 'Media Converters', 'description': 'Merge multiple audio files'},
-        {'name': 'Video Merge', 'url': 'media_converter:video_merge', 'category': 'Media Converters', 'description': 'Merge multiple video files into one'},
-        {'name': 'Video Compressor', 'url': 'media_converter:video_compressor', 'category': 'Media Converters', 'description': 'Compress video files'},
-        {'name': 'Mute Video Audio', 'url': 'media_converter:mute_video', 'category': 'Media Converters', 'description': 'Remove audio from video'},
-        {'name': 'Reduce Audio Noise', 'url': 'media_converter:reduce_noise', 'category': 'Media Converters', 'description': 'Reduce background noise from audio'},
+        {'name': 'Audio Converter', 'url': 'media_converter:audio_converter', 'category': 'Media Converters', 'description': 'Convert between audio formats', 'keywords': 'MP3 WAV OGG FLAC AAC M4A AIFF audio'},
+        {'name': 'Video Converter', 'url': 'media_converter:video_converter', 'category': 'Media Converters', 'description': 'Convert between video formats', 'keywords': 'MP4 AVI MOV MKV WebM FLV WMV 3GP video'},
+        {'name': 'MP4 to MP3', 'url': 'media_converter:mp4_to_mp3', 'category': 'Media Converters', 'description': 'Extract audio from MP4 videos', 'keywords': 'MP4 MP3 extract audio video'},
+        {'name': 'Video to GIF', 'url': 'media_converter:video_to_gif', 'category': 'Media Converters', 'description': 'Convert video to animated GIF', 'keywords': 'video GIF MP4 AVI animated'},
+        {'name': 'Audio Splitter', 'url': 'media_converter:audio_splitter', 'category': 'Media Converters', 'description': 'Split audio files into segments', 'keywords': 'MP3 WAV OGG FLAC split audio'},
+        {'name': 'Audio Merge', 'url': 'media_converter:audio_merge', 'category': 'Media Converters', 'description': 'Merge multiple audio files', 'keywords': 'MP3 WAV OGG FLAC merge combine audio'},
+        {'name': 'Video Merge', 'url': 'media_converter:video_merge', 'category': 'Media Converters', 'description': 'Merge multiple video files into one', 'keywords': 'MP4 AVI MOV merge combine video'},
+        {'name': 'Video Compressor', 'url': 'media_converter:video_compressor', 'category': 'Media Converters', 'description': 'Compress video files', 'keywords': 'MP4 AVI compress video'},
+        {'name': 'Mute Video Audio', 'url': 'media_converter:mute_video', 'category': 'Media Converters', 'description': 'Remove audio from video', 'keywords': 'MP4 AVI mute remove audio video'},
+        {'name': 'Reduce Audio Noise', 'url': 'media_converter:reduce_noise', 'category': 'Media Converters', 'description': 'Reduce background noise from audio', 'keywords': 'MP3 WAV OGG FLAC noise reduction audio'},
     ])
     
     # PDF Tools
     tools.extend([
-        {'name': 'Universal PDF Converter', 'url': 'pdf_tools:universal', 'category': 'PDF Tools', 'description': 'Convert PDF to various formats and vice versa'},
-        {'name': 'Merge PDFs', 'url': 'pdf_tools:pdf_merge', 'category': 'PDF Tools', 'description': 'Combine multiple PDF files'},
-        {'name': 'Split PDF', 'url': 'pdf_tools:pdf_split', 'category': 'PDF Tools', 'description': 'Split PDF into individual pages'},
-        {'name': 'PDF to Images', 'url': 'pdf_tools:pdf_to_images', 'category': 'PDF Tools', 'description': 'Convert PDF pages to images'},
-        {'name': 'PDF to HTML', 'url': 'pdf_tools:pdf_to_html', 'category': 'PDF Tools', 'description': 'Convert PDF to HTML'},
-        {'name': 'HTML to PDF', 'url': 'pdf_tools:html_to_pdf', 'category': 'PDF Tools', 'description': 'Convert HTML to PDF'},
-        {'name': 'PDF to Text', 'url': 'pdf_tools:pdf_to_text', 'category': 'PDF Tools', 'description': 'Extract text from PDF'},
-        {'name': 'Compress PDF', 'url': 'pdf_tools:pdf_compress', 'category': 'PDF Tools', 'description': 'Reduce PDF file size'},
-        {'name': 'Rotate PDF', 'url': 'pdf_tools:pdf_rotate', 'category': 'PDF Tools', 'description': 'Rotate PDF pages'},
-        {'name': 'OCR PDF', 'url': 'pdf_tools:pdf_ocr', 'category': 'PDF Tools', 'description': 'Make scanned PDFs searchable'},
-        {'name': 'Remove PDF Metadata', 'url': 'pdf_tools:pdf_remove_metadata', 'category': 'PDF Tools', 'description': 'Remove metadata from PDF'},
+        {'name': 'Universal PDF Converter', 'url': 'pdf_tools:universal', 'category': 'PDF Tools', 'description': 'Convert PDF to various formats and vice versa', 'keywords': 'PDF convert'},
+        {'name': 'Merge PDFs', 'url': 'pdf_tools:pdf_merge', 'category': 'PDF Tools', 'description': 'Combine multiple PDF files', 'keywords': 'PDF merge combine'},
+        {'name': 'Split PDF', 'url': 'pdf_tools:pdf_split', 'category': 'PDF Tools', 'description': 'Split PDF into individual pages', 'keywords': 'PDF split'},
+        {'name': 'PDF to Images', 'url': 'pdf_tools:pdf_to_images', 'category': 'PDF Tools', 'description': 'Convert PDF pages to images', 'keywords': 'PDF image JPEG PNG'},
+        {'name': 'PDF to HTML', 'url': 'pdf_tools:pdf_to_html', 'category': 'PDF Tools', 'description': 'Convert PDF to HTML', 'keywords': 'PDF HTML'},
+        {'name': 'HTML to PDF', 'url': 'pdf_tools:html_to_pdf', 'category': 'PDF Tools', 'description': 'Convert HTML to PDF', 'keywords': 'HTML PDF'},
+        {'name': 'PDF to Text', 'url': 'pdf_tools:pdf_to_text', 'category': 'PDF Tools', 'description': 'Extract text from PDF', 'keywords': 'PDF text extract'},
+        {'name': 'Compress PDF', 'url': 'pdf_tools:pdf_compress', 'category': 'PDF Tools', 'description': 'Reduce PDF file size', 'keywords': 'PDF compress'},
+        {'name': 'Rotate PDF', 'url': 'pdf_tools:pdf_rotate', 'category': 'PDF Tools', 'description': 'Rotate PDF pages', 'keywords': 'PDF rotate'},
+        {'name': 'OCR PDF', 'url': 'pdf_tools:pdf_ocr', 'category': 'PDF Tools', 'description': 'Make scanned PDFs searchable', 'keywords': 'PDF OCR'},
+        {'name': 'Remove PDF Metadata', 'url': 'pdf_tools:pdf_remove_metadata', 'category': 'PDF Tools', 'description': 'Remove metadata from PDF', 'keywords': 'PDF metadata'},
     ])
     
     # Utilities
@@ -219,41 +219,41 @@ def _get_all_tools():
     
     # Archive Converters
     tools.extend([
-        {'name': 'RAR to ZIP', 'url': 'archive_converter:rar_to_zip', 'category': 'Archive Converters', 'description': 'Convert RAR archives to ZIP'},
-        {'name': 'ZIP to 7Z', 'url': 'archive_converter:zip_to_7z', 'category': 'Archive Converters', 'description': 'Convert ZIP to 7Z format'},
-        {'name': '7Z to ZIP', 'url': 'archive_converter:7z_to_zip', 'category': 'Archive Converters', 'description': 'Convert 7Z to ZIP format'},
-        {'name': 'TAR.GZ to ZIP', 'url': 'archive_converter:targz_to_zip', 'category': 'Archive Converters', 'description': 'Convert TAR.GZ to ZIP'},
-        {'name': 'ZIP to TAR.GZ', 'url': 'archive_converter:zip_to_targz', 'category': 'Archive Converters', 'description': 'Convert ZIP to TAR.GZ'},
-        {'name': 'Extract ISO', 'url': 'archive_converter:extract_iso', 'category': 'Archive Converters', 'description': 'Extract files from ISO images'},
-        {'name': 'Create ZIP', 'url': 'archive_converter:create_zip', 'category': 'Archive Converters', 'description': 'Create ZIP from multiple files'},
+        {'name': 'RAR to ZIP', 'url': 'archive_converter:rar_to_zip', 'category': 'Archive Converters', 'description': 'Convert RAR archives to ZIP', 'keywords': 'RAR ZIP archive'},
+        {'name': 'ZIP to 7Z', 'url': 'archive_converter:zip_to_7z', 'category': 'Archive Converters', 'description': 'Convert ZIP to 7Z format', 'keywords': 'ZIP 7Z archive'},
+        {'name': '7Z to ZIP', 'url': 'archive_converter:7z_to_zip', 'category': 'Archive Converters', 'description': 'Convert 7Z to ZIP format', 'keywords': '7Z ZIP archive'},
+        {'name': 'TAR.GZ to ZIP', 'url': 'archive_converter:targz_to_zip', 'category': 'Archive Converters', 'description': 'Convert TAR.GZ to ZIP', 'keywords': 'TAR.GZ TAR GZ ZIP archive'},
+        {'name': 'ZIP to TAR.GZ', 'url': 'archive_converter:zip_to_targz', 'category': 'Archive Converters', 'description': 'Convert ZIP to TAR.GZ', 'keywords': 'ZIP TAR.GZ TAR GZ archive'},
+        {'name': 'Extract ISO', 'url': 'archive_converter:extract_iso', 'category': 'Archive Converters', 'description': 'Extract files from ISO images', 'keywords': 'ISO extract archive'},
+        {'name': 'Create ZIP', 'url': 'archive_converter:create_zip', 'category': 'Archive Converters', 'description': 'Create ZIP from multiple files', 'keywords': 'ZIP create archive'},
     ])
     
     # Text Converters
     tools.extend([
-        {'name': 'Uppercase ↔ Lowercase', 'url': 'text_converter:uppercase_lowercase', 'category': 'Text Converters', 'description': 'Convert text case'},
-        {'name': 'CamelCase ↔ snake_case', 'url': 'text_converter:camelcase_snakecase', 'category': 'Text Converters', 'description': 'Convert naming conventions'},
-        {'name': 'Remove Special Characters', 'url': 'text_converter:remove_special', 'category': 'Text Converters', 'description': 'Remove special characters from text'},
-        {'name': 'Remove Duplicate Lines', 'url': 'text_converter:remove_duplicates', 'category': 'Text Converters', 'description': 'Remove duplicate lines'},
-        {'name': 'Sort Lines', 'url': 'text_converter:sort_lines', 'category': 'Text Converters', 'description': 'Sort lines alphabetically'},
-        {'name': 'JSON ↔ XML', 'url': 'text_converter:json_xml', 'category': 'Text Converters', 'description': 'Convert between JSON and XML'},
-        {'name': 'JSON ↔ YAML', 'url': 'text_converter:json_yaml', 'category': 'Text Converters', 'description': 'Convert between JSON and YAML'},
-        {'name': 'HTML ↔ Markdown', 'url': 'text_converter:html_markdown', 'category': 'Text Converters', 'description': 'Convert between HTML and Markdown'},
-        {'name': 'Text ↔ Base64', 'url': 'text_converter:text_base64', 'category': 'Text Converters', 'description': 'Encode/decode Base64'},
-        {'name': 'Word Counter', 'url': 'text_converter:word_counter', 'category': 'Text Converters', 'description': 'Count words, characters, lines, and more'},
+        {'name': 'Uppercase ↔ Lowercase', 'url': 'text_converter:uppercase_lowercase', 'category': 'Text Converters', 'description': 'Convert text case', 'keywords': 'uppercase lowercase case'},
+        {'name': 'CamelCase ↔ snake_case', 'url': 'text_converter:camelcase_snakecase', 'category': 'Text Converters', 'description': 'Convert naming conventions', 'keywords': 'CamelCase snake_case naming'},
+        {'name': 'Remove Special Characters', 'url': 'text_converter:remove_special', 'category': 'Text Converters', 'description': 'Remove special characters from text', 'keywords': 'special characters text'},
+        {'name': 'Remove Duplicate Lines', 'url': 'text_converter:remove_duplicates', 'category': 'Text Converters', 'description': 'Remove duplicate lines', 'keywords': 'duplicate lines text'},
+        {'name': 'Sort Lines', 'url': 'text_converter:sort_lines', 'category': 'Text Converters', 'description': 'Sort lines alphabetically', 'keywords': 'sort lines text'},
+        {'name': 'JSON ↔ XML', 'url': 'text_converter:json_xml', 'category': 'Text Converters', 'description': 'Convert between JSON and XML', 'keywords': 'JSON XML'},
+        {'name': 'JSON ↔ YAML', 'url': 'text_converter:json_yaml', 'category': 'Text Converters', 'description': 'Convert between JSON and YAML', 'keywords': 'JSON YAML'},
+        {'name': 'HTML ↔ Markdown', 'url': 'text_converter:html_markdown', 'category': 'Text Converters', 'description': 'Convert between HTML and Markdown', 'keywords': 'HTML Markdown MD'},
+        {'name': 'Text ↔ Base64', 'url': 'text_converter:text_base64', 'category': 'Text Converters', 'description': 'Encode/decode Base64', 'keywords': 'Base64 encode decode'},
+        {'name': 'Word Counter', 'url': 'text_converter:word_counter', 'category': 'Text Converters', 'description': 'Count words, characters, lines, and more', 'keywords': 'word count character'},
     ])
     
     # Developer Converters
     tools.extend([
-        {'name': 'Minify Code', 'url': 'developer_converter:minify', 'category': 'Developer Converters', 'description': 'Minify HTML, CSS, or JavaScript'},
-        {'name': 'Unminify Code', 'url': 'developer_converter:unminify', 'category': 'Developer Converters', 'description': 'Beautify minified code'},
-        {'name': 'CSV to JSON', 'url': 'developer_converter:csv_to_json', 'category': 'Developer Converters', 'description': 'Convert CSV to JSON'},
-        {'name': 'JSON to CSV', 'url': 'developer_converter:json_to_csv', 'category': 'Developer Converters', 'description': 'Convert JSON to CSV'},
-        {'name': 'SQL Formatter', 'url': 'developer_converter:sql_formatter', 'category': 'Developer Converters', 'description': 'Format SQL queries'},
-        {'name': 'CSS ↔ SCSS', 'url': 'developer_converter:css_scss', 'category': 'Developer Converters', 'description': 'Convert between CSS and SCSS'},
-        {'name': 'Regex Tester', 'url': 'developer_converter:regex_tester', 'category': 'Developer Converters', 'description': 'Test regular expressions'},
-        {'name': 'JWT Decoder', 'url': 'developer_converter:jwt_decoder', 'category': 'Developer Converters', 'description': 'Decode JWT tokens'},
-        {'name': 'URL Encoder/Decoder', 'url': 'developer_converter:url_encoder', 'category': 'Developer Converters', 'description': 'Encode or decode URLs'},
-        {'name': 'Hash Generator', 'url': 'developer_converter:hash_generator', 'category': 'Developer Converters', 'description': 'Generate MD5, SHA1, SHA256 hashes'},
+        {'name': 'Minify Code', 'url': 'developer_converter:minify', 'category': 'Developer Converters', 'description': 'Minify HTML, CSS, or JavaScript', 'keywords': 'HTML CSS JavaScript minify'},
+        {'name': 'Unminify Code', 'url': 'developer_converter:unminify', 'category': 'Developer Converters', 'description': 'Beautify minified code', 'keywords': 'HTML CSS JavaScript beautify unminify'},
+        {'name': 'CSV to JSON', 'url': 'developer_converter:csv_to_json', 'category': 'Developer Converters', 'description': 'Convert CSV to JSON', 'keywords': 'CSV JSON'},
+        {'name': 'JSON to CSV', 'url': 'developer_converter:json_to_csv', 'category': 'Developer Converters', 'description': 'Convert JSON to CSV', 'keywords': 'JSON CSV'},
+        {'name': 'SQL Formatter', 'url': 'developer_converter:sql_formatter', 'category': 'Developer Converters', 'description': 'Format SQL queries', 'keywords': 'SQL format'},
+        {'name': 'CSS ↔ SCSS', 'url': 'developer_converter:css_scss', 'category': 'Developer Converters', 'description': 'Convert between CSS and SCSS', 'keywords': 'CSS SCSS SASS'},
+        {'name': 'Regex Tester', 'url': 'developer_converter:regex_tester', 'category': 'Developer Converters', 'description': 'Test regular expressions', 'keywords': 'regex regular expression'},
+        {'name': 'JWT Decoder', 'url': 'developer_converter:jwt_decoder', 'category': 'Developer Converters', 'description': 'Decode JWT tokens', 'keywords': 'JWT token decode'},
+        {'name': 'URL Encoder/Decoder', 'url': 'developer_converter:url_encoder', 'category': 'Developer Converters', 'description': 'Encode or decode URLs', 'keywords': 'URL encode decode'},
+        {'name': 'Hash Generator', 'url': 'developer_converter:hash_generator', 'category': 'Developer Converters', 'description': 'Generate MD5, SHA1, SHA256 hashes', 'keywords': 'MD5 SHA1 SHA256 hash'},
     ])
     
     return tools
@@ -344,8 +344,9 @@ def search(request):
         all_tools = _get_all_tools()
         
         for tool in all_tools:
-            # Search in name, description, and category
-            search_text = f"{tool['name']} {tool.get('description', '')} {tool.get('category', '')}".lower()
+            # Search in name, description, category, and keywords
+            keywords = tool.get('keywords', '')
+            search_text = f"{tool['name']} {tool.get('description', '')} {tool.get('category', '')} {keywords}".lower()
             
             if query in search_text:
                 # Calculate relevance score (simple: count matches)

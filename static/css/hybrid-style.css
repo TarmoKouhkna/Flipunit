@@ -716,6 +716,16 @@ header:not(.hybrid-header) {
     height: 54px;
 }
 
+[data-theme="dark"] .hybrid-hero h1 {
+    color: rgba(148, 109, 238, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .hybrid-hero h1 {
+        color: rgba(148, 109, 238, 1);
+    }
+}
+
 .hybrid-hero p {
     font-size: 20px;
     color: var(--text-secondary);
