@@ -3,8 +3,9 @@
 
 cd "$(dirname "$0")"
 
-# Set Google Gemini API Key
-export GOOGLE_GEMINI_API_KEY='AIzaSyAwqWBmAImLYZKRk2IvrW2ZqSN_wCgrArY'
+# Google Gemini API Key - set via environment variable
+# Set GOOGLE_GEMINI_API_KEY in your environment or .env file before running
+# Example: export GOOGLE_GEMINI_API_KEY='your-key-here'
 
 # Set DEBUG to 'True' (as string, which Django expects)
 export DEBUG='True'
