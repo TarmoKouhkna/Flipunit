@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}AI Chat - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Chat with our AI to find the right converter or tool you need. Get help with conversions and discover new tools.{% endblock %}
+
+{% block content %}
+<div class="ai-chat-container">
+    <div class="ai-chat-header">
+        <h1>Chat with Our AI</h1>
+        <p>Ask me anything about conversions, tools, or what you're looking for!</p>
+    </div>
+
+    <div id="ai-chat-messages" class="ai-chat-messages">
+        <div class="ai-chat-message assistant">
+            <div class="ai-chat-message-bubble">
+                Hello! I'm here to help you find the right converter or tool. What are you looking for?
+            </div>
+            <div class="ai-chat-message-time" id="welcome-time"></div>
+        </div>
+    </div>
+
+    <div id="ai-chat-error" class="ai-chat-error" style="display: none;"></div>
+
+    <div class="ai-chat-input-container">
+        <textarea 
+            id="ai-chat-input" 
+            class="ai-chat-input" 
+            placeholder="Type your message here..."
+            rows="1"
+            aria-label="Chat input"
+        ></textarea>
+        <button 
+            id="ai-chat-send-button" 
+            class="ai-chat-send-button"
+            aria-label="Send message"
+        >
+            <span>Send</span>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    'use strict';
+    
+    const messagesContainer = document.getElementById('ai-chat-messages');
+    const inputField = document.getElementById('ai-chat-input');
+    const sendButton = document.getElementById('ai-chat-send-button');
+    const errorDiv = document.getElementById('ai-chat-error');
+    const welcomeTime = document.getElementById('welcome-time');
+    
+    // Set welcome message time
+    if (welcomeTime) {
+        welcomeTime.textContent = getCurrentTime();
+    }
+    
+    // Initialize conversation history - start fresh each time the page loads
+    let conversationHistory = [];
+    
+    // Clear any old chat history from previous page visits
+    sessionStorage.removeItem('ai_chat_history');
+    
+    // Auto-resize textarea
+    inputField.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+    });
+    
+    // Handle Enter key (Shift+Enter for new line)
+    inputField.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    // Send button click
+    sendButton.addEventListener('click', sendMessage);
+    
+    function sendMessage() {
+        const message = inputField.value.trim();
+        
+        if (!message) {
+            return;
+        }
+        
+        // Disable input and button
+        inputField.disabled = true;
+        sendButton.disabled = true;
+        const buttonSpan = sendButton.querySelector('span');
+        if (buttonSpan) {
+            buttonSpan.textContent = 'Sending...';
+        } else {
+            sendButton.textContent = 'Sending...';
+        }
+        
+        // Hide error
+        errorDiv.style.display = 'none';
+        
+        // Add user message to UI
+        addMessageToUI('user', message, true);
+        
+        // Add to conversation history
+        conversationHistory.push({
+            role: 'user',
+            content: message
+        });
+        
+        // Clear input
+        inputField.value = '';
+        inputField.style.height = 'auto';
+        
+        // Show loading indicator
+        const loadingId = showLoadingIndicator();
+        
+        // Get CSRF token
+        const csrfToken = getCookie('csrftoken');
+        if (!csrfToken) {
+            showError('CSRF token not found. Please refresh the page.');
+            inputField.disabled = false;
+            sendButton.disabled = false;
+            sendButton.textContent = 'Send';
+            removeLoadingIndicator(loadingId);
+            return;
+        }
+        
+        // Send to API
+        fetch('{% url "ai_chat:chat_api" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                message: message,
+                history: conversationHistory
+            })
+        })
+        .then(function(response) {
+            return response.json().then(function(data) {
+                if (!response.ok) {
+                    throw new Error(data.error || 'Request failed');
+                }
+                return data;
+            });
+        })
+        .then(function(data) {
+            removeLoadingIndicator(loadingId);
+            
+            if (data.status === 'success') {
+                // Add AI response to UI
+                addMessageToUI('assistant', data.message, true);
+                
+                // Add to conversation history
+                conversationHistory.push({
+                    role: 'assistant',
+                    content: data.message
+                });
+                
+                // Save to sessionStorage (keep last 20 messages) - only for current session
+                const historyToSave = conversationHistory.slice(-20);
+                sessionStorage.setItem('ai_chat_history', JSON.stringify(historyToSave));
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        })
+        .catch(function(error) {
+            removeLoadingIndicator(loadingId);
+            showError(error.message || 'Failed to send message. Please try again.');
+        })
+        .finally(function() {
+            // Re-enable input and button
+            inputField.disabled = false;
+            sendButton.disabled = false;
+            const buttonSpan = sendButton.querySelector('span');
+            if (buttonSpan) {
+                buttonSpan.textContent = 'Send';
+            } else {
+                sendButton.textContent = 'Send';
+            }
+            inputField.focus();
+        });
+    }
+    
+    function addMessageToUI(role, content, scroll) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'ai-chat-message ' + role;
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-chat-message-bubble';
+        bubble.textContent = content;
+        
+        const time = document.createElement('div');
+        time.className = 'ai-chat-message-time';
+        time.textContent = getCurrentTime();
+        
+        messageDiv.appendChild(bubble);
+        messageDiv.appendChild(time);
+        messagesContainer.appendChild(messageDiv);
+        
+        if (scroll) {
+            scrollToBottom();
+        }
+    }
+    
+    function showLoadingIndicator() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'ai-chat-loading';
+        loadingDiv.id = 'ai-chat-loading-' + Date.now();
+        
+        const text = document.createElement('span');
+        text.textContent = 'AI is thinking';
+        
+        const dots = document.createElement('div');
+        dots.className = 'ai-chat-loading-dots';
+        for (let i = 0; i < 3; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'ai-chat-loading-dot';
+            dots.appendChild(dot);
+        }
+        
+        loadingDiv.appendChild(text);
+        loadingDiv.appendChild(dots);
+        messagesContainer.appendChild(loadingDiv);
+        scrollToBottom();
+        
+        return loadingDiv.id;
+    }
+    
+    function removeLoadingIndicator(id) {
+        const loading = document.getElementById(id);
+        if (loading) {
+            loading.remove();
+        }
+    }
+    
+    function showError(message) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        setTimeout(function() {
+            errorDiv.style.display = 'none';
+        }, 5000);
+    }
+    
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    function getCurrentTime() {
+        const now = new Date();
+        return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Focus input on load
+    inputField.focus();
+    
+    // Clear chat history when user leaves the page
+    window.addEventListener('beforeunload', function() {
+        sessionStorage.removeItem('ai_chat_history');
+    });
+    
+    // Also clear on pagehide (more reliable for mobile/navigation)
+    window.addEventListener('pagehide', function() {
+        sessionStorage.removeItem('ai_chat_history');
+    });
+})();
+</script>
+{% endblock %}

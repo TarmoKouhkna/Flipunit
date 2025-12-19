@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     'developer_converter',
     'isdown',
     'youtube_thumbnail',
+    'ai_chat',
 ]
 
 MIDDLEWARE = [
@@ -186,6 +187,9 @@ SITE_NAME = 'FlipUnit'
 SITE_DISPLAY_NAME = 'flipunit'  # Display name for navbar (without .eu)
 SITE_DESCRIPTION = 'Simple, fast, no-login online converter hub - unit converters, image converters, media converters, and everyday utilities.'
 SITE_URL = os.environ.get('SITE_URL', 'https://flipunit.eu')
+
+# Google Gemini API Key
+GOOGLE_GEMINI_API_KEY = os.environ.get('GOOGLE_GEMINI_API_KEY')
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB

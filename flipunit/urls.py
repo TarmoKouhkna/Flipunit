@@ -115,6 +115,7 @@ urlpatterns = [
     path('developer-converter/', include('developer_converter.urls')),
     path('isdown/', include('isdown.urls')),
     path('youtube-thumbnail/', include('youtube_thumbnail.urls')),
+    path('ai-chat/', include('ai_chat.urls')),
     path('sitemap.xml', sitemap, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='robots.txt', content_type='text/plain')),
 ]

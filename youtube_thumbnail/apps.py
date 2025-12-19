@@ -15,3 +15,7 @@ class YoutubeThumbnailConfig(AppConfig):
 
 
 
+
+
+
+

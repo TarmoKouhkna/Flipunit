@@ -1,21 +1,6 @@
 from django.apps import AppConfig
 
 
-class IsdownConfig(AppConfig):
+class AiChatConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'isdown'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    name = 'ai_chat'
