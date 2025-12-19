@@ -43,3 +43,4 @@ rcssmin>=1.1.1  # For CSS minification
 rjsmin>=1.2.2  # For JavaScript minification
 jsbeautifier>=1.15.1  # For JavaScript unminification
 PyJWT>=2.8.0  # For JWT decoding
+python-dotenv>=1.0.0  # For loading .env files
