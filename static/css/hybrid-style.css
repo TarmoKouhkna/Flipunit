@@ -950,6 +950,8 @@ header:not(.hybrid-header) {
     transform: translateY(-2px);
     box-shadow: var(--neu-shadow-hover);
     color: var(--bg-base);
+    border: 2px solid var(--primary-accent);
+    border-color: var(--primary-accent) !important;
 }
 
 .hybrid-ai-cta-button:hover::before {
@@ -3182,6 +3184,8 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
     transform: translateY(-2px);
     box-shadow: var(--neu-shadow-hover);
     color: var(--bg-base);
+    border: 2px solid var(--primary-accent);
+    border-color: var(--primary-accent) !important;
 }
 
 .ai-chat-send-button:hover:not(:disabled)::before {
