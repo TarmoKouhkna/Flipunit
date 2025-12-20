@@ -486,45 +486,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <style>
 .remove-pdf-btn {
-    background: rgba(239, 68, 68, 0.08) !important;
-    border: 1px solid rgba(239, 68, 68, 0.3) !important;
-    color: #dc2626 !important;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
     font-weight: 500 !important;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2) !important;
 }
 
 [data-theme="dark"] .remove-pdf-btn {
-    background: rgba(239, 68, 68, 0.15) !important;
-    border-color: rgba(239, 68, 68, 0.4) !important;
-    color: #f87171 !important;
+    background: rgba(103, 40, 40, 1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
 }
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) .remove-pdf-btn {
-        background: rgba(239, 68, 68, 0.15) !important;
-        border-color: rgba(239, 68, 68, 0.4) !important;
-        color: #f87171 !important;
+        background: rgba(103, 40, 40, 1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
     }
 }
 
 .remove-pdf-btn:hover {
-    background: rgba(239, 68, 68, 0.15) !important;
-    border-color: rgba(239, 68, 68, 0.6) !important;
-    color: #dc2626 !important;
-    transform: translateY(-1px) !important;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 1), rgba(220, 38, 38, 1)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+    transform: translateY(-2px) !important;
     box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2) !important;
 }
 
 [data-theme="dark"] .remove-pdf-btn:hover {
-    background: rgba(239, 68, 68, 0.25) !important;
-    border-color: rgba(239, 68, 68, 0.7) !important;
-    color: #ef4444 !important;
+    background: rgba(103, 40, 40, 1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
 }
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) .remove-pdf-btn:hover {
-        background: rgba(239, 68, 68, 0.25) !important;
-        border-color: rgba(239, 68, 68, 0.7) !important;
-        color: #ef4444 !important;
+        background: rgba(103, 40, 40, 1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
     }
 }
 

@@ -1529,3 +1529,685 @@ def pdf_remove_metadata(request):
         messages.error(request, f'Error removing metadata: {str(e)}')
         return render(request, 'pdf_tools/pdf_remove_metadata.html')
 
+def pdf_to_flipbook(request):
+    """Convert PDF to interactive HTML flipbook"""
+    if not PDF2IMAGE_AVAILABLE:
+        messages.error(request, 'PDF to flipbook conversion requires pdf2image and poppler. Install with: brew install poppler (macOS) or apt-get install poppler-utils (Linux)')
+        return render(request, 'pdf_tools/pdf_to_flipbook.html', {
+            'pdf2image_available': PDF2IMAGE_AVAILABLE,
+        })
+    
+    if request.method != 'POST':
+        return render(request, 'pdf_tools/pdf_to_flipbook.html', {
+            'pdf2image_available': PDF2IMAGE_AVAILABLE,
+        })
+    
+    if 'pdf_files' not in request.FILES:
+        messages.error(request, 'Please upload at least one PDF file.')
+        return render(request, 'pdf_tools/pdf_to_flipbook.html', {
+            'pdf2image_available': PDF2IMAGE_AVAILABLE,
+        })
+    
+    pdf_files = request.FILES.getlist('pdf_files')
+    
+    if len(pdf_files) == 0:
+        messages.error(request, 'Please upload at least one PDF file.')
+        return render(request, 'pdf_tools/pdf_to_flipbook.html', {
+            'pdf2image_available': PDF2IMAGE_AVAILABLE,
+        })
+    
+    # Validate all files
+    max_size = 50 * 1024 * 1024  # 50MB
+    pdf_file_names = []
+    for pdf_file in pdf_files:
+        if not pdf_file.name.lower().endswith('.pdf'):
+            messages.error(request, f'{pdf_file.name} is not a valid PDF file.')
+            return render(request, 'pdf_tools/pdf_to_flipbook.html', {
+                'pdf2image_available': PDF2IMAGE_AVAILABLE,
+            })
+        
+        if pdf_file.size > max_size:
+            messages.error(request, f'{pdf_file.name} exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
+            return render(request, 'pdf_tools/pdf_to_flipbook.html', {
+                'pdf2image_available': PDF2IMAGE_AVAILABLE,
+            })
+        
+        pdf_file_names.append(pdf_file.name)
+    
+    try:
+        import base64
+        import json
+        
+        # Process all PDFs and combine pages
+        all_image_data_uris = []
+        pdf_metadata = []  # Track which PDF each page belongs to
+        
+        for pdf_file in pdf_files:
+            # Convert PDF to images
+            pdf_data = pdf_file.read()
+            images = convert_from_bytes(pdf_data, dpi=200)
+            
+            if not images:
+                messages.warning(request, f'No images could be extracted from {pdf_file.name}. Skipping.')
+                continue
+            
+            # Track metadata for this PDF
+            start_page = len(all_image_data_uris)
+            pdf_metadata.append({
+                'name': pdf_file.name,
+                'start_page': start_page,
+                'end_page': start_page + len(images) - 1,
+                'page_count': len(images)
+            })
+            
+            # Convert images to base64
+            for i, image in enumerate(images):
+                img_buffer = io.BytesIO()
+                image.save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                img_base64 = base64.b64encode(img_buffer.read()).decode('utf-8')
+                all_image_data_uris.append(f'data:image/png;base64,{img_base64}')
+        
+        if not all_image_data_uris:
+            messages.error(request, 'No images could be extracted from any of the PDF files.')
+            return render(request, 'pdf_tools/pdf_to_flipbook.html', {
+                'pdf2image_available': PDF2IMAGE_AVAILABLE,
+            })
+        
+        # Format image array for JavaScript (escape quotes properly)
+        images_json = json.dumps(all_image_data_uris)
+        pdf_metadata_json = json.dumps(pdf_metadata)
+        
+        # Check if this is a preview request
+        is_preview = request.POST.get('preview', 'false').lower() == 'true'
+        
+        # Generate HTML flipbook
+        html_content = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Flipbook</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }}
+        
+        .flipbook-container {{
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 20px;
+            max-width: 1200px;
+            width: 100%;
+            margin: 20px auto;
+            position: relative;
+        }}
+        
+        .toolbar {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }}
+        
+        .toolbar-left, .toolbar-right {{
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }}
+        
+        .btn {{
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            background: #667eea;
+            color: white;
+        }}
+        
+        .btn:hover {{
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }}
+        
+        .btn:active {{
+            transform: translateY(0);
+        }}
+        
+        .btn-secondary {{
+            background: #6c757d;
+        }}
+        
+        .btn-secondary:hover {{
+            background: #5a6268;
+        }}
+        
+        .page-info {{
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            min-width: 120px;
+            text-align: center;
+        }}
+        
+        .zoom-controls {{
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }}
+        
+        .zoom-btn {{
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }}
+        
+        .zoom-level {{
+            min-width: 60px;
+            text-align: center;
+            font-weight: 600;
+            color: #333;
+        }}
+        
+        .flipbook-viewer {{
+            position: relative;
+            width: 100%;
+            min-height: 600px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 2000px;
+            padding: 20px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }}
+        
+        .page-container {{
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }}
+        
+        .page-container.zoomed {{
+            transform-origin: center center;
+        }}
+        
+        .page {{
+            position: relative;
+            background: white;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            max-width: 100%;
+            height: auto;
+        }}
+        
+        .page img {{
+            width: 100%;
+            height: auto;
+            display: block;
+            user-select: none;
+            pointer-events: none;
+        }}
+        
+        .page.flipping {{
+            transform: rotateY(-180deg);
+        }}
+        
+        .page.prev-page {{
+            transform: translateX(-100%) rotateY(-180deg);
+            opacity: 0;
+        }}
+        
+        .page.next-page {{
+            transform: translateX(100%) rotateY(180deg);
+            opacity: 0;
+        }}
+        
+        .navigation-hint {{
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }}
+        
+        .navigation-hint:hover {{
+            opacity: 0.1;
+        }}
+        
+        .navigation-hint.prev {{
+            left: 0;
+        }}
+        
+        .navigation-hint.next {{
+            right: 0;
+        }}
+        
+        .fullscreen-overlay {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }}
+        
+        .fullscreen-overlay.active {{
+            display: flex;
+        }}
+        
+        .fullscreen-toolbar {{
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10000;
+        }}
+        
+        .fullscreen-viewer {{
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }}
+        
+        .fullscreen-page-container {{
+            max-width: 90%;
+            max-height: 90%;
+        }}
+        
+        .fullscreen-page {{
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: 0 0 40px rgba(255,255,255,0.1);
+        }}
+        
+        .fullscreen-page img {{
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }}
+        
+        @media (max-width: 768px) {{
+            .toolbar {{
+                flex-direction: column;
+            }}
+            
+            .toolbar-left, .toolbar-right {{
+                width: 100%;
+                justify-content: center;
+            }}
+            
+            .flipbook-viewer {{
+                min-height: 400px;
+            }}
+            
+            .btn {{
+                padding: 8px 16px;
+                font-size: 12px;
+            }}
+        }}
+        
+        .loading {{
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+        }}
+        
+        .loading.active {{
+            display: block;
+        }}
+        
+        .spinner {{
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }}
+        
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="flipbook-container">
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <button class="btn" onclick="previousPage()" id="prevBtn">← Previous</button>
+                <div class="page-info" id="pageInfo">Page 1 of {len(images)}</div>
+                <button class="btn" onclick="nextPage()" id="nextBtn">Next →</button>
+            </div>
+            <div class="toolbar-right">
+                <div class="zoom-controls">
+                    <button class="btn btn-secondary zoom-btn" onclick="zoomOut()">−</button>
+                    <div class="zoom-level" id="zoomLevel">100%</div>
+                    <button class="btn btn-secondary zoom-btn" onclick="zoomIn()">+</button>
+                </div>
+                <button class="btn btn-secondary" onclick="resetZoom()">Reset Zoom</button>
+                <button class="btn btn-secondary" onclick="toggleFullscreen()">Fullscreen</button>
+                <button class="btn btn-secondary" onclick="downloadFlipbook()">Download</button>
+            </div>
+        </div>
+        
+        <div class="flipbook-viewer" id="flipbookViewer">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+            </div>
+            <div class="page-container" id="pageContainer">
+                <div class="page" id="currentPage">
+                    <img src="{all_image_data_uris[0] if all_image_data_uris else ''}" alt="Page 1" id="pageImage">
+                </div>
+            </div>
+            <div class="navigation-hint prev" onclick="previousPage()"></div>
+            <div class="navigation-hint next" onclick="nextPage()"></div>
+        </div>
+    </div>
+    
+    <div class="fullscreen-overlay" id="fullscreenOverlay">
+        <div class="fullscreen-toolbar">
+            <button class="btn" onclick="previousPage()">← Prev</button>
+            <div class="page-info" id="fullscreenPageInfo">Page 1 of {len(all_image_data_uris)}</div>
+            <button class="btn" onclick="nextPage()">Next →</button>
+            <button class="btn btn-secondary" onclick="toggleFullscreen()">Exit Fullscreen</button>
+        </div>
+        <div class="fullscreen-viewer">
+            <div class="fullscreen-page-container">
+                <div class="fullscreen-page" id="fullscreenPage">
+                    <img src="{all_image_data_uris[0] if all_image_data_uris else ''}" alt="Page 1" id="fullscreenImage">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const images = {images_json};
+        const pdfMetadata = {pdf_metadata_json};
+        let currentPage = 0;
+        let zoomLevel = 1;
+        let isFullscreen = false;
+        
+        function getPdfInfo(pageIndex) {{
+            if (!pdfMetadata || pdfMetadata.length === 0) return null;
+            for (let i = 0; i < pdfMetadata.length; i++) {{
+                if (pageIndex >= pdfMetadata[i].start_page && pageIndex <= pdfMetadata[i].end_page) {{
+                    const localPage = pageIndex - pdfMetadata[i].start_page + 1;
+                    return {{
+                        name: pdfMetadata[i].name,
+                        localPage: localPage,
+                        totalPages: pdfMetadata[i].page_count
+                    }};
+                }}
+            }}
+            return null;
+        }}
+        
+        function updatePage() {{
+            const pageInfo = document.getElementById('pageInfo');
+            const fullscreenPageInfo = document.getElementById('fullscreenPageInfo');
+            const pageImage = document.getElementById('pageImage');
+            const fullscreenImage = document.getElementById('fullscreenImage');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            
+            const pdfInfo = getPdfInfo(currentPage);
+            let pageText = `Page ${{currentPage + 1}} of ${{images.length}}`;
+            if (pdfInfo && pdfMetadata.length > 1) {{
+                pageText += ` (${{pdfInfo.name}} - Page ${{pdfInfo.localPage}}/${{pdfInfo.totalPages}})`;
+            }}
+            
+            if (pageInfo) pageInfo.textContent = pageText;
+            if (fullscreenPageInfo) fullscreenPageInfo.textContent = pageText;
+            
+            if (pageImage) {{
+                pageImage.src = images[currentPage];
+                pageImage.alt = `Page ${{currentPage + 1}}`;
+            }}
+            
+            if (fullscreenImage) {{
+                fullscreenImage.src = images[currentPage];
+                fullscreenImage.alt = `Page ${{currentPage + 1}}`;
+            }}
+            
+            if (prevBtn) prevBtn.disabled = currentPage === 0;
+            if (nextBtn) nextBtn.disabled = currentPage === images.length - 1;
+            
+            applyZoom();
+        }}
+        
+        function previousPage() {{
+            if (currentPage > 0) {{
+                const page = document.getElementById(isFullscreen ? 'fullscreenPage' : 'currentPage');
+                if (page) {{
+                    page.classList.add('flipping');
+                    setTimeout(() => {{
+                        currentPage--;
+                        updatePage();
+                        page.classList.remove('flipping');
+                    }}, 300);
+                }} else {{
+                    currentPage--;
+                    updatePage();
+                }}
+            }}
+        }}
+        
+        function nextPage() {{
+            if (currentPage < images.length - 1) {{
+                const page = document.getElementById(isFullscreen ? 'fullscreenPage' : 'currentPage');
+                if (page) {{
+                    page.classList.add('flipping');
+                    setTimeout(() => {{
+                        currentPage++;
+                        updatePage();
+                        page.classList.remove('flipping');
+                    }}, 300);
+                }} else {{
+                    currentPage++;
+                    updatePage();
+                }}
+            }}
+        }}
+        
+        function zoomIn() {{
+            if (zoomLevel < 3) {{
+                zoomLevel = Math.min(zoomLevel + 0.25, 3);
+                applyZoom();
+            }}
+        }}
+        
+        function zoomOut() {{
+            if (zoomLevel > 0.5) {{
+                zoomLevel = Math.max(zoomLevel - 0.25, 0.5);
+                applyZoom();
+            }}
+        }}
+        
+        function resetZoom() {{
+            zoomLevel = 1;
+            applyZoom();
+        }}
+        
+        function applyZoom() {{
+            const pageContainer = document.getElementById('pageContainer');
+            const zoomLevelEl = document.getElementById('zoomLevel');
+            
+            if (pageContainer) {{
+                pageContainer.style.transform = `scale(${{zoomLevel}})`;
+                pageContainer.classList.add('zoomed');
+            }}
+            
+            if (zoomLevelEl) {{
+                zoomLevelEl.textContent = `${{Math.round(zoomLevel * 100)}}%`;
+            }}
+        }}
+        
+        function toggleFullscreen() {{
+            const overlay = document.getElementById('fullscreenOverlay');
+            if (!overlay) return;
+            
+            isFullscreen = !isFullscreen;
+            
+            if (isFullscreen) {{
+                overlay.classList.add('active');
+                updatePage();
+            }} else {{
+                overlay.classList.remove('active');
+            }}
+        }}
+        
+        function downloadFlipbook() {{
+            const link = document.createElement('a');
+            link.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(document.documentElement.outerHTML);
+            link.download = 'flipbook.html';
+            link.click();
+        }}
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {{
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {{
+                e.preventDefault();
+                previousPage();
+            }} else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {{
+                e.preventDefault();
+                nextPage();
+            }} else if (e.key === 'Escape' && isFullscreen) {{
+                toggleFullscreen();
+            }} else if (e.key === '+' || e.key === '=') {{
+                e.preventDefault();
+                zoomIn();
+            }} else if (e.key === '-') {{
+                e.preventDefault();
+                zoomOut();
+            }} else if (e.key === '0') {{
+                e.preventDefault();
+                resetZoom();
+            }}
+        }});
+        
+        // Mouse wheel zoom
+        const flipbookViewer = document.getElementById('flipbookViewer');
+        if (flipbookViewer) {{
+            flipbookViewer.addEventListener('wheel', function(e) {{
+                if (e.ctrlKey || e.metaKey) {{
+                    e.preventDefault();
+                    if (e.deltaY < 0) {{
+                        zoomIn();
+                    }} else {{
+                        zoomOut();
+                    }}
+                }}
+            }}, {{ passive: false }});
+        }}
+        
+        // Touch gestures for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+        
+        document.addEventListener('touchstart', function(e) {{
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }}, {{ passive: true }});
+        
+        document.addEventListener('touchend', function(e) {{
+            if (!touchStartX || !touchStartY) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const diffX = touchStartX - touchEndX;
+            const diffY = touchStartY - touchEndY;
+            
+            if (Math.abs(diffX) > Math.abs(diffY)) {{
+                if (diffX > 50) {{
+                    nextPage();
+                }} else if (diffX < -50) {{
+                    previousPage();
+                }}
+            }}
+            
+            touchStartX = 0;
+            touchStartY = 0;
+        }}, {{ passive: true }});
+        
+        // Initialize
+        updatePage();
+    </script>
+</body>
+</html>'''
+        
+        # Return HTML - either for preview (inline) or download (attachment)
+        response = HttpResponse(html_content, content_type='text/html; charset=utf-8')
+        if not is_preview:
+            response['Content-Disposition'] = 'attachment; filename="flipbook.html"'
+        return response
+        
+    except Exception as e:
+        error_msg = str(e)
+        if 'poppler' in error_msg.lower() or 'pdftoppm' in error_msg.lower():
+            messages.error(request, 'Poppler is required for PDF to flipbook conversion. Install with: brew install poppler (macOS) or apt-get install poppler-utils (Linux)')
+        else:
+            messages.error(request, f'Error converting PDF to flipbook: {error_msg}')
+        return render(request, 'pdf_tools/pdf_to_flipbook.html', {
+            'pdf2image_available': PDF2IMAGE_AVAILABLE,
+        })
+
