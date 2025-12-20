@@ -20,6 +20,7 @@
         <li>Rotate PDF pages (90°, 180°, 270°)</li>
         <li>OCR PDF to make scanned documents searchable</li>
         <li>Remove metadata and personal information</li>
+        <li>Convert PDF to interactive HTML flipbook</li>
         <li>Secure processing - files are not stored on our servers</li>
     </ul>
 </div>
@@ -60,6 +61,10 @@
         <a href="{% url 'pdf_tools:pdf_remove_metadata' %}" class="category-card">
             <h3>Remove Metadata</h3>
             <p>Remove metadata and personal information</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_to_flipbook' %}" class="category-card">
+            <h3>PDF to Flipbook</h3>
+            <p>Convert PDF to interactive HTML flipbook with animations</p>
         </a>
     </div>
 </div>

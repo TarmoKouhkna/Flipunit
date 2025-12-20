@@ -1,0 +1,669 @@
+{% extends 'base.html' %}
+
+{% block title %}PDF to Flipbook - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Convert PDF files to interactive HTML flipbook with page flip animations, zoom, fullscreen mode, and download options.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Convert PDF to Interactive Flipbook</h1>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data" class="converter-tool" id="flipbookForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select PDF Files</label>
+            <input type="file" name="pdf_files" id="pdf_files" accept=".pdf" multiple style="display: none;">
+            <div class="file-upload-area" id="uploadArea">
+                <p style="margin-top: 1rem;">Click to select or drag and drop PDF files</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">You can select multiple files at once or add them one by one</p>
+            </div>
+        </div>
+        
+        <div id="fileListContainer" style="margin-top: 1.5rem; display: none;">
+            <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Selected Files (<span id="fileCount">0</span>)</h3>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Drag files to reorder, or use ↑↓ buttons</p>
+            <div id="fileList" style="background: var(--surface); border-radius: 6px; padding: 1rem; max-height: 300px; overflow-y: auto;">
+                <!-- Files will be added here dynamically -->
+            </div>
+            <button type="button" class="btn btn-secondary" style="margin-top: 1rem; width: 100%;" onclick="clearAllFiles()">Clear All Files</button>
+        </div>
+        
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+            <button type="button" class="btn btn-primary" id="preview-btn" disabled style="flex: 1;">Preview Flipbook</button>
+            <button type="submit" class="btn btn-primary" id="download-btn" disabled style="flex: 1;">Download Flipbook</button>
+        </div>
+    </form>
+    
+    <div style="margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+        <h3 style="margin-bottom: 0.75rem; color: var(--primary-color);">✨ Features</h3>
+        <ul class="list-indent" style="color: var(--text-secondary); line-height: 1.8;">
+            <li><strong>Interactive Page Navigation:</strong> Click buttons or use arrow keys to flip through pages</li>
+            <li><strong>Page Flip Animation:</strong> Smooth 3D page turning effects</li>
+            <li><strong>Zoom Controls:</strong> Zoom in/out from 50% to 300% with mouse wheel support</li>
+            <li><strong>Fullscreen Mode:</strong> View the flipbook in fullscreen for immersive reading</li>
+            <li><strong>Download Option:</strong> Save the flipbook HTML file to use offline or share</li>
+            <li><strong>Mobile Support:</strong> Swipe gestures for page navigation on touch devices</li>
+            <li><strong>Keyboard Shortcuts:</strong> Arrow keys for navigation, +/- for zoom, Escape to exit fullscreen</li>
+        </ul>
+    </div>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol class="list-indent" style="margin-top: 0.5rem;">
+            <li>Select one or multiple PDF files (max 50MB each)</li>
+            <li>Add files one by one or select multiple at once</li>
+            <li>Review your file list and remove any unwanted files</li>
+            <li>Click "Convert to Flipbook" to combine all PDFs into one flipbook</li>
+            <li>Download the HTML flipbook file</li>
+            <li>Open the HTML file in any web browser to view your interactive flipbook</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> The flipbook is a self-contained HTML file with embedded images. 
+            {% if not pdf2image_available %}
+            <span style="color: #ff6b6b;">PDF to flipbook conversion requires pdf2image and poppler. Install with: pip install pdf2image && brew install poppler (macOS) or apt-get install poppler-utils (Linux)</span>
+            {% else %}
+            You can use it offline or host it on any web server. All images are embedded in the HTML file.
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+
+<!-- Preview Modal -->
+<div class="preview-modal" id="previewModal">
+    <div class="preview-header">
+        <h3>Flipbook Preview</h3>
+        <button class="preview-close" id="previewClose">Close Preview</button>
+    </div>
+    <iframe class="preview-content" id="previewContent"></iframe>
+</div>
+
+{% block extra_js %}
+<style>
+    .file-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        background: var(--background);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+    
+    .file-item:hover {
+        background: var(--surface);
+        border-color: var(--primary-color);
+    }
+    
+    .file-item-info {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .file-item-name {
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+    
+    .file-item-size {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    
+    .file-item-remove {
+        background: linear-gradient(135deg, rgba(234, 195, 195, 0.9) 0%, rgba(210, 121, 121, 0.9) 100%);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: var(--font-size-base);
+        font-weight: 500;
+        transition: all var(--transition-base);
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    
+    .file-item-remove:hover {
+        background: linear-gradient(135deg, rgba(234, 195, 195, 1) 0%, rgba(210, 121, 121, 1) 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 2px 4px rgba(210, 121, 121, 0.2);
+    }
+    
+    [data-theme="dark"] .file-item-remove {
+        background: linear-gradient(90deg, rgba(92, 46, 46, 1) 0%, rgba(130, 28, 28, 1) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+    
+    [data-theme="dark"] .file-item-remove:hover {
+        background: linear-gradient(90deg, rgba(92, 46, 46, 1) 0%, rgba(130, 28, 28, 1) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .file-item-remove {
+            background: linear-gradient(90deg, rgba(92, 46, 46, 1) 0%, rgba(130, 28, 28, 1) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        :root:not([data-theme="light"]) .file-item-remove:hover {
+            background: linear-gradient(90deg, rgba(92, 46, 46, 1) 0%, rgba(130, 28, 28, 1) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+    }
+    
+    .file-item-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    
+    .file-item-drag-handle {
+        cursor: move;
+        color: var(--text-secondary);
+        font-size: 1.2rem;
+        padding: 0.25rem 0.5rem;
+        user-select: none;
+    }
+    
+    .file-item-drag-handle:hover {
+        color: var(--primary-color);
+    }
+    
+    .file-item-move-btn {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+    
+    .file-item-move-btn:hover {
+        background: #5a6268;
+    }
+    
+    .file-item-move-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+    
+    .file-item.dragging {
+        opacity: 0.5;
+        border: 2px dashed var(--primary-color);
+    }
+    
+    .file-item.drag-over {
+        border-top: 3px solid var(--primary-color);
+    }
+    
+    .preview-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 10000;
+        flex-direction: column;
+    }
+    
+    .preview-modal.active {
+        display: flex;
+    }
+    
+    .preview-header {
+        background: #fff;
+        padding: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .preview-header h3 {
+        margin: 0;
+        font-size: 1.2rem;
+    }
+    
+    .preview-close {
+        background: #ff6b6b;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    
+    .preview-close:hover {
+        background: #ff5252;
+    }
+    
+    .preview-content {
+        flex: 1;
+        width: 100%;
+        height: calc(100% - 60px);
+        border: none;
+        background: #fff;
+    }
+    
+    .file-upload-area {
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    
+    .file-upload-area:hover {
+        border-color: var(--primary-color);
+        background: var(--surface);
+    }
+    
+    .file-upload-area.dragover {
+        border-color: var(--primary-color);
+        background: var(--surface);
+        transform: scale(1.02);
+    }
+    
+    .file-upload-area input[type="file"] {
+        display: none;
+    }
+</style>
+<script>
+let selectedFiles = [];
+const maxFileSize = 50 * 1024 * 1024; // 50MB
+
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('pdf_files');
+    const uploadArea = document.getElementById('uploadArea');
+    const fileListContainer = document.getElementById('fileListContainer');
+    const fileList = document.getElementById('fileList');
+    const fileCount = document.getElementById('fileCount');
+    const form = document.getElementById('flipbookForm');
+    
+    // Click to select files - file input is now outside uploadArea, so no double-trigger
+    uploadArea.addEventListener('click', function(e) {
+        e.preventDefault();
+        fileInput.click();
+    });
+    
+    // Handle file selection
+    fileInput.addEventListener('change', function(e) {
+        handleFiles(e.target.files);
+        e.target.value = ''; // Reset input to allow selecting same files again
+    });
+    
+    // Drag and drop
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+    
+    function handleFiles(files) {
+        let addedCount = 0;
+        let skippedCount = 0;
+        
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            
+            // Validate file type
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                skippedCount++;
+                continue;
+            }
+            
+            // Check if file already exists
+            const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size);
+            if (exists) {
+                skippedCount++;
+                continue;
+            }
+            
+            // Validate file size
+            if (file.size > maxFileSize) {
+                skippedCount++;
+                continue;
+            }
+            
+            // Add file to list
+            selectedFiles.push(file);
+            addedCount++;
+        }
+        
+        if (addedCount > 0) {
+            updateFileList();
+        }
+        
+        if (skippedCount > 0) {
+            alert(`Skipped ${skippedCount} file(s) - either not PDF, already added, or exceeds 50MB limit.`);
+        }
+    }
+    
+    function updateFileList() {
+        fileList.innerHTML = '';
+        
+        if (selectedFiles.length === 0) {
+            fileListContainer.style.display = 'none';
+            document.getElementById('preview-btn').disabled = true;
+            document.getElementById('download-btn').disabled = true;
+            return;
+        }
+        
+        fileListContainer.style.display = 'block';
+        fileCount.textContent = selectedFiles.length;
+        document.getElementById('preview-btn').disabled = false;
+        document.getElementById('download-btn').disabled = false;
+        
+        selectedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.draggable = true;
+            fileItem.dataset.index = index;
+            
+            const size = formatFileSize(file.size);
+            const isFirst = index === 0;
+            const isLast = index === selectedFiles.length - 1;
+            
+            fileItem.innerHTML = `
+                <div class="file-item-drag-handle" title="Drag to reorder">☰</div>
+                <div class="file-item-info">
+                    <span class="file-item-name">${escapeHtml(file.name)}</span>
+                    <span class="file-item-size">${size}</span>
+                </div>
+                <div class="file-item-actions">
+                    <button type="button" class="file-item-move-btn" onclick="moveFile(${index}, -1)" ${isFirst ? 'disabled' : ''} title="Move up">↑</button>
+                    <button type="button" class="file-item-move-btn" onclick="moveFile(${index}, 1)" ${isLast ? 'disabled' : ''} title="Move down">↓</button>
+                    <button type="button" class="file-item-remove" onclick="removeFile(${index})">Remove</button>
+                </div>
+            `;
+            
+            // Drag and drop handlers
+            fileItem.addEventListener('dragstart', handleDragStart);
+            fileItem.addEventListener('dragover', handleDragOver);
+            fileItem.addEventListener('drop', handleDrop);
+            fileItem.addEventListener('dragend', handleDragEnd);
+            fileItem.addEventListener('dragleave', handleDragLeave);
+            
+            fileList.appendChild(fileItem);
+        });
+    }
+    
+    let draggedIndex = null;
+    let dragOverIndex = null;
+    
+    function handleDragStart(e) {
+        draggedIndex = parseInt(e.target.closest('.file-item').dataset.index);
+        e.target.closest('.file-item').classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    }
+    
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const item = e.target.closest('.file-item');
+        if (item && item.dataset.index) {
+            const overIndex = parseInt(item.dataset.index);
+            if (overIndex !== dragOverIndex) {
+                // Remove previous drag-over class
+                document.querySelectorAll('.file-item.drag-over').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+                item.classList.add('drag-over');
+                dragOverIndex = overIndex;
+            }
+        }
+    }
+    
+    function handleDragLeave(e) {
+        e.target.closest('.file-item')?.classList.remove('drag-over');
+    }
+    
+    function handleDrop(e) {
+        e.preventDefault();
+        const item = e.target.closest('.file-item');
+        if (item && draggedIndex !== null) {
+            const dropIndex = parseInt(item.dataset.index);
+            if (draggedIndex !== dropIndex) {
+                // Reorder files
+                const [movedFile] = selectedFiles.splice(draggedIndex, 1);
+                selectedFiles.splice(dropIndex, 0, movedFile);
+                updateFileList();
+            }
+        }
+        dragOverIndex = null;
+    }
+    
+    function handleDragEnd(e) {
+        e.target.closest('.file-item')?.classList.remove('dragging');
+        document.querySelectorAll('.file-item.drag-over').forEach(el => {
+            el.classList.remove('drag-over');
+        });
+        draggedIndex = null;
+        dragOverIndex = null;
+    }
+    
+    window.moveFile = function(index, direction) {
+        if ((direction === -1 && index === 0) || (direction === 1 && index === selectedFiles.length - 1)) {
+            return;
+        }
+        const newIndex = index + direction;
+        [selectedFiles[index], selectedFiles[newIndex]] = [selectedFiles[newIndex], selectedFiles[index]];
+        updateFileList();
+    };
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Preview functionality
+    const previewBtn = document.getElementById('preview-btn');
+    const previewModal = document.getElementById('previewModal');
+    const previewContent = document.getElementById('previewContent');
+    const previewClose = document.getElementById('previewClose');
+    
+    previewBtn.addEventListener('click', function() {
+        if (selectedFiles.length === 0) {
+            alert('Please select at least one PDF file.');
+            return;
+        }
+        
+        // Show loading
+        previewBtn.textContent = 'Generating Preview...';
+        previewBtn.disabled = true;
+        
+        // Create FormData with all files
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
+        formData.append('preview', 'true'); // Flag for preview mode
+        
+        selectedFiles.forEach((file) => {
+            formData.append('pdf_files', file);
+        });
+        
+        // Submit for preview
+        fetch(form.action || window.location.pathname, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => {
+                    if (text.includes('alert alert-')) {
+                        document.open();
+                        document.write(text);
+                        document.close();
+                    } else {
+                        throw new Error('Preview generation failed');
+                    }
+                });
+            }
+            return response.text();
+        })
+        .then(htmlContent => {
+            // Check if it's the flipbook HTML
+            if (htmlContent.includes('flipbook-container')) {
+                // Open in iframe
+                previewContent.srcdoc = htmlContent;
+                previewModal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            } else {
+                alert('Failed to generate preview. Please try again.');
+            }
+            
+            previewBtn.textContent = 'Preview Flipbook';
+            previewBtn.disabled = false;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while generating preview.');
+            previewBtn.textContent = 'Preview Flipbook';
+            previewBtn.disabled = false;
+        });
+    });
+    
+    // Close preview modal
+    previewClose.addEventListener('click', function() {
+        previewModal.classList.remove('active');
+        document.body.style.overflow = '';
+        previewContent.srcdoc = '';
+    });
+    
+    // Close on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && previewModal.classList.contains('active')) {
+            previewClose.click();
+        }
+    });
+    
+    // Download functionality
+    const downloadBtn = document.getElementById('download-btn');
+    const originalDownloadText = downloadBtn.textContent;
+    
+    form.addEventListener('submit', function(e) {
+        if (selectedFiles.length === 0) {
+            e.preventDefault();
+            alert('Please select at least one PDF file.');
+            return;
+        }
+        
+        e.preventDefault();
+        
+        // Create FormData with all files
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
+        
+        selectedFiles.forEach((file) => {
+            formData.append('pdf_files', file);
+        });
+        
+        // Show loading state
+        downloadBtn.textContent = 'Processing...';
+        downloadBtn.disabled = true;
+        
+        // Submit using fetch
+        fetch(form.action || window.location.pathname, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            // Check if response is successful
+            if (!response.ok) {
+                return response.text().then(text => {
+                    // If it's an error page, reload to show messages
+                    if (text.includes('alert alert-')) {
+                        document.open();
+                        document.write(text);
+                        document.close();
+                    } else {
+                        throw new Error('Conversion failed');
+                    }
+                });
+            }
+            
+            // Get the response as blob
+            return response.blob();
+        })
+        .then(blob => {
+            if (blob) {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'flipbook.html';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+            
+            downloadBtn.textContent = originalDownloadText;
+            downloadBtn.disabled = false;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            downloadBtn.textContent = originalDownloadText;
+            downloadBtn.disabled = false;
+        });
+    });
+    
+    // Global functions
+    window.removeFile = function(index) {
+        selectedFiles.splice(index, 1);
+        updateFileList();
+    };
+    
+    window.clearAllFiles = function() {
+        if (confirm('Are you sure you want to remove all files?')) {
+            selectedFiles = [];
+            updateFileList();
+        }
+    };
+});
+</script>
+{% endblock %}
+{% endblock %}
+
+
