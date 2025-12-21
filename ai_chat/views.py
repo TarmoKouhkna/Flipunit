@@ -131,6 +131,7 @@ def chat_api(request):
             # Log request for debugging (only in DEBUG mode)
             if settings.DEBUG:
                 logger.info(f"Gemini API request: URL={url}, payload keys={list(payload.keys())}, contents count={len(contents)}")
+                logger.info(f"Using model: {model_name}, Google Search grounding: {'enabled' if payload.get('tools') else 'disabled'}")
             
             # Make API request
             try:
@@ -138,6 +139,8 @@ def chat_api(request):
                 
                 # If successful (200) or non-404 error, break and handle
                 if response.status_code != 404:
+                    # Always log which model was successfully used (important for debugging)
+                    logger.info(f"Gemini API: Successfully using model '{model_name}' with Google Search grounding enabled")
                     break
                     
                 # If 404, try next model
@@ -175,6 +178,13 @@ def chat_api(request):
                 if 'content' in candidate and 'parts' in candidate['content']:
                     if len(candidate['content']['parts']) > 0:
                         response_text = candidate['content']['parts'][0].get('text', '')
+                        
+                        # Check if grounding was used (always log this for debugging)
+                        grounding_metadata = candidate.get('groundingMetadata', {})
+                        if grounding_metadata:
+                            logger.info(f"Google Search grounding was used successfully")
+                        else:
+                            logger.warning(f"Google Search grounding was NOT used - response may contain outdated information")
                         
                         return JsonResponse({
                             'status': 'success',
