@@ -258,5 +258,10 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'ai_chat': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
