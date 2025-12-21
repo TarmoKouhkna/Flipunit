@@ -1590,15 +1590,20 @@ def pdf_to_flipbook(request):
     try:
         import base64
         import json
+        import gc
         
         # Process all PDFs and combine pages
         all_image_data_uris = []
         pdf_metadata = []  # Track which PDF each page belongs to
         
         for pdf_file in pdf_files:
-            # Convert PDF to images
+            # Convert PDF to images - use lower DPI to reduce memory usage
             pdf_data = pdf_file.read()
-            images = convert_from_bytes(pdf_data, dpi=200)
+            images = convert_from_bytes(pdf_data, dpi=120, fmt='jpeg')
+            
+            # Free PDF data from memory immediately
+            del pdf_data
+            gc.collect()
             
             if not images:
                 messages.warning(request, f'No images could be extracted from {pdf_file.name}. Skipping.')
@@ -1613,13 +1618,20 @@ def pdf_to_flipbook(request):
                 'page_count': len(images)
             })
             
-            # Convert images to base64
+            # Convert images to base64 one at a time to save memory
             for i, image in enumerate(images):
                 img_buffer = io.BytesIO()
-                image.save(img_buffer, format='PNG')
+                # Use JPEG with compression for smaller file size
+                image.save(img_buffer, format='JPEG', quality=75, optimize=True)
                 img_buffer.seek(0)
                 img_base64 = base64.b64encode(img_buffer.read()).decode('utf-8')
-                all_image_data_uris.append(f'data:image/png;base64,{img_base64}')
+                all_image_data_uris.append(f'data:image/jpeg;base64,{img_base64}')
+                # Clear the buffer
+                img_buffer.close()
+            
+            # Free images from memory after processing each PDF
+            del images
+            gc.collect()
         
         if not all_image_data_uris:
             messages.error(request, 'No images could be extracted from any of the PDF files.')
