@@ -1597,13 +1597,20 @@ def pdf_to_flipbook(request):
         pdf_metadata = []  # Track which PDF each page belongs to
         
         for pdf_file in pdf_files:
-            # Convert PDF to images - use lower DPI to reduce memory usage
-            pdf_data = pdf_file.read()
-            images = convert_from_bytes(pdf_data, dpi=120, fmt='jpeg')
-            
-            # Free PDF data from memory immediately
-            del pdf_data
-            gc.collect()
+            images = None
+            pdf_data = None
+            try:
+                # Convert PDF to images - use lower DPI to reduce memory usage
+                pdf_data = pdf_file.read()
+                images = convert_from_bytes(pdf_data, dpi=120)
+            except Exception as conv_error:
+                messages.warning(request, f'Could not convert {pdf_file.name}: {str(conv_error)}. Skipping.')
+                continue
+            finally:
+                # Free PDF data from memory immediately
+                if pdf_data is not None:
+                    del pdf_data
+                gc.collect()
             
             if not images:
                 messages.warning(request, f'No images could be extracted from {pdf_file.name}. Skipping.')
@@ -1630,7 +1637,8 @@ def pdf_to_flipbook(request):
                 img_buffer.close()
             
             # Free images from memory after processing each PDF
-            del images
+            if images is not None:
+                del images
             gc.collect()
         
         if not all_image_data_uris:
