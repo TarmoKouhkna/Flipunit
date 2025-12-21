@@ -64,7 +64,8 @@ def chat_api(request):
         Users can convert between different units, formats, and tools. 
         Help users find the right converter or tool they need. 
         Be friendly, concise, and helpful. 
-        If a user asks about a conversion that doesn't exist on the site, suggest the closest alternative or explain that it's not available."""
+        If a user asks about a conversion that doesn't exist on the site, suggest the closest alternative or explain that it's not available.
+        IMPORTANT: Always respond in the same language that the user writes in."""
         
         # Build contents array for Gemini API
         contents = []
@@ -84,15 +85,10 @@ def chat_api(request):
                     'parts': [{'text': item.get('content', '')}]
                 })
         
-        # Add current user message with system context if it's the first message
-        if not conversation_history:
-            user_message = f"{system_context}\n\nUser: {message}"
-        else:
-            user_message = message
-        
+        # Add current user message
         contents.append({
             'role': 'user',
-            'parts': [{'text': user_message}]
+            'parts': [{'text': message}]
         })
         
         # Ensure we have at least one message
@@ -103,10 +99,23 @@ def chat_api(request):
             }, status=500)
         
         # Prepare request to Google Gemini API
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        # Try models in order: gemini-2.5-flash, gemini-2.0-flash-exp, gemini-1.5-flash
+        models_to_try = [
+            'gemini-2.5-flash',
+            'gemini-2.0-flash-exp',
+            'gemini-1.5-flash'
+        ]
         
         payload = {
-            'contents': contents
+            'contents': contents,
+            'systemInstruction': {
+                'parts': [{
+                    'text': system_context
+                }]
+            },
+            'tools': [{
+                'google_search': {}
+            }]
         }
         
         headers = {
@@ -114,16 +123,41 @@ def chat_api(request):
             'X-goog-api-key': api_key
         }
         
-        # Log request for debugging (only in DEBUG mode)
-        if settings.DEBUG:
-            logger.info(f"Gemini API request: URL={url}, payload keys={list(payload.keys())}, contents count={len(contents)}")
+        # Try each model until one works
+        response = None
+        for model_name in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+            
+            # Log request for debugging (only in DEBUG mode)
+            if settings.DEBUG:
+                logger.info(f"Gemini API request: URL={url}, payload keys={list(payload.keys())}, contents count={len(contents)}")
+            
+            # Make API request
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
+                
+                # If successful (200) or non-404 error, break and handle
+                if response.status_code != 404:
+                    break
+                    
+                # If 404, try next model
+                if settings.DEBUG:
+                    logger.info(f"Model {model_name} not found (404), trying next model...")
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Gemini API request failed for {model_name}: {e}")
+                # If it's the last model, raise the exception
+                if model_name == models_to_try[-1]:
+                    raise
+                # Otherwise, try next model
+                continue
         
-        # Make API request
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Gemini API request failed: {e}")
-            raise
+        # If no response was received (shouldn't happen, but safety check)
+        if response is None:
+            return JsonResponse({
+                'status': 'error',
+                'error': 'Failed to connect to AI service. Please try again.'
+            }, status=500)
         
         if response.status_code == 200:
             try:
@@ -171,6 +205,18 @@ def chat_api(request):
                 'error': error_message
             }, status=400)
             
+        elif response.status_code == 404:
+            # All models failed - provide helpful error message
+            try:
+                error_data = response.json() if response.content else {}
+                error_message = error_data.get('error', {}).get('message', 'No compatible model found. Please check your API tier or region availability.')
+            except:
+                error_message = 'No compatible model found. Please check your API tier or region availability.'
+            logger.error(f"Gemini API 404 error: {error_message}, tried models: {', '.join(models_to_try)}")
+            return JsonResponse({
+                'status': 'error',
+                'error': error_message
+            }, status=404)
         else:
             return JsonResponse({
                 'status': 'error',
