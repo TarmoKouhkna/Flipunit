@@ -20,6 +20,7 @@ def chat_index(request):
 @require_http_methods(["POST"])
 def chat_api(request):
     """API endpoint to handle chat messages with Google Gemini"""
+    logger.info("=== AI CHAT API CALLED ===")
     try:
         # Parse JSON request body
         if not request.body:
