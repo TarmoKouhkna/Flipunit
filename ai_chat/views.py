@@ -128,10 +128,14 @@ def chat_api(request):
         for model_name in models_to_try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
             
-            # Log request for debugging (only in DEBUG mode)
-            if settings.DEBUG:
-                logger.info(f"Gemini API request: URL={url}, payload keys={list(payload.keys())}, contents count={len(contents)}")
-                logger.info(f"Using model: {model_name}, Google Search grounding: {'enabled' if payload.get('tools') else 'disabled'}")
+            # Always log request details (important for debugging production issues)
+            tools_enabled = bool(payload.get('tools'))
+            grounding_status = 'enabled' if tools_enabled else 'disabled'
+            tools_config = payload.get('tools', [])
+            logger.info(f"Gemini API request: Model={model_name}, URL={url}")
+            logger.info(f"   Google Search grounding: {grounding_status}")
+            logger.info(f"   Tools configuration: {tools_config}")
+            logger.info(f"   Payload keys: {list(payload.keys())}")
             
             # Make API request
             try:
@@ -140,12 +144,11 @@ def chat_api(request):
                 # If successful (200) or non-404 error, break and handle
                 if response.status_code != 404:
                     # Always log which model was successfully used (important for debugging)
-                    logger.info(f"Gemini API: Successfully using model '{model_name}' with Google Search grounding enabled")
+                    logger.info(f"Gemini API: Successfully using model '{model_name}' with Google Search grounding {grounding_status}")
                     break
                     
                 # If 404, try next model
-                if settings.DEBUG:
-                    logger.info(f"Model {model_name} not found (404), trying next model...")
+                logger.info(f"Model {model_name} not found (404), trying next model...")
                 
             except requests.exceptions.RequestException as e:
                 logger.error(f"Gemini API request failed for {model_name}: {e}")
@@ -181,12 +184,18 @@ def chat_api(request):
                         
                         # Check if grounding was used (always log this for debugging)
                         grounding_metadata = candidate.get('groundingMetadata', {})
+                        candidate_keys = list(candidate.keys())
+                        result_keys = list(result.keys())
+                        
                         if grounding_metadata:
-                            logger.info(f"Google Search grounding was used successfully - metadata keys: {list(grounding_metadata.keys())}")
+                            logger.info(f"✅ Google Search grounding WAS used - metadata keys: {list(grounding_metadata.keys())}")
                         else:
-                            logger.warning(f"Google Search grounding was NOT used - response may contain outdated information")
-                            # Log candidate keys to help debug
-                            logger.warning(f"Candidate keys available: {list(candidate.keys())}")
+                            logger.warning(f"❌ Google Search grounding was NOT used - response may contain outdated information")
+                            logger.warning(f"   Candidate keys: {candidate_keys}")
+                            logger.warning(f"   Result keys: {result_keys}")
+                            # Check if grounding might be at result level
+                            if 'groundingMetadata' in result:
+                                logger.warning(f"   Found groundingMetadata at result level: {list(result['groundingMetadata'].keys())}")
                         
                         return JsonResponse({
                             'status': 'success',
