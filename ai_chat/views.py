@@ -182,9 +182,11 @@ def chat_api(request):
                         # Check if grounding was used (always log this for debugging)
                         grounding_metadata = candidate.get('groundingMetadata', {})
                         if grounding_metadata:
-                            logger.info(f"Google Search grounding was used successfully")
+                            logger.info(f"Google Search grounding was used successfully - metadata keys: {list(grounding_metadata.keys())}")
                         else:
                             logger.warning(f"Google Search grounding was NOT used - response may contain outdated information")
+                            # Log candidate keys to help debug
+                            logger.warning(f"Candidate keys available: {list(candidate.keys())}")
                         
                         return JsonResponse({
                             'status': 'success',
