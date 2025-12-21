@@ -7,6 +7,11 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
@@ -34,6 +39,11 @@ services:
     image: postgres:15
     container_name: flipunit-postgres
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - POSTGRES_DB=${DB_NAME:-flipunit}
       - POSTGRES_USER=${DB_USER:-flipunit_user}
