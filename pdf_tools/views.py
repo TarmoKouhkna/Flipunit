@@ -5,13 +5,26 @@ import io
 import zipfile
 import os
 import tempfile
+import subprocess
+import shutil
 from pypdf import PdfWriter, PdfReader
 from PIL import Image
+
+def _check_poppler_available():
+    """Check if poppler utilities are available on the system"""
+    # Check if pdftoppm (a poppler utility) is available
+    return shutil.which('pdftoppm') is not None
+
+# Check if pdf2image package is installed
 try:
     from pdf2image import convert_from_bytes
-    PDF2IMAGE_AVAILABLE = True
+    PDF2IMAGE_PACKAGE_AVAILABLE = True
 except ImportError:
-    PDF2IMAGE_AVAILABLE = False
+    PDF2IMAGE_PACKAGE_AVAILABLE = False
+    convert_from_bytes = None
+
+# PDF2IMAGE is only available if both the package AND poppler are available
+PDF2IMAGE_AVAILABLE = PDF2IMAGE_PACKAGE_AVAILABLE and _check_poppler_available()
 try:
     from weasyprint import HTML
     WEASYPRINT_AVAILABLE = True
