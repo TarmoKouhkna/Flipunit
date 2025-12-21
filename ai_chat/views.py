@@ -7,7 +7,7 @@ import requests
 import json
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('ai_chat')
 
 
 @ensure_csrf_cookie
