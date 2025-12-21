@@ -1967,7 +1967,7 @@ def pdf_to_flipbook(request):
         <div class="toolbar">
             <div class="toolbar-left">
                 <button class="btn" onclick="previousPage()" id="prevBtn">← Previous</button>
-                <div class="page-info" id="pageInfo">Page 1 of {len(images)}</div>
+                <div class="page-info" id="pageInfo">Page 1 of {len(all_image_data_uris)}</div>
                 <button class="btn" onclick="nextPage()" id="nextBtn">Next →</button>
             </div>
             <div class="toolbar-right">
