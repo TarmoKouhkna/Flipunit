@@ -29,7 +29,7 @@
         <div id="fileListContainer" style="margin-top: 1.5rem; display: none;">
             <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Selected Files (<span id="fileCount">0</span>)</h3>
             <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Drag files to reorder, or use ↑↓ buttons</p>
-            <div id="fileList" style="background: var(--surface); border-radius: 6px; padding: 1rem; max-height: 300px; overflow-y: auto;">
+            <div id="fileList" class="file-list-scrollable">
                 <!-- Files will be added here dynamically -->
             </div>
             <button type="button" class="btn btn-secondary" style="margin-top: 1rem; width: 100%;" onclick="clearAllFiles()">Clear All Files</button>
@@ -289,6 +289,33 @@
     
     .file-upload-area input[type="file"] {
         display: none;
+    }
+    
+    .file-list-scrollable {
+        background: var(--surface);
+        border-radius: 6px;
+        padding: 1rem;
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+    }
+    
+    .file-list-scrollable::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .file-list-scrollable::-webkit-scrollbar-track {
+        background: var(--background);
+        border-radius: 4px;
+    }
+    
+    .file-list-scrollable::-webkit-scrollbar-thumb {
+        background: var(--text-secondary);
+        border-radius: 4px;
+    }
+    
+    .file-list-scrollable::-webkit-scrollbar-thumb:hover {
+        background: var(--primary-color);
     }
 </style>
 <script>
