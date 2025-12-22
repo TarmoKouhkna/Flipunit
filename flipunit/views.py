@@ -200,6 +200,7 @@ def _get_all_tools():
         {'name': 'OCR PDF', 'url': 'pdf_tools:pdf_ocr', 'category': 'PDF Tools', 'description': 'Make scanned PDFs searchable', 'keywords': 'PDF OCR'},
         {'name': 'Remove PDF Metadata', 'url': 'pdf_tools:pdf_remove_metadata', 'category': 'PDF Tools', 'description': 'Remove metadata from PDF', 'keywords': 'PDF metadata'},
         {'name': 'PDF to Flipbook', 'url': 'pdf_tools:pdf_to_flipbook', 'category': 'PDF Tools', 'description': 'Convert PDF to interactive HTML flipbook', 'keywords': 'PDF flipbook interactive animation'},
+        {'name': 'PDF to EPUB', 'url': 'pdf_tools:pdf_to_epub', 'category': 'PDF Tools', 'description': 'Convert PDF to EPUB format for e-readers', 'keywords': 'PDF EPUB e-reader ebook'},
     ])
     
     # Utilities

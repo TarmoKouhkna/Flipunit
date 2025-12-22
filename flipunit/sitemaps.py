@@ -84,6 +84,7 @@ class StaticViewSitemap(Sitemap):
             'pdf_tools:pdf_ocr',
             'pdf_tools:pdf_remove_metadata',
             'pdf_tools:pdf_to_flipbook',
+            'pdf_tools:pdf_to_epub',
             
             # Utilities
             'utilities:calculator',

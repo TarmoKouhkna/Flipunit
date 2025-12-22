@@ -21,6 +21,7 @@
         <li>OCR PDF to make scanned documents searchable</li>
         <li>Remove metadata and personal information</li>
         <li>Convert PDF to interactive HTML flipbook</li>
+        <li>Convert PDF to EPUB format for e-readers</li>
         <li>Secure processing - files are not stored on our servers</li>
     </ul>
 </div>
@@ -65,6 +66,10 @@
         <a href="{% url 'pdf_tools:pdf_to_flipbook' %}" class="category-card">
             <h3>PDF to Flipbook</h3>
             <p>Convert PDF to interactive HTML flipbook with animations</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_to_epub' %}" class="category-card">
+            <h3>PDF to EPUB</h3>
+            <p>Convert PDF to EPUB format for e-readers</p>
         </a>
     </div>
 </div>

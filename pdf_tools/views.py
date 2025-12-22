@@ -55,6 +55,13 @@ try:
     PYTESSERACT_AVAILABLE = True
 except ImportError:
     PYTESSERACT_AVAILABLE = False
+try:
+    import ebooklib
+    from ebooklib import epub
+    EBOOKLIB_AVAILABLE = True
+except ImportError:
+    EBOOKLIB_AVAILABLE = False
+    epub = None
 
 def _get_universal_context():
     """Helper function to get context for universal converter template"""
@@ -2242,5 +2249,500 @@ def pdf_to_flipbook(request):
             messages.error(request, f'Error converting PDF to flipbook: {error_msg}')
         return render(request, 'pdf_tools/pdf_to_flipbook.html', {
             'pdf2image_available': PDF2IMAGE_AVAILABLE,
+        })
+
+def pdf_to_epub(request):
+    """Convert PDF to EPUB format"""
+    if not EBOOKLIB_AVAILABLE:
+        messages.error(request, 'PDF to EPUB conversion requires ebooklib. Install with: pip install ebooklib')
+        return render(request, 'pdf_tools/pdf_to_epub.html', {
+            'ebooklib_available': EBOOKLIB_AVAILABLE,
+        })
+    
+    if request.method != 'POST':
+        return render(request, 'pdf_tools/pdf_to_epub.html', {
+            'ebooklib_available': EBOOKLIB_AVAILABLE,
+        })
+    
+    if 'pdf_files' not in request.FILES:
+        messages.error(request, 'Please upload at least one PDF file.')
+        return render(request, 'pdf_tools/pdf_to_epub.html', {
+            'ebooklib_available': EBOOKLIB_AVAILABLE,
+        })
+    
+    pdf_files = request.FILES.getlist('pdf_files')
+    
+    if len(pdf_files) == 0:
+        messages.error(request, 'Please upload at least one PDF file.')
+        return render(request, 'pdf_tools/pdf_to_epub.html', {
+            'ebooklib_available': EBOOKLIB_AVAILABLE,
+        })
+    
+    # Validate all files
+    max_size = 50 * 1024 * 1024  # 50MB
+    pdf_file_names = []
+    for pdf_file in pdf_files:
+        if not pdf_file.name.lower().endswith('.pdf'):
+            messages.error(request, f'{pdf_file.name} is not a valid PDF file.')
+            return render(request, 'pdf_tools/pdf_to_epub.html', {
+                'ebooklib_available': EBOOKLIB_AVAILABLE,
+            })
+        
+        if pdf_file.size > max_size:
+            messages.error(request, f'{pdf_file.name} exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
+            return render(request, 'pdf_tools/pdf_to_epub.html', {
+                'ebooklib_available': EBOOKLIB_AVAILABLE,
+            })
+        
+        pdf_file_names.append(pdf_file.name)
+    
+    try:
+        import gc
+        import base64
+        import re
+        from html import escape
+        
+        # Get custom title from request or use default
+        epub_title = request.POST.get('epub_title', '').strip()
+        if not epub_title:
+            epub_title = 'PDF to EPUB Conversion'
+        
+        # Check if user wants to preserve page breaks
+        preserve_page_breaks = request.POST.get('preserve_page_breaks', 'off') == 'on'
+        
+        # Create EPUB book
+        book = epub.EpubBook()
+        
+        # Set metadata
+        book.set_identifier('pdf_to_epub_conversion')
+        book.set_title(epub_title)
+        book.set_language('en')
+        book.add_author('PDF Converter')
+        
+        # Handle cover image if provided
+        cover_image_file = None
+        if 'cover_image' in request.FILES:
+            cover_image_file = request.FILES['cover_image']
+            # Validate cover image
+            if cover_image_file.size > 5 * 1024 * 1024:  # 5MB limit
+                messages.warning(request, 'Cover image exceeds 5MB limit. Skipping cover image.')
+                cover_image_file = None
+            else:
+                # Validate image format
+                allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+                if cover_image_file.content_type not in allowed_types:
+                    messages.warning(request, f'Cover image format {cover_image_file.content_type} not supported. Use PNG, JPG, or WebP. Skipping cover image.')
+                    cover_image_file = None
+        
+        # Store chapters and spine
+        chapters = []
+        spine = ['nav']
+        
+        # Process all PDFs
+        for pdf_file in pdf_files:
+            pdf_data = None
+            try:
+                pdf_data = pdf_file.read()
+                
+                # Create temporary file for PDF processing
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_pdf:
+                    tmp_pdf.write(pdf_data)
+                    tmp_pdf_path = tmp_pdf.name
+                
+                # Extract content from PDF
+                pdf_content = []
+                images_dict = {}  # Store images by page number
+                
+                if PDFPLUMBER_AVAILABLE:
+                    # Use pdfplumber for better text extraction
+                    with pdfplumber.open(tmp_pdf_path) as pdf:
+                        for page_num, page in enumerate(pdf.pages, 1):
+                            page_content = []
+                            
+                            # Extract tables
+                            tables = page.extract_tables()
+                            if tables:
+                                for table in tables:
+                                    if table and len(table) > 0:
+                                        table_html = '<table style="border-collapse: collapse; width: 100%; margin: 15px 0;">\n'
+                                        is_first = True
+                                        for row in table:
+                                            if row and any(cell for cell in row if cell):
+                                                table_html += '<tr>\n'
+                                                for cell in row:
+                                                    cell_text = str(cell).strip() if cell else ''
+                                                    cell_text = escape(cell_text)
+                                                    tag = 'th' if is_first else 'td'
+                                                    table_html += f'<{tag} style="border: 1px solid #ddd; padding: 8px;">{cell_text}</{tag}>\n'
+                                                table_html += '</tr>\n'
+                                                is_first = False
+                                        table_html += '</table>\n'
+                                        page_content.append(table_html)
+                            
+                            # Extract text
+                            text = page.extract_text()
+                            if text and text.strip():
+                                paragraphs = text.split('\n\n')
+                                for para in paragraphs:
+                                    para = para.strip()
+                                    if para and len(para) > 2:
+                                        para = escape(para)
+                                        para = para.replace('\n', '<br>')
+                                        page_content.append(f'<p>{para}</p>')
+                            
+                            # Extract images
+                            if page.images:
+                                for img_idx, img in enumerate(page.images):
+                                    try:
+                                        cropped = page.crop((img['x0'], img['top'], img['x1'], img['bottom']))
+                                        img_obj = cropped.to_image(resolution=150)
+                                        img_buffer = io.BytesIO()
+                                        img_obj.save(img_buffer, format='PNG')
+                                        img_buffer.seek(0)
+                                        img_data = img_buffer.read()
+                                        img_buffer.close()
+                                        
+                                        # Store image for later embedding
+                                        img_id = f'img_{pdf_file.name}_{page_num}_{img_idx}'.replace('.', '_').replace('/', '_')
+                                        images_dict[img_id] = img_data
+                                        page_content.append(f'<p><img src="{img_id}.png" alt="Image" style="max-width: 100%; height: auto;" /></p>')
+                                    except Exception as img_error:
+                                        # Skip images that can't be extracted
+                                        continue
+                            
+                            if page_content:
+                                pdf_content.append({
+                                    'page_num': page_num,
+                                    'content': '\n'.join(page_content)
+                                })
+                
+                else:
+                    # Fallback to PyPDF2
+                    pdf_reader = PdfReader(io.BytesIO(pdf_data))
+                    for page_num, page in enumerate(pdf_reader.pages, 1):
+                        text = page.extract_text()
+                        if text.strip():
+                            paragraphs = text.split('\n\n')
+                            page_content = []
+                            for para in paragraphs:
+                                para = para.strip()
+                                if para:
+                                    para = escape(para)
+                                    para = para.replace('\n', '<br>')
+                                    page_content.append(f'<p>{para}</p>')
+                            
+                            if page_content:
+                                pdf_content.append({
+                                    'page_num': page_num,
+                                    'content': '\n'.join(page_content)
+                                })
+                
+                # Create chapter(s) for this PDF
+                if pdf_content:
+                    # Create one chapter per PDF, or split into multiple chapters if too long
+                    pdf_name = pdf_file.name.replace('.pdf', '').replace('.PDF', '')
+                    chapter_title = escape(pdf_name)
+                    
+                    # Combine all pages into one chapter
+                    full_content = []
+                    if preserve_page_breaks:
+                        # Preserve page breaks: each page gets its own div with header
+                        for page_data in pdf_content:
+                            full_content.append(f'<div class="page"><h3>Page {page_data["page_num"]}</h3>{page_data["content"]}</div>')
+                    else:
+                        # Continuous flow: combine all content without page breaks
+                        for page_data in pdf_content:
+                            full_content.append(f'<div class="page-content">{page_data["content"]}</div>')
+                    
+                    # Build CSS based on page break preference
+                    if preserve_page_breaks:
+                        page_css = '''
+        .page {
+            margin-bottom: 30px;
+            page-break-after: always;
+        }
+        h3 {
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 5px;
+        }'''
+                    else:
+                        page_css = '''
+        .page-content {
+            margin-bottom: 20px;
+        }'''
+                    
+                    chapter_html = f'''<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8"/>
+    <title>{chapter_title}</title>
+    <style>
+        body {{
+            font-family: Georgia, serif;
+            line-height: 1.6;
+            margin: 20px;
+            padding: 0;
+        }}{page_css}
+        p {{
+            margin: 10px 0;
+            text-align: justify;
+        }}
+        img {{
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+        }}
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }}
+        table th, table td {{
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }}
+        table th {{
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{chapter_title}</h1>
+    {''.join(full_content)}
+</body>
+</html>'''
+                    
+                    # Create chapter
+                    chapter_id = f'chapter_{pdf_file.name}'.replace('.', '_').replace('/', '_')
+                    chapter = epub.EpubHtml(title=chapter_title, file_name=f'{chapter_id}.xhtml', lang='en')
+                    chapter.content = chapter_html
+                    
+                    # Add images to chapter
+                    for img_id, img_data in images_dict.items():
+                        book.add_item(epub.EpubItem(uid=img_id, file_name=f'{img_id}.png', media_type='image/png', content=img_data))
+                    
+                    book.add_item(chapter)
+                    chapters.append(chapter)
+                    spine.append(chapter)
+                
+                # Clean up temporary file
+                if os.path.exists(tmp_pdf_path):
+                    os.unlink(tmp_pdf_path)
+                
+                # Free memory
+                if pdf_data is not None:
+                    del pdf_data
+                gc.collect()
+                
+            except Exception as conv_error:
+                messages.warning(request, f'Could not convert {pdf_file.name}: {str(conv_error)}. Skipping.')
+                continue
+        
+        if not chapters:
+            messages.error(request, 'No content could be extracted from any of the PDF files.')
+            return render(request, 'pdf_tools/pdf_to_epub.html', {
+                'ebooklib_available': EBOOKLIB_AVAILABLE,
+            })
+        
+        # Add cover image if provided
+        if cover_image_file:
+            try:
+                # Read cover image data
+                cover_data = cover_image_file.read()
+                
+                # Determine image format and media type
+                cover_image_file.seek(0)  # Reset file pointer
+                img = Image.open(cover_image_file)
+                
+                # Convert to RGB if needed (for JPEG compatibility)
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    # Create white background for transparent images
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Add title text overlay on the cover image
+                from PIL import ImageDraw, ImageFont
+                draw = ImageDraw.Draw(img)
+                
+                # Calculate text size and position
+                img_width, img_height = img.size
+                
+                # Try to use bold Helvetica font - prioritize heaviest variants
+                font_size = max(48, int(img_height * 0.08))
+                font = None
+                
+                # Try to load boldest Helvetica fonts (macOS)
+                # HelveticaNeue.ttc typically has: 0=UltraLight, 1=Thin, 2=Light, 3=Regular, 4=Medium, 5=Bold, 6=Heavy, 7=Black
+                # Helvetica.ttc typically has: 0=Regular, 1=Bold
+                font_paths_with_indices = [
+                    ("/System/Library/Fonts/HelveticaNeue.ttc", 7),  # Black (boldest)
+                    ("/System/Library/Fonts/HelveticaNeue.ttc", 6),  # Heavy (very bold)
+                    ("/System/Library/Fonts/HelveticaNeue.ttc", 5),  # Bold
+                    ("/System/Library/Fonts/Helvetica.ttc", 1),      # Bold
+                    ("/System/Library/Fonts/HelveticaNeue.ttc", 4),  # Medium (fallback)
+                    ("/System/Library/Fonts/Helvetica.ttc", 0),       # Regular (fallback)
+                ]
+                
+                for font_path, font_index in font_paths_with_indices:
+                    try:
+                        if os.path.exists(font_path):
+                            font = ImageFont.truetype(font_path, font_size, index=font_index)
+                            break
+                    except (OSError, IOError):
+                        continue
+                
+                # Fallback to regular Helvetica if bold not found
+                if not font:
+                    try:
+                        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
+                    except:
+                        try:
+                            font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", font_size)
+                        except:
+                            font = ImageFont.load_default()
+                
+                # Wrap text to fit within image width
+                text = epub_title
+                max_text_width = img_width - int(img_width * 0.1)  # 5% padding on each side
+                
+                # Helper function to get text width
+                def get_text_width(text, font):
+                    try:
+                        bbox = draw.textbbox((0, 0), text, font=font)
+                        return bbox[2] - bbox[0]
+                    except AttributeError:
+                        return draw.textsize(text, font=font)[0]
+                
+                # Helper function to get text height
+                def get_text_height(text, font):
+                    try:
+                        bbox = draw.textbbox((0, 0), text, font=font)
+                        return bbox[3] - bbox[1]
+                    except AttributeError:
+                        return draw.textsize(text, font=font)[1]
+                
+                # Wrap text into lines
+                words = text.split()
+                lines = []
+                current_line = []
+                
+                for word in words:
+                    # Test if adding this word would exceed the width
+                    test_line = ' '.join(current_line + [word])
+                    test_width = get_text_width(test_line, font)
+                    
+                    if test_width <= max_text_width:
+                        current_line.append(word)
+                    else:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                        # If a single word is too long, add it anyway (will be truncated visually)
+                        current_line = [word]
+                
+                # Add the last line
+                if current_line:
+                    lines.append(' '.join(current_line))
+                
+                # If no lines (empty text), create one empty line
+                if not lines:
+                    lines = ['']
+                
+                # Calculate total height of all lines
+                line_height = get_text_height('A', font)  # Approximate line height
+                line_spacing = int(line_height * 0.2)  # 20% spacing between lines
+                total_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
+                
+                # Position text block at bottom center
+                y_start = img_height - total_height - int(img_height * 0.1)  # 10% from bottom
+                
+                # Draw text with bold stroke effect for extra boldness
+                # Use white text with a bold dark outline/stroke
+                stroke_color = (0, 0, 0)  # Black stroke
+                text_color = (255, 255, 255)  # White text
+                stroke_width = 3  # Increased stroke width for bolder appearance
+                
+                # Draw each line
+                for line_idx, line in enumerate(lines):
+                    line_width = get_text_width(line, font)
+                    x = (img_width - line_width) // 2  # Center each line
+                    y = y_start + (line_idx * (line_height + line_spacing))
+                    
+                    # Draw bold stroke by drawing text multiple times with offsets
+                    for adj_x in range(-stroke_width, stroke_width + 1):
+                        for adj_y in range(-stroke_width, stroke_width + 1):
+                            if abs(adj_x) + abs(adj_y) <= stroke_width:
+                                draw.text((x + adj_x, y + adj_y), line, font=font, fill=stroke_color)
+                    
+                    # Draw main text on top
+                    draw.text((x, y), line, font=font, fill=text_color)
+                
+                # Save the modified image
+                cover_format = img.format.lower() if img.format else 'png'
+                
+                # Convert to JPEG for better compatibility
+                img_buffer = io.BytesIO()
+                img.save(img_buffer, format='JPEG', quality=90)
+                cover_data = img_buffer.getvalue()
+                media_type = 'image/jpeg'
+                file_ext = 'jpg'
+                
+                # Create cover image item
+                cover_item = epub.EpubItem(
+                    uid='cover',
+                    file_name=f'cover.{file_ext}',
+                    media_type=media_type,
+                    content=cover_data
+                )
+                book.add_item(cover_item)
+                
+                # Set cover
+                book.set_cover(file_name=f'cover.{file_ext}', content=cover_data)
+                
+            except Exception as cover_error:
+                messages.warning(request, f'Error processing cover image: {str(cover_error)}. EPUB will be created without cover.')
+        
+        # Add table of contents
+        book.toc = [(chapter, chapter.title) for chapter in chapters]
+        
+        # Add navigation files
+        book.add_item(epub.EpubNcx())
+        book.add_item(epub.EpubNav())
+        
+        # Set spine
+        book.spine = spine
+        
+        # Generate EPUB file
+        epub_buffer = io.BytesIO()
+        epub.write_epub(epub_buffer, book, {})
+        epub_buffer.seek(0)
+        
+        # Generate safe filename from title
+        safe_filename = re.sub(r'[^\w\s-]', '', epub_title).strip()
+        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
+        if not safe_filename:
+            safe_filename = 'converted'
+        safe_filename = safe_filename[:100]  # Limit length
+        if not safe_filename.endswith('.epub'):
+            safe_filename += '.epub'
+        
+        # Return EPUB file
+        response = HttpResponse(epub_buffer.read(), content_type='application/epub+zip')
+        response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
+        return response
+        
+    except Exception as e:
+        error_msg = str(e)
+        messages.error(request, f'Error converting PDF to EPUB: {error_msg}')
+        return render(request, 'pdf_tools/pdf_to_epub.html', {
+            'ebooklib_available': EBOOKLIB_AVAILABLE,
         })
 

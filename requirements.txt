@@ -44,3 +44,4 @@ rjsmin>=1.2.2  # For JavaScript minification
 jsbeautifier>=1.15.1  # For JavaScript unminification
 PyJWT>=2.8.0  # For JWT decoding
 python-dotenv>=1.0.0  # For loading .env files
+ebooklib>=0.18  # For PDF to EPUB conversion

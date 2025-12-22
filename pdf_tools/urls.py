@@ -17,5 +17,6 @@ urlpatterns = [
     path('ocr/', views.pdf_ocr, name='pdf_ocr'),
     path('remove-metadata/', views.pdf_remove_metadata, name='pdf_remove_metadata'),
     path('to-flipbook/', views.pdf_to_flipbook, name='pdf_to_flipbook'),
+    path('to-epub/', views.pdf_to_epub, name='pdf_to_epub'),
 ]
 
