@@ -2309,6 +2309,12 @@ def pdf_to_epub(request):
         
         # Check if user wants to preserve page breaks
         preserve_page_breaks = request.POST.get('preserve_page_breaks', 'off') == 'on'
+        skip_images = request.POST.get('skip_images', 'off') == 'on'
+        tables_as_text = request.POST.get('tables_as_text', 'off') == 'on'
+        
+        import logging
+        logger = logging.getLogger('pdf_tools')
+        logger.info(f'EPUB options: preserve_page_breaks={preserve_page_breaks}, skip_images={skip_images}, tables_as_text={tables_as_text}')
         
         # Create EPUB book
         book = epub.EpubBook()
@@ -2353,11 +2359,40 @@ def pdf_to_epub(request):
                 pdf_content = []
                 images_dict = {}  # Store images by page number
                 
-                if PDFPLUMBER_AVAILABLE:
-                    # Use pdfplumber for better text extraction
+                # Open PyMuPDF document for image extraction and page rendering
+                pymupdf_doc = None
+                if PYMUPDF_AVAILABLE:
+                    try:
+                        import fitz
+                        pymupdf_doc = fitz.open(tmp_pdf_path)
+                        import logging
+                        logger = logging.getLogger('pdf_tools')
+                        logger.info(f'Opened PyMuPDF document for {pdf_file.name}: {len(pymupdf_doc)} pages')
+                    except Exception as e:
+                        import logging
+                        logger = logging.getLogger('pdf_tools')
+                        logger.error(f'Failed to open PyMuPDF document for {pdf_file.name}: {str(e)}')
+                        pymupdf_doc = None
+                else:
+                    import logging
+                    logger = logging.getLogger('pdf_tools')
+                    logger.warning(f'PyMuPDF not available for {pdf_file.name}')
+                
+                import logging
+                logger = logging.getLogger('pdf_tools')
+
+                # Use PyMuPDF for EPUB conversion (more reliable for preserving content)
+                # pdfplumber causes issues with duplicate images and lost text
+                use_pdfplumber_for_epub = False
+                
+                if use_pdfplumber_for_epub and PDFPLUMBER_AVAILABLE:
+                    # Use pdfplumber for text extraction (disabled - causes issues)
                     with pdfplumber.open(tmp_pdf_path) as pdf:
                         for page_num, page in enumerate(pdf.pages, 1):
                             page_content = []
+                            logger.info(f'Processing page {page_num}/{len(pdf.pages)} for {pdf_file.name}')
+                            tables_found = False
+                            text_found = False
                             
                             # Extract tables
                             tables = page.extract_tables()
@@ -2378,8 +2413,89 @@ def pdf_to_epub(request):
                                                 is_first = False
                                         table_html += '</table>\n'
                                         page_content.append(table_html)
+                                        tables_found = True
                             
-                            # Extract text
+                            # Extract images FIRST (before text) to preserve order
+                            images_extracted = False
+                            images_found_count = 0
+                            
+                            # Try pdfplumber image detection first
+                            if page.images:
+                                images_found_count = len(page.images)
+                                logger.info(f'pdfplumber found {images_found_count} images on page {page_num}')
+                                for img_idx, img in enumerate(page.images):
+                                    try:
+                                        # Get image coordinates
+                                        x0 = img.get('x0', 0)
+                                        top = img.get('top', 0)
+                                        x1 = img.get('x1', 0)
+                                        bottom = img.get('bottom', 0)
+                                        
+                                        # Crop and convert to image
+                                        cropped = page.crop((x0, top, x1, bottom))
+                                        img_obj = cropped.to_image(resolution=150)
+                                        img_buffer = io.BytesIO()
+                                        img_obj.save(img_buffer, format='PNG')
+                                        img_buffer.seek(0)
+                                        img_data = img_buffer.read()
+                                        img_buffer.close()
+                                        
+                                        if len(img_data) > 0:  # Only add if image data is valid
+                                            # Store image for later embedding (use .png extension in key)
+                                            img_id = f'img_{pdf_file.name}_{page_num}_{img_idx}'.replace('.', '_').replace('/', '_').replace('\\', '_')
+                                            img_id_with_ext = f'{img_id}.png'
+                                            images_dict[img_id_with_ext] = img_data
+                                            # Add image reference to page content (must match the key exactly)
+                                            page_content.append(f'<p><img src="{img_id_with_ext}" alt="Image from page {page_num}" style="max-width: 100%; height: auto; display: block; margin: 15px auto;" /></p>')
+                                            images_extracted = True
+                                    except Exception as img_error:
+                                        logger.warning(f'Failed to extract image {img_idx} from page {page_num} using pdfplumber: {str(img_error)}')
+                                        continue
+                            
+                            # ALWAYS use PyMuPDF for image extraction - it's more reliable
+                            # PyMuPDF can extract embedded images directly from PDF
+                            if pymupdf_doc is not None:
+                                try:
+                                    if page_num <= len(pymupdf_doc):
+                                        pdf_page = pymupdf_doc[page_num - 1]  # 0-indexed
+                                        image_list = pdf_page.get_images(full=True)
+                                        
+                                        if image_list:
+                                            logger.info(f'PyMuPDF get_images() found {len(image_list)} images on page {page_num}')
+                                            # Use PyMuPDF images (more reliable) - start indexing after pdfplumber images
+                                            start_idx = images_found_count if images_extracted else 0
+                                            for list_idx, img_info in enumerate(image_list):
+                                                try:
+                                                    # Get image from PDF
+                                                    xref = img_info[0]
+                                                    base_image = pymupdf_doc.extract_image(xref)
+                                                    img_data = base_image["image"]
+                                                    
+                                                    if len(img_data) > 0:  # Only add if image data is valid
+                                                        # Determine image format
+                                                        ext = base_image.get("ext", "png").lower()
+                                                        if ext not in ['png', 'jpg', 'jpeg', 'gif']:
+                                                            ext = 'png'  # Default to PNG for unknown formats
+                                                        
+                                                        # Store image for later embedding (include extension in key for format tracking)
+                                                        img_idx = start_idx + list_idx
+                                                        img_id = f'img_{pdf_file.name}_{page_num}_{img_idx}'.replace('.', '_').replace('/', '_').replace('\\', '_')
+                                                        img_id_with_ext = f'{img_id}.{ext}'
+                                                        
+                                                        # Only add if not already added by pdfplumber
+                                                        if img_id_with_ext not in images_dict:
+                                                            images_dict[img_id_with_ext] = img_data
+                                                            logger.info(f'Extracted embedded image via PyMuPDF: {img_id_with_ext} ({len(img_data)} bytes)')
+                                                            # Add image reference to page content
+                                                            page_content.append(f'<p><img src="{img_id_with_ext}" alt="Image from page {page_num}" style="max-width: 100%; height: auto; display: block; margin: 15px auto;" /></p>')
+                                                            images_extracted = True
+                                                except Exception as img_error:
+                                                    logger.warning(f'Failed to extract image {list_idx} from page {page_num} using PyMuPDF: {str(img_error)}')
+                                                    continue
+                                except Exception as pymupdf_error:
+                                    logger.warning(f'PyMuPDF image extraction failed for page {page_num}: {str(pymupdf_error)}')
+                            
+                            # Extract text AFTER images to preserve visual order
                             text = page.extract_text()
                             if text and text.strip():
                                 paragraphs = text.split('\n\n')
@@ -2389,70 +2505,231 @@ def pdf_to_epub(request):
                                         para = escape(para)
                                         para = para.replace('\n', '<br>')
                                         page_content.append(f'<p>{para}</p>')
+                                        text_found = True
+
+                            # Fallback: render full page as image ONLY if nothing was extracted (no images, no tables, no text)
+                            if (not images_extracted) and (not tables_found) and (not text_found) and pymupdf_doc is not None:
+                                try:
+                                    if page_num <= len(pymupdf_doc):
+                                        logger.info(f'Fallback rendering full page via PyMuPDF: page {page_num}/{len(pymupdf_doc)}')
+                                        pdf_page = pymupdf_doc[page_num - 1]  # 0-indexed
+                                        import fitz
+                                        mat = fitz.Matrix(2.0, 2.0)
+                                        pix = pdf_page.get_pixmap(matrix=mat)
+                                        img_data = pix.tobytes("png")
+                                        if len(img_data) > 0:
+                                            img_id = f'page_{pdf_file.name}_{page_num}'.replace('.', '_').replace('/', '_').replace('\\', '_')
+                                            img_id_with_ext = f'{img_id}.png'
+                                            images_dict[img_id_with_ext] = img_data
+                                            logger.info(f'Fallback rendered page {page_num} as image: {img_id_with_ext} ({len(img_data)} bytes)')
+                                            page_content.insert(0, f'<p><img src="{img_id_with_ext}" alt="Page {page_num}" style="max-width: 100%; height: auto; display: block; margin: 15px auto;" /></p>')
+                                            images_extracted = True
+                                        else:
+                                            logger.warning(f'Fallback render produced empty image data for page {page_num}')
+                                    else:
+                                        logger.warning(f'Page {page_num} out of range for fallback render (total pages: {len(pymupdf_doc)})')
+                                except Exception as render_error:
+                                    logger.error(f'Fallback render failed for page {page_num}: {str(render_error)}', exc_info=True)
                             
-                            # Extract images
-                            if page.images:
-                                for img_idx, img in enumerate(page.images):
-                                    try:
-                                        cropped = page.crop((img['x0'], img['top'], img['x1'], img['bottom']))
-                                        img_obj = cropped.to_image(resolution=150)
-                                        img_buffer = io.BytesIO()
-                                        img_obj.save(img_buffer, format='PNG')
-                                        img_buffer.seek(0)
-                                        img_data = img_buffer.read()
-                                        img_buffer.close()
-                                        
-                                        # Store image for later embedding
-                                        img_id = f'img_{pdf_file.name}_{page_num}_{img_idx}'.replace('.', '_').replace('/', '_')
-                                        images_dict[img_id] = img_data
-                                        page_content.append(f'<p><img src="{img_id}.png" alt="Image" style="max-width: 100%; height: auto;" /></p>')
-                                    except Exception as img_error:
-                                        # Skip images that can't be extracted
-                                        continue
-                            
-                            if page_content:
+                            # IMPORTANT: Always add page to pdf_content if it has content OR images
+                            # This ensures image-only pages are included
+                            if page_content or images_extracted:
+                                # Remove standalone page-number blocks (paragraphs/headings like "Page 10" or "10")
+                                content_html = '\n'.join(page_content) if page_content else ''
+                                import re
+                                content_html = re.sub(r'<p[^>]*>\s*(?:page\s+)?\d+\s*</p>', '', content_html, flags=re.IGNORECASE)
+                                content_html = re.sub(r'<h[1-6][^>]*>\s*(?:page\s+)?\d+\s*</h[1-6]>', '', content_html, flags=re.IGNORECASE)
                                 pdf_content.append({
                                     'page_num': page_num,
-                                    'content': '\n'.join(page_content)
+                                    'content': content_html
                                 })
+                    
+                    # Close PyMuPDF document after processing all pages
+                    if pymupdf_doc is not None:
+                        pymupdf_doc.close()
                 
                 else:
-                    # Fallback to PyPDF2
-                    pdf_reader = PdfReader(io.BytesIO(pdf_data))
-                    for page_num, page in enumerate(pdf_reader.pages, 1):
-                        text = page.extract_text()
-                        if text.strip():
-                            paragraphs = text.split('\n\n')
+                    # No pdfplumber; try PyMuPDF directly for images and page rendering
+                    if pymupdf_doc is not None:
+                        total_pages = len(pymupdf_doc)
+                        logger.info(f'pdfplumber unavailable; using PyMuPDF only. Total pages: {total_pages} for {pdf_file.name}')
+                        for page_num in range(1, total_pages + 1):
                             page_content = []
-                            for para in paragraphs:
-                                para = para.strip()
-                                if para:
-                                    para = escape(para)
-                                    para = para.replace('\n', '<br>')
-                                    page_content.append(f'<p>{para}</p>')
+                            images_extracted = False
+                            text_found = False
                             
-                            if page_content:
-                                pdf_content.append({
-                                    'page_num': page_num,
-                                    'content': '\n'.join(page_content)
-                                })
+                            try:
+                                pdf_page = pymupdf_doc[page_num - 1]
+
+                                # Extract embedded images via PyMuPDF (skip if skip_images mode)
+                                if not skip_images:
+                                    image_list = pdf_page.get_images(full=True)
+                                    if image_list:
+                                        logger.info(f'PyMuPDF get_images() found {len(image_list)} images on page {page_num}')
+                                        for list_idx, img_info in enumerate(image_list):
+                                            try:
+                                                xref = img_info[0]
+                                                base_image = pymupdf_doc.extract_image(xref)
+                                                img_data = base_image["image"]
+                                                ext = base_image.get("ext", "png").lower()
+                                                if ext not in ['png', 'jpg', 'jpeg', 'gif']:
+                                                    ext = 'png'
+                                                if len(img_data) > 0:
+                                                    img_id = f'img_{pdf_file.name}_{page_num}_{list_idx}'.replace('.', '_').replace('/', '_').replace('\\', '_')
+                                                    img_id_with_ext = f'{img_id}.{ext}'
+                                                    images_dict[img_id_with_ext] = img_data
+                                                    logger.info(f'Extracted embedded image via PyMuPDF: {img_id_with_ext} ({len(img_data)} bytes)')
+                                                    page_content.append(f'<p><img src="{img_id_with_ext}" alt="Image from page {page_num}" style="max-width: 100%; height: auto; display: block; margin: 15px auto;" /></p>')
+                                                    images_extracted = True
+                                            except Exception as img_error:
+                                                logger.warning(f'Failed to extract image {list_idx} from page {page_num} using PyMuPDF: {str(img_error)}')
+                                                continue
+
+                                # Extract tables using PyMuPDF's find_tables() method
+                                tables_found = False
+                                try:
+                                    tables = pdf_page.find_tables()
+                                    if tables and tables.tables:
+                                        logger.info(f'PyMuPDF found {len(tables.tables)} tables on page {page_num}')
+                                        for table in tables.tables:
+                                            table_data = table.extract()
+                                            if table_data and len(table_data) > 0:
+                                                if tables_as_text:
+                                                    # Extract table as plain text
+                                                    for row in table_data:
+                                                        if row and any(cell for cell in row if cell):
+                                                            row_text = ' | '.join(str(cell).strip() if cell else '' for cell in row)
+                                                            row_text = escape(row_text)
+                                                            page_content.append(f'<p>{row_text}</p>')
+                                                    tables_found = True
+                                                    text_found = True
+                                                else:
+                                                    # Extract table as HTML table
+                                                    table_html = '<table style="border-collapse: collapse; width: 100%; margin: 15px 0;">\n'
+                                                    is_first_row = True
+                                                    for row in table_data:
+                                                        if row and any(cell for cell in row if cell):
+                                                            table_html += '<tr>\n'
+                                                            for cell in row:
+                                                                cell_text = str(cell).strip() if cell else ''
+                                                                cell_text = escape(cell_text)
+                                                                tag = 'th' if is_first_row else 'td'
+                                                                table_html += f'<{tag} style="border: 1px solid #ddd; padding: 8px;">{cell_text}</{tag}>\n'
+                                                            table_html += '</tr>\n'
+                                                            is_first_row = False
+                                                    table_html += '</table>\n'
+                                                    page_content.append(table_html)
+                                                    tables_found = True
+                                                    text_found = True
+                                except AttributeError:
+                                    pass  # find_tables() not available in older PyMuPDF versions
+                                except Exception as table_error:
+                                    logger.warning(f'Table extraction failed on page {page_num}: {str(table_error)}')
+                                
+                                # Extract text (skip if tables found to avoid duplication)
+                                if not tables_found:
+                                    try:
+                                        import re
+                                        page_text = pdf_page.get_text("text")
+                                        if page_text and page_text.strip():
+                                            paragraphs = page_text.split('\n\n')
+                                            for para in paragraphs:
+                                                para = para.strip()
+                                                # Skip standalone page numbers
+                                                if para and len(para) > 1 and not re.match(r'^\d{1,4}$', para):
+                                                    para = escape(para)
+                                                    para = para.replace('\n', '<br>')
+                                                    page_content.append(f'<p>{para}</p>')
+                                                    text_found = True
+                                    except Exception as text_error:
+                                        logger.warning(f'Failed to extract text on page {page_num} via PyMuPDF: {str(text_error)}')
+
+                                # Fallback: render full page only if nothing extracted (skip in skip_images mode)
+                                if (not images_extracted) and (not text_found) and (not skip_images):
+                                    try:
+                                        logger.info(f'Rendering full page image via PyMuPDF (fallback): page {page_num}/{total_pages}')
+                                        import fitz
+                                        mat = fitz.Matrix(2.0, 2.0)
+                                        pix = pdf_page.get_pixmap(matrix=mat)
+                                        img_data = pix.tobytes("png")
+                                        if len(img_data) > 0:
+                                            img_id = f'page_{pdf_file.name}_{page_num}'.replace('.', '_').replace('/', '_').replace('\\', '_')
+                                            img_id_with_ext = f'{img_id}.png'
+                                            images_dict[img_id_with_ext] = img_data
+                                            logger.info(f'Fallback rendered page {page_num} as image: {img_id_with_ext} ({len(img_data)} bytes)')
+                                            page_content.insert(0, f'<p><img src="{img_id_with_ext}" alt="Page {page_num}" style="max-width: 100%; height: auto; display: block; margin: 15px auto;" /></p>')
+                                            images_extracted = True
+                                        else:
+                                            logger.warning(f'Page {page_num} rendered but image data is empty')
+                                    except Exception as render_error:
+                                        logger.error(f'Failed to render page {page_num} as image (fallback): {str(render_error)}', exc_info=True)
+
+                                if page_content or images_extracted:
+                                    # Remove standalone page-number blocks (paragraphs/headings like "Page 10" or "10")
+                                    content_html = '\n'.join(page_content) if page_content else ''
+                                    import re
+                                    content_html = re.sub(r'<p[^>]*>\s*(?:page\s+)?\d+\s*</p>', '', content_html, flags=re.IGNORECASE)
+                                    content_html = re.sub(r'<h[1-6][^>]*>\s*(?:page\s+)?\d+\s*</h[1-6]>', '', content_html, flags=re.IGNORECASE)
+                                    pdf_content.append({
+                                        'page_num': page_num,
+                                        'content': content_html
+                                    })
+                            except Exception as page_error:
+                                logger.error(f'Failed to process page {page_num} via PyMuPDF-only path: {str(page_error)}', exc_info=True)
+                    
+                    else:
+                        logger.warning(f'Neither pdfplumber nor PyMuPDF available for {pdf_file.name}; images will not be extracted')
+                        # Fallback to PyPDF2 text only
+                        pdf_reader = PdfReader(io.BytesIO(pdf_data))
+                        for page_num, page in enumerate(pdf_reader.pages, 1):
+                            text = page.extract_text()
+                            if text and text.strip():
+                                paragraphs = text.split('\n\n')
+                                page_content = []
+                                for para in paragraphs:
+                                    para = para.strip()
+                                    if para:
+                                        para = escape(para)
+                                        para = para.replace('\n', '<br>')
+                                        page_content.append(f'<p>{para}</p>')
+                                
+                                if page_content:
+                                    pdf_content.append({
+                                        'page_num': page_num,
+                                        'content': '\n'.join(page_content)
+                                    })
                 
                 # Create chapter(s) for this PDF
-                if pdf_content:
-                    # Create one chapter per PDF, or split into multiple chapters if too long
+                # IMPORTANT: Always create a chapter if we have content OR images
+                # This handles PDFs with only images
+                import logging
+                logger = logging.getLogger('pdf_tools')
+                logger.info(f'After processing {pdf_file.name}: pdf_content has {len(pdf_content)} pages, images_dict has {len(images_dict)} images')
+                
+                if pdf_content or images_dict:
                     pdf_name = pdf_file.name.replace('.pdf', '').replace('.PDF', '')
                     chapter_title = escape(pdf_name)
                     
                     # Combine all pages into one chapter
                     full_content = []
-                    if preserve_page_breaks:
-                        # Preserve page breaks: each page gets its own div with header
+                    if pdf_content:
+                        import re
                         for page_data in pdf_content:
-                            full_content.append(f'<div class="page"><h3>Page {page_data["page_num"]}</h3>{page_data["content"]}</div>')
-                    else:
-                        # Continuous flow: combine all content without page breaks
-                        for page_data in pdf_content:
-                            full_content.append(f'<div class="page-content">{page_data["content"]}</div>')
+                            content = page_data["content"]
+                            # Strip trailing page numbers from content
+                            content = re.sub(r'<p[^>]*>\s*\d{1,4}\s*</p>\s*$', '', content, flags=re.IGNORECASE)
+                            
+                            if preserve_page_breaks:
+                                # Preserve page breaks without confusing page headers
+                                full_content.append(f'<div class="page">{content}</div>')
+                            else:
+                                # Continuous flow
+                                full_content.append(f'<div class="page-content">{content}</div>')
+                    elif images_dict:
+                        # If no text content but images exist, create a chapter with just images
+                        # This handles image-only PDFs - add all images
+                        for img_id_with_ext in sorted(images_dict.keys()):
+                            full_content.append(f'<p><img src="{img_id_with_ext}" alt="Image" style="max-width: 100%; height: auto; display: block; margin: 15px auto;" /></p>')
                     
                     # Build CSS based on page break preference
                     if preserve_page_breaks:
@@ -2460,11 +2737,6 @@ def pdf_to_epub(request):
         .page {
             margin-bottom: 30px;
             page-break-after: always;
-        }
-        h3 {
-            color: #333;
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 5px;
         }'''
                     else:
                         page_css = '''
@@ -2516,15 +2788,62 @@ def pdf_to_epub(request):
 </body>
 </html>'''
                     
-                    # Create chapter
+                    # Add images to book FIRST, before creating chapter
+                    # This ensures images are registered in the EPUB before the chapter references them
+                    image_items = {}  # Store image items for reference
+                    
+                    # Debug: Log how many images we're adding
+                    import logging
+                    logger = logging.getLogger('pdf_tools')
+                    logger.info(f'Adding {len(images_dict)} images to EPUB for {pdf_file.name}')
+                    
+                    for img_id_with_ext, img_data in images_dict.items():
+                        # img_id_with_ext already includes extension (e.g., "img_file_1_0.png")
+                        # Extract base name and extension
+                        if '.' in img_id_with_ext:
+                            base_img_id = img_id_with_ext.rsplit('.', 1)[0]
+                            original_ext = img_id_with_ext.rsplit('.', 1)[1].lower()
+                        else:
+                            base_img_id = img_id_with_ext
+                            original_ext = 'png'
+                        
+                        # Determine media type based on extension
+                        if original_ext in ['jpg', 'jpeg']:
+                            media_type = 'image/jpeg'
+                            file_ext = 'jpg'  # Normalize to jpg
+                        elif original_ext == 'gif':
+                            media_type = 'image/gif'
+                            file_ext = 'gif'
+                        else:
+                            media_type = 'image/png'
+                            file_ext = 'png'
+                        
+                        # CRITICAL: EPUB images should be in an 'images' subdirectory
+                        # This is the standard EPUB structure and ensures proper organization
+                        file_name = f'images/{img_id_with_ext}'
+                        
+                        img_item = epub.EpubItem(
+                            uid=base_img_id, 
+                            file_name=file_name,  # Store in images/ subdirectory
+                            media_type=media_type, 
+                            content=img_data
+                        )
+                        book.add_item(img_item)
+                        image_items[img_id_with_ext] = img_item
+                        logger.info(f'Added image to EPUB: {file_name} (size: {len(img_data)} bytes)')
+                    
+                    # Update HTML to reference images from images/ subdirectory
+                    # Replace all image references to use the correct path
+                    for img_id_with_ext in images_dict.keys():
+                        # Update HTML to use images/ path
+                        chapter_html = chapter_html.replace(f'src="{img_id_with_ext}"', f'src="images/{img_id_with_ext}"')
+                        chapter_html = chapter_html.replace(f'src="../{img_id_with_ext}"', f'src="images/{img_id_with_ext}"')
+                        chapter_html = chapter_html.replace(f'src="./{img_id_with_ext}"', f'src="images/{img_id_with_ext}"')
+                    
+                    # Create chapter AFTER images are added and HTML is updated
                     chapter_id = f'chapter_{pdf_file.name}'.replace('.', '_').replace('/', '_')
                     chapter = epub.EpubHtml(title=chapter_title, file_name=f'{chapter_id}.xhtml', lang='en')
                     chapter.content = chapter_html
-                    
-                    # Add images to chapter
-                    for img_id, img_data in images_dict.items():
-                        book.add_item(epub.EpubItem(uid=img_id, file_name=f'{img_id}.png', media_type='image/png', content=img_data))
-                    
                     book.add_item(chapter)
                     chapters.append(chapter)
                     spine.append(chapter)
