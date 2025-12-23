@@ -39,16 +39,9 @@ def sitemap(request):
         current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
         
         # Build XML as a list of lines to preserve formatting
-        # Add XSL stylesheet reference for better browser display
-        # Force HTTPS for XSL URL (same as sitemap URLs)
         sitemap_instance = StaticViewSitemap()
-        if hasattr(sitemap_instance, 'protocol') and sitemap_instance.protocol:
-            xsl_url = f"{sitemap_instance.protocol}://{request.get_host()}/static/sitemap.xsl"
-        else:
-            xsl_url = request.build_absolute_uri('/static/sitemap.xsl').replace('http://', 'https://')
         xml_lines = [
             '<?xml version="1.0" encoding="UTF-8"?>',
-            f'<?xml-stylesheet type="text/xsl" href="{xsl_url}"?>',
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
         ]
         

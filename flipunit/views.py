@@ -107,6 +107,12 @@ def home(request):
                 'description': 'Download YouTube thumbnails (HD, HQ, MQ, Default)',
                 'icon': 'youtube-thumbnail.svg'
             },
+            {
+                'name': 'AI Chat',
+                'url': 'ai_chat:index',
+                'description': 'Chat with AI to find the right converter or get help with conversions',
+                'icon': 'utilities.svg'
+            },
         ]
     }
     return render(request, 'home.html', context)
@@ -130,6 +136,7 @@ def _get_all_tools():
         {'name': 'Developer Converters', 'url': 'developer_converter:index', 'category': 'Developer Converters', 'description': 'Developer tools and code utilities', 'keywords': 'HTML CSS JavaScript JSON CSV'},
         {'name': 'Website Status Checker', 'url': 'isdown:index', 'category': 'Network Tools', 'description': 'Check instantly if any website is online or down', 'keywords': 'website status down online'},
         {'name': 'YouTube Thumbnail Downloader', 'url': 'youtube_thumbnail:index', 'category': 'Media Converters', 'description': 'Download YouTube thumbnails (HD, HQ, MQ, Default)', 'keywords': 'YouTube thumbnail'},
+        {'name': 'AI Chat', 'url': 'ai_chat:index', 'category': 'AI Tools', 'description': 'Chat with AI to find the right converter or get help with conversions', 'keywords': 'AI chat assistant help find tool converter'},
     ]
     tools.extend(categories)
     
@@ -199,8 +206,8 @@ def _get_all_tools():
         {'name': 'Rotate PDF', 'url': 'pdf_tools:pdf_rotate', 'category': 'PDF Tools', 'description': 'Rotate PDF pages', 'keywords': 'PDF rotate'},
         {'name': 'OCR PDF', 'url': 'pdf_tools:pdf_ocr', 'category': 'PDF Tools', 'description': 'Make scanned PDFs searchable', 'keywords': 'PDF OCR'},
         {'name': 'Remove PDF Metadata', 'url': 'pdf_tools:pdf_remove_metadata', 'category': 'PDF Tools', 'description': 'Remove metadata from PDF', 'keywords': 'PDF metadata'},
-        {'name': 'PDF to Flipbook', 'url': 'pdf_tools:pdf_to_flipbook', 'category': 'PDF Tools', 'description': 'Convert PDF to interactive HTML flipbook', 'keywords': 'PDF flipbook interactive animation'},
-        {'name': 'PDF to EPUB', 'url': 'pdf_tools:pdf_to_epub', 'category': 'PDF Tools', 'description': 'Convert PDF to EPUB format for e-readers', 'keywords': 'PDF EPUB e-reader ebook'},
+        {'name': 'PDF to Flipbook', 'url': 'pdf_tools:pdf_to_flipbook', 'category': 'PDF Tools', 'description': 'Convert PDF to interactive HTML flipbook with page flip animations', 'keywords': 'PDF flipbook interactive animation HTML page flip book reader'},
+        {'name': 'PDF to EPUB', 'url': 'pdf_tools:pdf_to_epub', 'category': 'PDF Tools', 'description': 'Convert PDF to EPUB format for e-readers', 'keywords': 'PDF EPUB e-reader ebook Kindle Nook e-book electronic book'},
     ])
     
     # Utilities
@@ -339,6 +346,12 @@ def search(request):
             'url': 'youtube_thumbnail:index',
             'description': 'Download YouTube thumbnails in all available qualities',
             'icon': 'youtube-thumbnail.svg'
+        },
+        {
+            'name': 'AI Chat',
+            'url': 'ai_chat:index',
+            'description': 'Chat with AI to find the right converter or get help with conversions',
+            'icon': 'utilities.svg'
         },
     ]
     

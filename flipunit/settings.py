@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     'django.contrib.sitemaps',
     'flipunit',  # Main project app (needed for management commands)
     'converters',
@@ -87,6 +88,9 @@ INSTALLED_APPS = [
     'youtube_thumbnail',
     'ai_chat',
 ]
+
+# Django Sites Framework
+SITE_ID = 1
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

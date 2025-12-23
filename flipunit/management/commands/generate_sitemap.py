@@ -109,19 +109,6 @@ class Command(BaseCommand):
                 if sample:
                     self.stdout.write(self.style.WARNING(f'   ⚠️  Sample lastmod format: {sample[0]}'))
         
-        # Add XSL stylesheet reference for better browser display
-        # Insert after <?xml version="1.0" encoding="UTF-8"?>
-        if '<?xml-stylesheet' not in xml_content:
-            xsl_reference = '<?xml-stylesheet type="text/xsl" href="/static/sitemap.xsl"?>\n'
-            # Find the XML declaration and insert XSL reference after it
-            # Match XML declaration with optional newline after it
-            xml_content = re.sub(
-                r'(<\?xml[^>]*\?>)\s*\n?',
-                r'\1\n' + xsl_reference,
-                xml_content,
-                count=1
-            )
-            self.stdout.write(self.style.SUCCESS('   ✓ Added XSL stylesheet reference for browser display'))
 
         # Write to file
         try:

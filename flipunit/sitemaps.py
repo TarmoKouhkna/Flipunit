@@ -143,6 +143,7 @@ class StaticViewSitemap(Sitemap):
             # Additional tools
             'isdown:index',
             'youtube_thumbnail:index',
+            'ai_chat:index',
         ]
 
     def location(self, item):
