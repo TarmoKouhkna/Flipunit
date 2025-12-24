@@ -2320,7 +2320,8 @@ def pdf_to_epub(request):
         book = epub.EpubBook()
         
         # Set metadata
-        book.set_identifier('pdf_to_epub_conversion')
+        import uuid
+        book.set_identifier(str(uuid.uuid4()))  # Use unique identifier for each EPUB
         book.set_title(epub_title)
         book.set_language('en')
         book.add_author('PDF Converter')
@@ -2843,6 +2844,7 @@ def pdf_to_epub(request):
                     # Create chapter AFTER images are added and HTML is updated
                     chapter_id = f'chapter_{pdf_file.name}'.replace('.', '_').replace('/', '_')
                     chapter = epub.EpubHtml(title=chapter_title, file_name=f'{chapter_id}.xhtml', lang='en')
+                    chapter.id = chapter_id  # Set ID for proper TOC linking
                     chapter.content = chapter_html
                     book.add_item(chapter)
                     chapters.append(chapter)
@@ -3029,8 +3031,15 @@ def pdf_to_epub(request):
             except Exception as cover_error:
                 messages.warning(request, f'Error processing cover image: {str(cover_error)}. EPUB will be created without cover.')
         
-        # Add table of contents
-        book.toc = [(chapter, chapter.title) for chapter in chapters]
+        # Add table of contents - ensure proper structure for EPUB3 navigation
+        if len(chapters) > 0:
+            book.toc = [
+                (epub.Section('Chapters'), [
+                    (chapter, chapter.title) for chapter in chapters
+                ])
+            ]
+        else:
+            book.toc = []
         
         # Add navigation files
         book.add_item(epub.EpubNcx())
