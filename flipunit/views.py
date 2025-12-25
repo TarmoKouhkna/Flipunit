@@ -107,12 +107,6 @@ def home(request):
                 'description': 'Download YouTube thumbnails (HD, HQ, MQ, Default)',
                 'icon': 'youtube-thumbnail.svg'
             },
-            {
-                'name': 'AI Chat',
-                'url': 'ai_chat:index',
-                'description': 'Chat with AI to find the right converter or get help with conversions',
-                'icon': 'utilities.svg'
-            },
         ]
     }
     return render(request, 'home.html', context)
