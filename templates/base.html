@@ -164,8 +164,8 @@
             <p>&copy; {% now "Y" %} {{ SITE_NAME }}. All rights reserved.</p>
             <p>Fast, simple, no-login required online converters.</p>
             <div class="hybrid-footer-links">
-                <a href="#" aria-label="Privacy Policy">Privacy</a>
-                <a href="#" aria-label="Terms of Service">Terms</a>
+                <a href="{% url 'privacy' %}" aria-label="Privacy Policy">Privacy</a>
+                <a href="{% url 'terms' %}" aria-label="Terms of Service">Terms</a>
             </div>
             <p style="margin-top: 1rem; font-size: 0.85rem;">
                 🔒 <strong>Privacy:</strong> Your files are never stored on our servers. All conversions are processed securely and files are deleted immediately after processing.
