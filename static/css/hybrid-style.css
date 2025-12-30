@@ -3014,11 +3014,12 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
 
 .ai-chat-container {
     max-width: 900px;
-    margin: 0 auto;
+    margin: var(--space-lg) auto 0;
     padding: var(--space-lg);
+    padding-top: var(--space-xl);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 120px);
+    height: calc(100vh - 200px);
     min-height: 700px;
     overflow: hidden;
     gap: var(--space-lg);
@@ -3047,6 +3048,7 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding: var(--space-lg);
+    padding-top: var(--space-md);
     padding-bottom: var(--space-xl);
     background: var(--bg-base);
     border-radius: var(--radius-lg);
