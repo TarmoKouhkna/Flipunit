@@ -3014,14 +3014,12 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
 
 .ai-chat-container {
     max-width: 900px;
-    margin: calc(var(--space-xl) + var(--space-lg)) auto 0;
+    margin: var(--space-lg) auto 0;
     padding: var(--space-lg);
     padding-top: var(--space-xl);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 250px);
-    min-height: 700px;
-    overflow: hidden;
+    min-height: calc(100vh - 200px);
     gap: var(--space-lg);
     scroll-margin-top: calc(var(--space-xl) + var(--space-lg));
 }
