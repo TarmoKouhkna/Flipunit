@@ -205,6 +205,7 @@
     
     let canvas = null;
     let ctx = null;
+    let canvasReady = false;
     
     // File upload handling (click is handled by main.js)
     imageInput.addEventListener('change', (e) => {
@@ -234,41 +235,246 @@
     });
     
     function loadImage(file) {
+        canvasReady = false;
         const reader = new FileReader();
         reader.onload = (e) => {
-            imagePreview.src = e.target.result;
+            const dataUrl = e.target.result;
+            
+            // Reset canvas state
+            canvas = null;
+            ctx = null;
+            canvasReady = false;
+            
+            // Remove any existing onload handlers to avoid conflicts
+            imagePreview.onload = null;
+            imagePreview.onerror = null;
+            
+            // Set up the onload handler BEFORE setting src
+            imagePreview.onload = function() {
+                // Use decode() if available to ensure image is fully decoded (important for iOS Safari)
+                const decodePromise = imagePreview.decode ? imagePreview.decode().catch(() => Promise.resolve()) : Promise.resolve();
+                
+                decodePromise.then(() => {
+                    // Small delay to ensure image is fully decoded (iOS Safari workaround for JPEG)
+                    setTimeout(() => {
+                        try {
+                            // Verify image is actually loaded
+                            if (imagePreview.naturalWidth === 0 || imagePreview.naturalHeight === 0) {
+                                console.error('Image has zero dimensions');
+                                return;
+                            }
+                            
+                            console.log('Image loaded:', {
+                                width: imagePreview.naturalWidth,
+                                height: imagePreview.naturalHeight,
+                                complete: imagePreview.complete
+                            });
+                            
+                            // Create canvas for color picking using the preview image
+                            canvas = document.createElement('canvas');
+                            canvas.width = imagePreview.naturalWidth;
+                            canvas.height = imagePreview.naturalHeight;
+                            ctx = canvas.getContext('2d', { willReadFrequently: true });
+                            
+                            // Draw the preview image to canvas
+                            ctx.drawImage(imagePreview, 0, 0);
+                        
+                        // Verify canvas has data by checking multiple points
+                        const testPoints = [
+                            [0, 0],
+                            [Math.floor(canvas.width / 2), Math.floor(canvas.height / 2)],
+                            [canvas.width - 1, canvas.height - 1]
+                        ];
+                        
+                        let hasValidData = false;
+                        for (const [tx, ty] of testPoints) {
+                            const td = ctx.getImageData(tx, ty, 1, 1);
+                            const [tr, tg, tb, ta] = td.data;
+                            console.log(`Test point [${tx}, ${ty}]:`, {r: tr, g: tg, b: tb, a: ta});
+                            if (tr !== 0 || tg !== 0 || tb !== 0) {
+                                hasValidData = true;
+                                break;
+                            }
+                        }
+                        
+                        if (hasValidData) {
+                            canvasReady = true;
+                            console.log('Canvas ready:', canvas.width, 'x', canvas.height, 'with valid data');
+                        } else {
+                            console.warn('Canvas appears to be all black, retrying with longer delay...');
+                            // Retry after a longer delay - iOS Safari sometimes needs more time
+                            setTimeout(() => {
+                                try {
+                                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                    ctx.drawImage(imagePreview, 0, 0);
+                                    
+                                    // Check again
+                                    const retryData = ctx.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1);
+                                    const [rr, rg, rb] = retryData.data;
+                                    console.log('Retry check:', {r: rr, g: rg, b: rb});
+                                    
+                                    if (rr !== 0 || rg !== 0 || rb !== 0) {
+                                        canvasReady = true;
+                                        console.log('Canvas ready after retry');
+                                    } else {
+                                        console.error('Canvas still appears black after retry');
+                                    }
+                                } catch (retryError) {
+                                    console.error('Error in retry:', retryError);
+                                }
+                            }, 300);
+                        }
+                    } catch (error) {
+                        console.error('Error creating canvas:', error);
+                        canvas = null;
+                        ctx = null;
+                        canvasReady = false;
+                    }
+                }, 100); // Delay for iOS Safari JPEG handling
+                }).catch((decodeError) => {
+                    console.warn('Image decode failed, proceeding anyway:', decodeError);
+                    // Fallback: try without decode
+                    setTimeout(() => {
+                        try {
+                            if (imagePreview.naturalWidth === 0 || imagePreview.naturalHeight === 0) {
+                                return;
+                            }
+                            canvas = document.createElement('canvas');
+                            canvas.width = imagePreview.naturalWidth;
+                            canvas.height = imagePreview.naturalHeight;
+                            ctx = canvas.getContext('2d', { willReadFrequently: true });
+                            ctx.drawImage(imagePreview, 0, 0);
+                            canvasReady = true;
+                            console.log('Canvas ready (fallback):', canvas.width, 'x', canvas.height);
+                        } catch (error) {
+                            console.error('Error in fallback:', error);
+                        }
+                    }, 200);
+                });
+            };
+            
+            imagePreview.onerror = () => {
+                console.error('Error loading preview image');
+                canvas = null;
+                ctx = null;
+                canvasReady = false;
+            };
+            
+            // Now set the source - this will trigger onload
+            imagePreview.src = dataUrl;
             imagePreviewContainer.classList.add('active');
             
-            // Create canvas for color picking
-            imagePreview.onload = () => {
-                canvas = document.createElement('canvas');
-                canvas.width = imagePreview.naturalWidth;
-                canvas.height = imagePreview.naturalHeight;
-                ctx = canvas.getContext('2d');
-                ctx.drawImage(imagePreview, 0, 0);
-            };
+            // Handle case where image is already loaded (cached)
+            if (imagePreview.complete && imagePreview.naturalWidth > 0) {
+                // Use setTimeout to ensure onload handler is set
+                setTimeout(() => {
+                    imagePreview.onload();
+                }, 0);
+            }
         };
         reader.readAsDataURL(file);
     }
     
-    // Color picking from image
-    imagePreview.addEventListener('click', (e) => {
-        if (!canvas || !ctx) return;
+    // Color picking function (works for both click and touch)
+    function pickColor(e) {
+        e.preventDefault();
+        
+        if (!canvas || !ctx || !canvasReady) {
+            console.log('Canvas not ready:', {canvas: !!canvas, ctx: !!ctx, ready: canvasReady});
+            return;
+        }
+        
+        // Get touch or mouse coordinates
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         
         const rect = imagePreview.getBoundingClientRect();
+        
+        // Ensure we have valid dimensions
+        if (imagePreview.naturalWidth === 0 || imagePreview.naturalHeight === 0) {
+            console.error('Image dimensions are zero:', {
+                naturalWidth: imagePreview.naturalWidth,
+                naturalHeight: imagePreview.naturalHeight
+            });
+            return;
+        }
+        
+        // Verify canvas dimensions match image
+        if (canvas.width !== imagePreview.naturalWidth || canvas.height !== imagePreview.naturalHeight) {
+            console.error('Canvas dimensions mismatch:', {
+                canvas: `${canvas.width}x${canvas.height}`,
+                image: `${imagePreview.naturalWidth}x${imagePreview.naturalHeight}`
+            });
+            return;
+        }
+        
         const scaleX = imagePreview.naturalWidth / rect.width;
         const scaleY = imagePreview.naturalHeight / rect.height;
         
-        const x = Math.floor((e.clientX - rect.left) * scaleX);
-        const y = Math.floor((e.clientY - rect.top) * scaleY);
+        const x = Math.floor((clientX - rect.left) * scaleX);
+        const y = Math.floor((clientY - rect.top) * scaleY);
         
-        const imageData = ctx.getImageData(x, y, 1, 1);
-        const [r, g, b] = imageData.data;
+        // Clamp coordinates to canvas bounds
+        const clampedX = Math.max(0, Math.min(x, canvas.width - 1));
+        const clampedY = Math.max(0, Math.min(y, canvas.height - 1));
         
-        // Use the ColorConverter from color-picker.js
-        // Since it's in a closure, we'll recreate the conversion functions here
-        const hex = rgbToHex(r, g, b);
-        updateColorDisplay(r, g, b, hex);
+        console.log('Attempting to pick color at:', {
+            client: `${clientX}, ${clientY}`,
+            rect: `${rect.left}, ${rect.top}, ${rect.width}, ${rect.height}`,
+            scale: `${scaleX}, ${scaleY}`,
+            calculated: `${x}, ${y}`,
+            clamped: `${clampedX}, ${clampedY}`,
+            canvasSize: `${canvas.width}x${canvas.height}`
+        });
+        
+        try {
+            const imageData = ctx.getImageData(clampedX, clampedY, 1, 1);
+            const [r, g, b, a] = imageData.data;
+            
+            console.log('Picked color:', {r, g, b, a, at: `${clampedX}, ${clampedY}`});
+            
+            // If we're getting all zeros, the canvas might not have the image data
+            if (r === 0 && g === 0 && b === 0 && a === 255) {
+                // Check a few more points to see if it's really all black
+                const testPoints = [
+                    [Math.floor(canvas.width / 4), Math.floor(canvas.height / 4)],
+                    [Math.floor(canvas.width / 2), Math.floor(canvas.height / 2)],
+                    [Math.floor(canvas.width * 3 / 4), Math.floor(canvas.height * 3 / 4)]
+                ];
+                
+                let allBlack = true;
+                for (const [tx, ty] of testPoints) {
+                    const td = ctx.getImageData(tx, ty, 1, 1);
+                    const [tr, tg, tb] = td.data;
+                    if (tr !== 0 || tg !== 0 || tb !== 0) {
+                        allBlack = false;
+                        console.log('Found non-black pixel at', tx, ty, ':', tr, tg, tb);
+                        break;
+                    }
+                }
+                
+                if (allBlack) {
+                    console.error('Canvas appears to contain only black pixels. Image may not have been drawn correctly.');
+                    return;
+                }
+            }
+            
+            const hex = rgbToHex(r, g, b);
+            updateColorDisplay(r, g, b, hex);
+        } catch (error) {
+            console.error('Error getting image data:', error);
+            // Try to get more info about the error
+            if (error.name === 'SecurityError') {
+                console.error('Security error: Canvas may be tainted. Image may need CORS headers.');
+            }
+        }
+    }
+    
+    // Color picking from image - support both click and touch
+    imagePreview.addEventListener('click', pickColor);
+    imagePreview.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        pickColor(e);
     });
     
     function rgbToHex(r, g, b) {
