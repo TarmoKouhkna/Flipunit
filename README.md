@@ -8,52 +8,141 @@ FlipUnit.eu is a one-stop solution for all your conversion needs. Whether you ne
 
 ## ✨ Features
 
-### 📐 Unit Converters
-- **Length Converter**: Convert between meters, kilometers, centimeters, millimeters, miles, feet, inches, and yards
-- **Weight Converter**: Convert between kilograms, grams, pounds, ounces, tons, and stone
-- **Temperature Converter**: Convert between Celsius, Fahrenheit, and Kelvin
-- **Volume Converter**: Convert between liters, milliliters, gallons (US/UK), quarts (US/UK), pints (US/UK), cups, and fluid ounces (US/UK)
-- **Area Converter**: Convert between various area units
-- **Speed Converter**: Convert between different speed units
+### 📐 Unit Converters (16 Converters)
+- **Length**: Convert between meters, kilometers, centimeters, millimeters, miles, feet, inches, and yards
+- **Weight**: Convert between kilograms, grams, pounds, ounces, tons, and stone
+- **Temperature**: Convert between Celsius, Fahrenheit, and Kelvin
+- **Volume**: Convert between liters, milliliters, gallons (US/UK), quarts (US/UK), pints (US/UK), cups, and fluid ounces (US/UK)
+- **Area**: Convert between square meters, square feet, acres, hectares, and more
+- **Speed**: Convert between m/s, km/h, mph, ft/s, and knots
+- **Time**: Convert between seconds, milliseconds, minutes, hours, days, weeks, months, and years
+- **Data Storage**: Convert between bytes, KB, MB, GB, TB, PB, and binary units (KiB, MiB, GiB, TiB)
+- **Energy**: Convert between joules, kilojoules, calories, kilocalories, watt-hours, kilowatt-hours, electronvolts, BTU, and foot-pounds
+- **Power**: Convert between watts, kilowatts, megawatts, horsepower (mechanical & metric), BTU/hour, and foot-pounds/second
+- **Pressure**: Convert between pascal, kilopascal, bar, atmosphere, PSI, torr, mmHg, and inHg
+- **Force**: Convert between newtons, kilonewtons, pound-force, kilogram-force, dynes, and ounce-force
+- **Angle**: Convert between degrees, radians, gradians, turns, arcminutes, and arcseconds
+- **Fuel Consumption**: Convert between MPG, L/100km, km/L, and more
+- **Frequency**: Convert between Hertz, kilohertz, megahertz, RPM, and more
+- **Data Transfer Rate**: Convert between Mbps, MB/s, Gbps, and more
 
 ### 🖼️ Image Converters
-- **JPEG to PNG**: Convert JPEG images to PNG format
-- **PNG to JPG**: Convert PNG images to JPEG format
-- **WebP Tools**: Convert to/from WebP format
-- **SVG to PNG**: Convert SVG vector graphics to PNG raster images
+- **Universal Image Converter**: Convert between JPEG, PNG, WebP, BMP, TIFF, GIF, and HEIC formats
 - **Image Resize**: Resize images while maintaining aspect ratio
+- **Rotate & Flip**: Rotate images by any angle and flip horizontally/vertically
+- **Remove EXIF**: Remove metadata from images for privacy
+- **Grayscale Conversion**: Convert images to grayscale
+- **Image Merge**: Combine multiple images into one
+- **Watermark**: Add text or image watermarks to images
+- **SVG to PNG**: Convert SVG vector graphics to PNG raster images
 
 ### 🎬 Media Converters
 - **MP4 to MP3**: Extract audio from MP4 video files
-- **Audio Converter**: Convert between various audio formats
+- **Audio Converter**: Convert between MP3, WAV, OGG, FLAC, AAC, AIFF, and M4A formats
+- **Audio Splitter**: Split audio files into segments by time
+- **Audio Merge**: Merge multiple audio files into one
+- **Reduce Audio Noise**: Reduce background noise from audio files
 - **Video to GIF**: Convert video files to animated GIFs
-- **Video Converter**: Convert between different video formats
+- **Video Converter**: Convert between MP4, AVI, MOV, MKV, WebM, and 3GP formats
+- **Video Compressor**: Compress video files to reduce file size
+- **Mute Video**: Remove audio track from video files
+- **Video Merge**: Combine multiple video files into one
+- **Video Preview**: Generate preview thumbnails from videos
+
+### 📄 PDF Tools
+- **Universal PDF Converter**: Convert PDFs to various formats (images, HTML, text, EPUB, etc.)
+- **PDF Merge**: Merge multiple PDF files into one
+- **PDF Split**: Split PDF files into separate pages
+- **PDF to Images**: Convert PDF pages to images (PNG, JPEG)
+- **PDF to HTML**: Convert PDF files to HTML format
+- **HTML to PDF**: Convert HTML files to PDF
+- **PDF to Text**: Extract text content from PDF files
+- **PDF Compress**: Compress PDF files to reduce file size
+- **PDF Rotate**: Rotate PDF pages
+- **PDF OCR**: Extract text from scanned PDFs using OCR
+- **Remove PDF Metadata**: Remove metadata from PDF files
+- **PDF to Flipbook**: Convert PDFs to interactive flipbook format
+- **PDF to EPUB**: Convert PDF files to EPUB e-book format
+
+### 💱 Currency & Crypto Converter
+- **Currency Converter**: Convert between 100+ currencies with real-time exchange rates
+- **Cryptocurrency Converter**: Convert between Bitcoin, Ethereum, and other cryptocurrencies
+
+### 🎨 Color Picker & Converter
+- **Color Picker**: Pick colors from screen using eyedropper tool
+- **Color from Image**: Extract color palette from uploaded images
+- **Color Format Converter**: Convert between HEX, RGB, HSL, CMYK, and HSV formats
+
+### 📦 Archive Converters
+- **RAR to ZIP**: Convert RAR archives to ZIP format
+- **ZIP to 7Z**: Convert ZIP archives to 7Z format
+- **7Z to ZIP**: Convert 7Z archives to ZIP format
+- **TAR.GZ to ZIP**: Convert TAR.GZ archives to ZIP format
+- **ZIP to TAR.GZ**: Convert ZIP archives to TAR.GZ format
+- **Extract ISO**: Extract files from ISO disk images
+- **Create ZIP**: Create ZIP archives from multiple files
+
+### 📝 Text & String Converters
+- **Uppercase/Lowercase**: Convert text case
+- **CamelCase/Snake_case**: Convert between naming conventions
+- **Remove Special Characters**: Clean text by removing special characters
+- **Remove Duplicate Lines**: Remove duplicate lines from text
+- **Sort Lines**: Sort lines alphabetically or numerically
+- **JSON ↔ XML**: Convert between JSON and XML formats
+- **JSON ↔ YAML**: Convert between JSON and YAML formats
+- **HTML ↔ Markdown**: Convert between HTML and Markdown
+- **Text ↔ Base64**: Encode/decode text to/from Base64
+- **Word Counter**: Count words, characters, sentences, and paragraphs
+- **Text to Speech**: Convert text to speech audio files
+
+### 💻 Developer Converters
+- **Code Minify**: Minify HTML, CSS, and JavaScript code
+- **Code Unminify**: Beautify and format minified code
+- **CSV ↔ JSON**: Convert between CSV and JSON formats
+- **SQL Formatter**: Format and beautify SQL queries
+- **CSS ↔ SCSS**: Convert between CSS and SCSS
+- **Regex Tester**: Test and validate regular expressions
+- **JWT Decoder**: Decode and inspect JWT tokens
+- **URL Encoder/Decoder**: Encode and decode URLs
+- **Hash Generator**: Generate MD5, SHA1, SHA256, SHA512 hashes
 
 ### 🛠️ Utilities
-- **PDF Tools**:
-  - Merge multiple PDF files into one
-  - Split PDF files into separate pages
-  - Convert PDF pages to images
 - **Calculator**: Simple online calculator with basic operations
-- **Text Tools**: Word count, character count, and text analysis utilities
-- **Color Converter**: Convert between HEX, RGB, HSL, and CMYK color formats
 - **QR Code Generator**: Generate QR codes from text or URLs
-- **Time Zone Converter**: Convert time between different time zones
+- **Timezone Converter**: Convert time between different time zones
 - **Roman Numeral Converter**: Convert between Roman and Arabic numerals
 - **Favicon Generator**: Generate favicon.ico files from any image
+- **Timestamp Converter**: Convert Unix timestamps to readable dates and vice versa
+- **Random Number Generator**: Generate random numbers within a range
+- **Lorem Ipsum Generator**: Generate placeholder text
+- **Random Word Generator**: Generate random words
+- **Random Name Generator**: Generate random names
+- **Word Lottery**: Random word picker tool
+
+### 🤖 AI Chat
+- **AI Chat Assistant**: Chat with AI using Google Gemini API for help with conversions and general questions
+
+### 🔍 Other Tools
+- **YouTube Thumbnail Downloader**: Download thumbnails from YouTube videos
+- **Is Down Checker**: Check if websites are down or accessible
 
 ## 🛠️ Technology Stack
 
 - **Backend Framework**: Django 5.2.8
 - **Database**: PostgreSQL
 - **Python Version**: 3.12.0
-- **Image Processing**: Pillow 12.0.0
-- **PDF Processing**: pypdf 6.3.0, pdf2image 1.17.0
+- **Image Processing**: Pillow 12.0.0, pillow-heif 0.13.0
+- **PDF Processing**: pypdf 6.3.0, pdf2image 1.17.0, pdfplumber 0.11.4, pymupdf 1.23.0+, weasyprint 62.3
 - **SVG Processing**: CairoSVG 2.8.2
 - **Video/Audio Processing**: FFmpeg (system dependency)
+- **Archive Processing**: py7zr 0.21.0+, rarfile 4.1+, pycdlib 1.13.0+
+- **Text Processing**: markdown 3.5.0+, html2text 2024.2.26+, pyyaml 6.0+
+- **Code Minification**: htmlmin 0.1.12+, rcssmin 1.1.1+, rjsmin 1.2.2+, jsbeautifier 1.15.1+
 - **QR Code Generation**: qrcode[pil] 8.0
+- **Text-to-Speech**: gtts 2.5.0+
 - **Static Files**: WhiteNoise 6.8.2
 - **Web Server**: Gunicorn 23.0.0
+- **AI Integration**: Google Gemini API (for AI chat feature)
 - **Frontend**: Responsive CSS with mobile-first design
 
 ## 📋 Prerequisites
@@ -74,6 +163,17 @@ Before you begin, ensure you have the following installed on your system:
   - macOS: `brew install poppler`
   - Ubuntu/Debian: `sudo apt-get install poppler-utils`
   - Windows: Download from [https://poppler.freedesktop.org/](https://poppler.freedesktop.org/)
+- **Pandoc** (for PDF ↔ RTF conversion)
+  - macOS: `brew install pandoc`
+  - Ubuntu/Debian: `sudo apt-get install pandoc`
+  - Windows: Download from [https://pandoc.org/installing.html](https://pandoc.org/installing.html)
+- **Tesseract OCR** (for OCR PDF conversion)
+  - macOS: `brew install tesseract`
+  - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
+  - Windows: Download from [https://github.com/UB-Mannheim/tesseract/wiki](https://github.com/UB-Mannheim/tesseract/wiki)
+- **unrar** (for RAR archive writing)
+  - macOS: `brew install unrar`
+  - Ubuntu/Debian: `sudo apt-get install unrar`
 
 ## 🚀 Installation Guide
 
@@ -142,19 +242,22 @@ Create a `.env` file in the project root directory:
    ```env
 # Django Settings
 SECRET_KEY=your-secret-key-here-generate-a-long-random-string
-   DEBUG=True
+DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 CSRF_TRUSTED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
 
 # Database Configuration
-   DB_NAME=flipunit
+DB_NAME=flipunit
 DB_USER=flipunit_user
 DB_PASSWORD=your_password_here
-   DB_HOST=localhost
-   DB_PORT=5432
+DB_HOST=localhost
+DB_PORT=5432
 
 # Site Configuration (optional)
 SITE_URL=http://localhost:8000
+
+# AI Chat (optional - for AI chat feature)
+GOOGLE_GEMINI_API_KEY=your-google-gemini-api-key-here
 ```
 
 **Important**: 
@@ -207,13 +310,13 @@ Open your web browser and navigate to:
 
 ```
 Flipunit/
-├── converters/              # Unit converters app (length, weight, temperature, etc.)
-│   ├── migrations/         # Database migrations
-│   ├── templates/          # HTML templates for converters
-│   ├── urls.py            # URL routing for converters
-│   └── views.py           # View functions for converters
+├── converters/              # Unit converters app (16 different converters)
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
 │
-├── image_converter/        # Image conversion app
+├── image_converter/        # Image conversion and editing app
 │   ├── migrations/
 │   ├── templates/
 │   ├── urls.py
@@ -225,7 +328,61 @@ Flipunit/
 │   ├── urls.py
 │   └── views.py
 │
-├── utilities/              # Utilities app (PDF, calculator, text tools, etc.)
+├── pdf_tools/              # PDF tools app (merge, split, convert, etc.)
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── currency_converter/     # Currency and cryptocurrency converter
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── color_picker/           # Color picker and converter app
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── archive_converter/      # Archive format converter (ZIP, RAR, 7Z, etc.)
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── text_converter/         # Text and string conversion tools
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── developer_converter/     # Developer tools (minify, format, etc.)
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── utilities/              # General utilities (calculator, QR codes, etc.)
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── ai_chat/                # AI chat assistant using Google Gemini
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── youtube_thumbnail/      # YouTube thumbnail downloader
+│   ├── migrations/
+│   ├── templates/
+│   ├── urls.py
+│   └── views.py
+│
+├── isdown/                 # Website status checker
 │   ├── migrations/
 │   ├── templates/
 │   ├── urls.py
@@ -237,7 +394,8 @@ Flipunit/
 │   ├── wsgi.py            # WSGI configuration for production
 │   ├── asgi.py            # ASGI configuration
 │   ├── context_processors.py  # Template context processors
-│   └── sitemaps.py        # Sitemap configuration for SEO
+│   ├── sitemaps.py        # Sitemap configuration for SEO
+│   └── management/        # Custom management commands
 │
 ├── templates/              # Global HTML templates
 │   ├── base.html          # Base template
@@ -245,6 +403,9 @@ Flipunit/
 │   ├── converters/        # Converter-specific templates
 │   ├── image_converter/   # Image converter templates
 │   ├── media_converter/   # Media converter templates
+│   ├── pdf_tools/         # PDF tool templates
+│   ├── text_converter/    # Text converter templates
+│   ├── developer_converter/ # Developer tool templates
 │   └── utilities/         # Utility tool templates
 │
 ├── static/                 # Static files (CSS, JavaScript, images)
@@ -283,6 +444,7 @@ The application uses environment variables for configuration. All variables have
 | `DB_HOST` | PostgreSQL host | `localhost` | No |
 | `DB_PORT` | PostgreSQL port | `5432` | No |
 | `SITE_URL` | Full URL of the site | `https://flipunit.eu` | No |
+| `GOOGLE_GEMINI_API_KEY` | Google Gemini API key for AI chat feature | None | No (optional) |
 
 ### File Upload Settings
 
@@ -436,18 +598,72 @@ server {
 
 - **Django 5.2.8**: Web framework
 - **psycopg2-binary 2.9.11**: PostgreSQL database adapter
-- **Pillow 12.0.0**: Image processing
+- **Pillow 12.0.0**: Image processing and format conversion
 - **pypdf 6.3.0**: PDF manipulation
 - **pdf2image 1.17.0**: PDF to image conversion
 - **CairoSVG 2.8.2**: SVG to PNG conversion
 - **qrcode[pil] 8.0**: QR code generation
 - **whitenoise 6.8.2**: Static file serving
 - **gunicorn 23.0.0**: Production WSGI server
+- **python-dotenv 1.0.0**: Environment variable management
+- **requests 2.32.5**: HTTP library for API calls
+
+### PDF Processing
+
+- **pypdf 6.3.0**: PDF manipulation and merging
+- **pdf2image 1.17.0**: PDF to image conversion
+- **pdfplumber 0.11.4**: PDF text extraction
+- **pymupdf 1.23.0+**: PDF to SVG conversion
+- **pypandoc 1.11+**: PDF ↔ RTF conversion
+- **pytesseract 0.3.10+**: OCR for PDF text extraction
+- **ebooklib 0.18+**: PDF to EPUB conversion
+- **weasyprint 62.3**: HTML to PDF conversion
+- **python-docx 1.1.2**: Word document processing
+- **docx2pdf 0.1.8**: Word to PDF conversion
+
+### Archive Processing
+
+- **py7zr 0.21.0+**: 7Z archive support
+- **rarfile 4.1+**: RAR archive reading
+- **pycdlib 1.13.0+**: ISO file extraction
+
+### Text & Format Conversion
+
+- **pyyaml 6.0+**: JSON ↔ YAML conversion
+- **markdown 3.5.0+**: HTML ↔ Markdown conversion
+- **html2text 2024.2.26+**: HTML to Markdown conversion
+- **htmlmin 0.1.12+**: HTML minification
+- **rcssmin 1.1.1+**: CSS minification
+- **rjsmin 1.2.2+**: JavaScript minification
+- **jsbeautifier 1.15.1+**: JavaScript unminification
+- **PyJWT 2.8.0+**: JWT token decoding
+
+### Media Processing
+
+- **gtts 2.5.0+**: Text-to-speech conversion
+- **pillow-heif 0.13.0**: HEIC image format support
 
 ### System Dependencies
 
 - **FFmpeg**: Required for video/audio conversion
+  - macOS: `brew install ffmpeg`
+  - Ubuntu/Debian: `sudo apt-get install ffmpeg`
+  - Windows: Download from [https://ffmpeg.org/download.html](https://ffmpeg.org/download.html)
 - **Poppler**: Required for PDF to image conversion (optional but recommended)
+  - macOS: `brew install poppler`
+  - Ubuntu/Debian: `sudo apt-get install poppler-utils`
+  - Windows: Download from [https://poppler.freedesktop.org/](https://poppler.freedesktop.org/)
+- **Pandoc**: Required for PDF ↔ RTF conversion (optional)
+  - macOS: `brew install pandoc`
+  - Ubuntu/Debian: `sudo apt-get install pandoc`
+  - Windows: Download from [https://pandoc.org/installing.html](https://pandoc.org/installing.html)
+- **Tesseract OCR**: Required for OCR PDF conversion (optional)
+  - macOS: `brew install tesseract`
+  - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
+  - Windows: Download from [https://github.com/UB-Mannheim/tesseract/wiki](https://github.com/UB-Mannheim/tesseract/wiki)
+- **unrar**: Required for RAR archive writing (optional)
+  - macOS: `brew install unrar`
+  - Ubuntu/Debian: `sudo apt-get install unrar`
 
 ## 🔍 SEO Features
 
@@ -482,7 +698,16 @@ Test individual apps:
 python manage.py test converters
 python manage.py test image_converter
 python manage.py test media_converter
+python manage.py test pdf_tools
+python manage.py test currency_converter
+python manage.py test color_picker
+python manage.py test archive_converter
+python manage.py test text_converter
+python manage.py test developer_converter
 python manage.py test utilities
+python manage.py test ai_chat
+python manage.py test youtube_thumbnail
+python manage.py test isdown
 ```
 
 ## 🐛 Troubleshooting

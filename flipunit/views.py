@@ -68,7 +68,7 @@ def home(request):
             {
                 'name': 'Utilities',
                 'url': 'utilities:index',
-                'description': 'Calculator, converters, generators, QR codes, text-to-speech, and more',
+                'description': 'Calculator, converters, generators, QR codes, and more',
                 'icon': 'utilities.svg'
             },
             {
