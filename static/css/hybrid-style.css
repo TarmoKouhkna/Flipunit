@@ -3018,8 +3018,8 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
     padding: var(--space-lg);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 200px);
-    min-height: 600px;
+    height: calc(100vh - 120px);
+    min-height: 700px;
     overflow: hidden;
     gap: var(--space-md);
 }
@@ -3054,7 +3054,7 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
-    min-height: 0;
+    min-height: 500px;
     touch-action: pan-y;
     overscroll-behavior-y: contain;
 }
