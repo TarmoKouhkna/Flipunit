@@ -3021,7 +3021,7 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
     height: calc(100vh - 120px);
     min-height: 700px;
     overflow: hidden;
-    gap: var(--space-md);
+    gap: var(--space-lg);
 }
 
 .ai-chat-header {
@@ -3047,6 +3047,7 @@ div[style*="border-radius: 4px"][style*="display: inline-block"] {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding: var(--space-lg);
+    padding-bottom: var(--space-xl);
     background: var(--bg-base);
     border-radius: var(--radius-lg);
     box-shadow: var(--neu-shadow-inset);
