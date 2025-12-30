@@ -1677,24 +1677,57 @@ def pdf_to_flipbook(request):
         
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #a8b5d1 0%, #b8a8c8 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 20px;
             overflow-x: hidden;
+            position: relative;
+        }}
+        
+        @keyframes gradientShift {{
+            0% {{ background-position: 0% 50%; }}
+            50% {{ background-position: 100% 50%; }}
+            100% {{ background-position: 0% 50%; }}
+        }}
+        
+        body::before {{
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: float 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }}
+        
+        @keyframes float {{
+            0% {{ transform: translate(0, 0); }}
+            100% {{ transform: translate(50px, 50px); }}
         }}
         
         .flipbook-container {{
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
             padding: 20px;
             max-width: 1200px;
             width: 100%;
             margin: 20px auto;
             position: relative;
+            z-index: 1;
         }}
         
         .toolbar {{
@@ -1702,8 +1735,13 @@ def pdf_to_flipbook(request):
             justify-content: space-between;
             align-items: center;
             padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.3);
             margin-bottom: 20px;
             flex-wrap: wrap;
             gap: 10px;
@@ -1718,40 +1756,50 @@ def pdf_to_flipbook(request):
         
         .btn {{
             padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
             transition: all 0.3s;
-            background: #667eea;
-            color: white;
+            background: rgba(140, 150, 180, 0.25);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
         }}
         
         .btn:hover {{
-            background: #5568d3;
+            background: rgba(140, 150, 180, 0.4);
+            border-color: rgba(255, 255, 255, 0.4);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }}
         
         .btn:active {{
             transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         }}
         
         .btn-secondary {{
-            background: #6c757d;
+            background: rgba(120, 125, 140, 0.25);
         }}
         
         .btn-secondary:hover {{
-            background: #5a6268;
+            background: rgba(120, 125, 140, 0.4);
+            border-color: rgba(255, 255, 255, 0.4);
         }}
         
         .page-info {{
             font-size: 16px;
             font-weight: 600;
-            color: #333;
+            color: rgba(255, 255, 255, 0.95);
             min-width: 120px;
             text-align: center;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }}
         
         .zoom-controls {{
@@ -1774,7 +1822,8 @@ def pdf_to_flipbook(request):
             min-width: 60px;
             text-align: center;
             font-weight: 600;
-            color: #333;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }}
         
         .flipbook-viewer {{
@@ -1786,9 +1835,13 @@ def pdf_to_flipbook(request):
             align-items: center;
             perspective: 2000px;
             padding: 20px;
-            background: #f0f0f0;
-            border-radius: 8px;
+            background: rgba(240, 240, 240, 0.2);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
             overflow: hidden;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
         }}
         
         .page-container {{
@@ -1809,7 +1862,8 @@ def pdf_to_flipbook(request):
         .page {{
             position: relative;
             background: white;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3),
+                        0 0 0 1px rgba(255, 255, 255, 0.1);
             border-radius: 4px;
             overflow: hidden;
             transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1872,7 +1926,9 @@ def pdf_to_flipbook(request):
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: #000;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             z-index: 9999;
             display: none;
             flex-direction: column;
@@ -1893,6 +1949,13 @@ def pdf_to_flipbook(request):
             display: flex;
             gap: 10px;
             z-index: 10000;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 10px 15px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         }}
         
         .fullscreen-viewer {{
@@ -1955,8 +2018,8 @@ def pdf_to_flipbook(request):
         }}
         
         .spinner {{
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid rgba(255, 255, 255, 0.9);
             border-radius: 50%;
             width: 50px;
             height: 50px;
