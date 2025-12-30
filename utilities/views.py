@@ -29,7 +29,6 @@ def index(request):
             {'name': 'Roman Numeral Converter', 'url_name': 'roman_numeral_converter', 'description': 'Convert between Roman and Arabic numerals'},
             {'name': 'Favicon Generator', 'url_name': 'favicon_generator', 'description': 'Generate favicon.ico from any image'},
             {'name': 'Timestamp Converter', 'url_name': 'timestamp_converter', 'description': 'Convert between timestamps and dates'},
-            {'name': 'Text-to-Speech', 'url_name': 'text_to_speech', 'description': 'Convert text to speech audio'},
             {'name': 'Random Number Generator', 'url_name': 'random_number_generator', 'description': 'Generate random numbers'},
             {'name': 'Lorem Ipsum Generator', 'url_name': 'lorem_ipsum_generator', 'description': 'Generate Lorem Ipsum placeholder text'},
             {'name': 'Random Word Generator', 'url_name': 'random_word_generator', 'description': 'Generate random words from a dictionary'},

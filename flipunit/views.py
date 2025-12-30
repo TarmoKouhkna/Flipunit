@@ -212,7 +212,6 @@ def _get_all_tools():
         {'name': 'Roman Numeral Converter', 'url': 'utilities:roman_numeral_converter', 'category': 'Utilities', 'description': 'Convert Roman and Arabic numerals'},
         {'name': 'Favicon Generator', 'url': 'utilities:favicon_generator', 'category': 'Utilities', 'description': 'Generate favicon from image'},
         {'name': 'Timestamp Converter', 'url': 'utilities:timestamp_converter', 'category': 'Utilities', 'description': 'Convert timestamps and dates'},
-        {'name': 'Text-to-Speech', 'url': 'utilities:text_to_speech', 'category': 'Utilities', 'description': 'Convert text to speech audio'},
         {'name': 'Random Number Generator', 'url': 'utilities:random_number_generator', 'category': 'Utilities', 'description': 'Generate random numbers'},
         {'name': 'Lorem Ipsum Generator', 'url': 'utilities:lorem_ipsum_generator', 'category': 'Utilities', 'description': 'Generate Lorem Ipsum text'},
         {'name': 'Random Word Generator', 'url': 'utilities:random_word_generator', 'category': 'Utilities', 'description': 'Generate random words'},
@@ -243,6 +242,7 @@ def _get_all_tools():
         {'name': 'HTML ↔ Markdown', 'url': 'text_converter:html_markdown', 'category': 'Text Converters', 'description': 'Convert between HTML and Markdown', 'keywords': 'HTML Markdown MD'},
         {'name': 'Text ↔ Base64', 'url': 'text_converter:text_base64', 'category': 'Text Converters', 'description': 'Encode/decode Base64', 'keywords': 'Base64 encode decode'},
         {'name': 'Word Counter', 'url': 'text_converter:word_counter', 'category': 'Text Converters', 'description': 'Count words, characters, lines, and more', 'keywords': 'word count character'},
+        {'name': 'Text-to-Speech', 'url': 'utilities:text_to_speech', 'category': 'Text Converters', 'description': 'Convert text to speech audio', 'keywords': 'text speech audio TTS'},
     ])
     
     # Developer Converters
