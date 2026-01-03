@@ -6,6 +6,10 @@ import json
 import re
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import os
+import tempfile
+import shutil
+import subprocess
 
 # Check for optional dependencies
 try:
@@ -20,6 +24,12 @@ try:
     MARKDOWN_AVAILABLE = True
 except ImportError:
     MARKDOWN_AVAILABLE = False
+
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 
 def index(request):
@@ -503,4 +513,184 @@ def word_counter(request):
         'paragraph_count': paragraph_count,
         'sentence_count': sentence_count,
     })
+
+
+def _check_ffprobe():
+    """Check if ffprobe is available and return its path"""
+    ffprobe_path = shutil.which('ffprobe') or '/usr/local/bin/ffprobe'
+    
+    if not os.path.exists(ffprobe_path):
+        return None, 'ffprobe not found. Please install FFmpeg on your system.'
+    
+    ffprobe_dir = os.path.dirname(ffprobe_path)
+    original_path = os.environ.get('PATH', '')
+    if ffprobe_dir not in original_path:
+        os.environ['PATH'] = f"{ffprobe_dir}:{original_path}"
+    
+    return ffprobe_path, None
+
+
+def _get_audio_duration(file_path, ffprobe_path):
+    """
+    Get audio file duration in seconds using ffprobe.
+    Returns duration as float, or None if error.
+    """
+    try:
+        cmd = [
+            ffprobe_path,
+            '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            file_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode != 0:
+            return None
+        
+        duration_str = result.stdout.strip()
+        if duration_str:
+            return float(duration_str)
+        return None
+    except (ValueError, subprocess.TimeoutExpired, Exception):
+        return None
+
+
+def _transcribe_audio(file_path, api_key):
+    """
+    Transcribe audio file using OpenAI Whisper API.
+    Returns tuple: (transcription_text, detected_language) or (None, None) on error.
+    """
+    try:
+        client = OpenAI(api_key=api_key)
+        
+        with open(file_path, 'rb') as audio_file:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language=None  # Auto-detect language (do NOT hardcode)
+            )
+        
+        transcription_text = transcript.text
+        # Whisper API response may include language if available
+        # Check for language attribute in the response
+        detected_language = getattr(transcript, 'language', None)
+        
+        return transcription_text, detected_language
+    except Exception as e:
+        # Log error for debugging but don't expose internal details to user
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'OpenAI transcription error: {str(e)}')
+        return None, None
+
+
+def audio_transcription(request):
+    """Transcribe audio files using OpenAI Whisper API"""
+    if request.method != 'POST':
+        return render(request, 'text_converter/audio_transcription.html', {
+            'openai_available': OPENAI_AVAILABLE,
+        })
+    
+    # Check if OpenAI is available
+    if not OPENAI_AVAILABLE:
+        messages.error(request, 'OpenAI library is not installed. Please install with: pip install openai')
+        return render(request, 'text_converter/audio_transcription.html', {
+            'openai_available': OPENAI_AVAILABLE,
+        })
+    
+    # Check for API key
+    from django.conf import settings
+    api_key = settings.OPENAI_API_KEY
+    if not api_key:
+        messages.error(request, 'OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file.')
+        return render(request, 'text_converter/audio_transcription.html', {
+            'openai_available': OPENAI_AVAILABLE,
+        })
+    
+    # Check for uploaded file
+    if 'audio_file' not in request.FILES:
+        messages.error(request, 'Please upload an audio file.')
+        return render(request, 'text_converter/audio_transcription.html', {
+            'openai_available': OPENAI_AVAILABLE,
+        })
+    
+    uploaded_file = request.FILES['audio_file']
+    
+    # Validate file size (max 700MB, consistent with other tools)
+    max_size = 700 * 1024 * 1024  # 700MB
+    if uploaded_file.size > max_size:
+        messages.error(request, f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.')
+        return render(request, 'text_converter/audio_transcription.html', {
+            'openai_available': OPENAI_AVAILABLE,
+        })
+    
+    # Validate file type
+    allowed_extensions = ['.mp3', '.wav', '.m4a', '.ogg']
+    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+    
+    if file_ext not in allowed_extensions:
+        messages.error(request, 'Invalid file type. Please upload MP3, WAV, M4A, or OGG files.')
+        return render(request, 'text_converter/audio_transcription.html', {
+            'openai_available': OPENAI_AVAILABLE,
+        })
+    
+    # Check ffprobe for duration validation
+    ffprobe_path, error = _check_ffprobe()
+    if error:
+        # If ffprobe is not available, we'll skip server-side duration check
+        # but still proceed (client-side validation should catch it)
+        ffprobe_path = None
+    
+    temp_dir = None
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        input_path = os.path.join(temp_dir, f'input{file_ext}')
+        
+        # Save uploaded file
+        with open(input_path, 'wb') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
+        
+        # Validate audio duration using ffprobe (server-side check)
+        if ffprobe_path:
+            duration = _get_audio_duration(input_path, ffprobe_path)
+            if duration is not None:
+                max_duration = 30 * 60  # 30 minutes in seconds
+                if duration > max_duration:
+                    messages.error(request, f'Audio duration ({duration / 60:.1f} minutes) exceeds the 30-minute limit. Please use the audio splitter tool to shorten your file.')
+                    return render(request, 'text_converter/audio_transcription.html', {
+                        'openai_available': OPENAI_AVAILABLE,
+                        'duration_exceeded': True,
+                    })
+        
+        # Transcribe audio using OpenAI Whisper API
+        transcription_text, detected_language = _transcribe_audio(input_path, api_key)
+        
+        if transcription_text is None:
+            messages.error(request, 'Failed to transcribe audio. Please check your API key and try again.')
+            return render(request, 'text_converter/audio_transcription.html', {
+                'openai_available': OPENAI_AVAILABLE,
+            })
+        
+        # Return results
+        return render(request, 'text_converter/audio_transcription.html', {
+            'openai_available': OPENAI_AVAILABLE,
+            'transcription': transcription_text,
+            'detected_language': detected_language,
+        })
+        
+    except Exception as e:
+        messages.error(request, f'Error processing file: {str(e)}')
+        return render(request, 'text_converter/audio_transcription.html', {
+            'openai_available': OPENAI_AVAILABLE,
+        })
+    finally:
+        # Clean up temporary files
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except (OSError, PermissionError):
+                pass
 

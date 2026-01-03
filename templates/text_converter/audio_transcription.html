@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block title %}Audio Transcription - Transcribe Audio to Text Online - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online audio transcription - Convert audio files (MP3, WAV, M4A, OGG) to text using AI. Automatic language detection. Fast, secure, no registration required.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Audio Transcription - Convert Audio to Text</h1>
+    <p>Transcribe audio files to text using AI-powered speech recognition</p>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    {% if not openai_available %}
+    <div class="alert alert-error">
+        OpenAI library is not installed. Please install with: pip install openai
+    </div>
+    {% endif %}
+    
+    <div class="privacy-notice">
+        <p>
+            <span>🔒</span>
+            <span><strong>Privacy Notice:</strong> Your files are processed securely and are <strong>not stored</strong> on our servers.</span>
+        </p>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" id="transcriptionForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select Audio File</label>
+            <div class="file-upload-area" id="uploadArea">
+                <input type="file" name="audio_file" id="audio_file" accept="audio/mp3,audio/wav,audio/m4a,audio/ogg" required>
+                <div id="uploadContent">
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: MP3, WAV, M4A, OGG (max 30 minutes)</p>
+                </div>
+            </div>
+            <div id="durationInfo" style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem; display: none;"></div>
+            <div id="durationError" class="alert alert-error" style="display: none; margin-top: 1rem;"></div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">Transcribe Audio</button>
+    </form>
+    
+    {% if transcription %}
+    <div style="margin-top: 2rem;">
+        <h3>Transcription Result:</h3>
+        {% if detected_language %}
+        <div style="background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem; margin-bottom: 1rem;">
+            <strong style="color: var(--primary-color);">Detected Language:</strong>
+            <span style="text-transform: uppercase;">{{ detected_language }}</span>
+        </div>
+        {% endif %}
+        <div style="background: var(--surface); padding: 1.5rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea class="form-control" rows="15" readonly style="font-family: monospace; white-space: pre-wrap;">{{ transcription }}</textarea>
+        </div>
+        <button onclick="copyTranscription()" class="btn btn-secondary" style="margin-top: 1rem;">Copy to Clipboard</button>
+    </div>
+    {% endif %}
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol class="list-indent" style="margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.8;">
+            <li>Upload your audio file (MP3, WAV, M4A, or OGG format)</li>
+            <li>File duration must be 30 minutes or less</li>
+            <li>Click "Transcribe Audio" to start transcription</li>
+            <li>Wait for the AI to process your audio (may take a few moments)</li>
+            <li>Copy the transcribed text from the results</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> If your audio file is longer than 30 minutes, use our <a href="{% url 'media_converter:audio_splitter' %}" style="color: var(--primary-color);">Audio Splitter tool</a> to split it into smaller segments first.
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'text_converter:index' %}" class="btn btn-secondary">← Back to Text Converters</a>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('transcriptionForm');
+    const fileInput = document.getElementById('audio_file');
+    const uploadArea = document.getElementById('uploadArea');
+    const uploadContent = document.getElementById('uploadContent');
+    const durationInfo = document.getElementById('durationInfo');
+    const durationError = document.getElementById('durationError');
+    const submitBtn = document.getElementById('submit-btn');
+    const MAX_DURATION = 30 * 60; // 30 minutes in seconds
+    
+    let audioDuration = null;
+    let isValidDuration = false;
+    
+    // Update UI when file is selected
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            uploadContent.querySelector('p').textContent = 'Selected: ' + file.name;
+            
+            // Validate file type
+            const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/ogg', 'audio/x-m4a'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            const allowedExts = ['.mp3', '.wav', '.m4a', '.ogg'];
+            
+            if (!allowedExts.includes(fileExt) && !allowedTypes.includes(file.type)) {
+                durationError.style.display = 'block';
+                durationError.innerHTML = 'Invalid file type. Please upload MP3, WAV, M4A, or OGG files.';
+                isValidDuration = false;
+                submitBtn.disabled = true;
+                return;
+            }
+            
+            // Check audio duration
+            durationInfo.style.display = 'block';
+            durationInfo.textContent = 'Checking audio duration...';
+            durationError.style.display = 'none';
+            isValidDuration = false;
+            submitBtn.disabled = true;
+            
+            const audio = new Audio();
+            const url = URL.createObjectURL(file);
+            
+            audio.addEventListener('loadedmetadata', function() {
+                audioDuration = audio.duration;
+                URL.revokeObjectURL(url);
+                
+                const minutes = Math.floor(audioDuration / 60);
+                const seconds = Math.floor(audioDuration % 60);
+                durationInfo.textContent = `Duration: ${minutes}:${seconds.toString().padStart(2, '0')} (${(audioDuration / 60).toFixed(1)} minutes)`;
+                
+                if (audioDuration > MAX_DURATION) {
+                    durationError.style.display = 'block';
+                    durationError.innerHTML = `Audio duration (${(audioDuration / 60).toFixed(1)} minutes) exceeds the 30-minute limit. ` +
+                        `Please use the <a href="{% url 'media_converter:audio_splitter' %}" style="color: var(--primary-color); text-decoration: underline;">Audio Splitter tool</a> to shorten your file first.`;
+                    isValidDuration = false;
+                    submitBtn.disabled = true;
+                } else {
+                    durationError.style.display = 'none';
+                    isValidDuration = true;
+                    submitBtn.disabled = false;
+                }
+            });
+            
+            audio.addEventListener('error', function() {
+                URL.revokeObjectURL(url);
+                durationInfo.textContent = 'Could not read audio file. Please ensure it is a valid audio file.';
+                isValidDuration = false;
+                submitBtn.disabled = true;
+            });
+            
+            audio.src = url;
+        } else {
+            durationInfo.style.display = 'none';
+            durationError.style.display = 'none';
+            isValidDuration = false;
+            submitBtn.disabled = false;
+        }
+    });
+    
+    // Form submission validation
+    form.addEventListener('submit', function(e) {
+        if (!isValidDuration && audioDuration !== null) {
+            e.preventDefault();
+            alert('Please ensure your audio file is 30 minutes or less before submitting.');
+            return false;
+        }
+        
+        if (!fileInput.files.length) {
+            e.preventDefault();
+            alert('Please select an audio file.');
+            return false;
+        }
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Transcribing... Please wait';
+    });
+    
+    // Drag and drop support
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--primary-color)';
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = '';
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = '';
+        
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change'));
+        }
+    });
+});
+
+function copyTranscription() {
+    const textarea = document.querySelector('textarea[readonly]');
+    if (textarea) {
+        textarea.select();
+        document.execCommand('copy');
+        
+        const btn = document.querySelector('button[onclick="copyTranscription()"]');
+        if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(function() {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+    }
+}
+</script>
+{% endblock %}
+

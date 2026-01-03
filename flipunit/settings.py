@@ -199,6 +199,10 @@ SITE_URL = os.environ.get('SITE_URL', 'https://flipunit.eu')
 # Google Gemini API Key
 GOOGLE_GEMINI_API_KEY = os.environ.get('GOOGLE_GEMINI_API_KEY')
 
+# OpenAI API Key (for Whisper audio transcription)
+# Must be set in .env file: OPENAI_API_KEY=your_key_here
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB

@@ -21,6 +21,7 @@
         <li>Convert between HTML and Markdown</li>
         <li>Encode/decode Base64</li>
         <li>Count words, characters, lines, and more</li>
+        <li>Transcribe audio files to text</li>
         <li>Convert text to speech audio</li>
     </ul>
 </div>
@@ -67,6 +68,10 @@
         <a href="{% url 'text_converter:word_counter' %}" class="category-card">
             <h3>Word Counter</h3>
             <p>Count words, characters, lines, paragraphs, and sentences</p>
+        </a>
+        <a href="{% url 'text_converter:audio_transcription' %}" class="category-card">
+            <h3>Audio Transcription</h3>
+            <p>Transcribe audio files (MP3, WAV, M4A, OGG) to text using AI</p>
         </a>
         <a href="{% url 'utilities:text_to_speech' %}" class="category-card">
             <h3>Text-to-Speech</h3>
