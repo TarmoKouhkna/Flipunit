@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}CamelCase ↔ snake_case Converter - {{ SITE_NAME }}{% endblock %}
+{% block title %}CamelCase snake_case Converter - Convert Naming Conventions - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online naming convention converter - Convert between CamelCase and snake_case. Transform variable and function names.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">CamelCase ↔ snake_case Converter</h1>
+    <h1 class="card-title">Naming Convention Converter - CamelCase snake_case</h1>
     
     {% if messages %}
         {% for message in messages %}

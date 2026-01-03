@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Hash Generator - {{ SITE_NAME }}{% endblock %}
+{% block title %}Hash Generator - Generate MD5, SHA1, SHA256 Hashes - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online hash generator - Generate MD5, SHA1, SHA256, and other hash values from text. Cryptographic hash generation tool.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">Hash Generator</h1>
+    <h1 class="card-title">Hash Generator - Generate MD5, SHA1, SHA256 Hashes</h1>
     
     {% if messages %}
         {% for message in messages %}

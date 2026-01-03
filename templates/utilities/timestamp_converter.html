@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Timestamp Converter - {{ SITE_NAME }}{% endblock %}
+{% block title %}Timestamp Converter - Convert Timestamps to Dates - {{ SITE_NAME }}{% endblock %}
 {% block meta_description %}Convert between Unix timestamps and dates. Convert timestamps to readable dates and dates to timestamps.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">Timestamp ↔ Date Converter</h1>
+    <h1 class="card-title">Timestamp Converter - Convert Timestamps to Dates</h1>
     <p style="color: var(--text-secondary); margin-bottom: 2rem;">Convert between Unix timestamps and human-readable dates</p>
     
     {% if error and not result %}

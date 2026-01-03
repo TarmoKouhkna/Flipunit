@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}SQL Formatter - {{ SITE_NAME }}{% endblock %}
+{% block title %}SQL Formatter - Format SQL Queries Online - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online SQL formatter - Format and beautify SQL queries. Improve SQL code readability with proper indentation and formatting.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">SQL Formatter</h1>
+    <h1 class="card-title">SQL Formatter - Format SQL Queries</h1>
     
     {% if messages %}
         {% for message in messages %}

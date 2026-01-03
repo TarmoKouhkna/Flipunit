@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ converter.title }} - {{ SITE_NAME }}{% endblock %}
-{% block meta_description %}Free online {{ converter.title|lower }} - Convert between different units instantly. Fast, accurate, no registration required.{% endblock %}
+{% block title %}{{ converter.title }} - Convert {{ converter.title|lower }} Online - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online {{ converter.title|lower }} - Convert between different {{ converter.title|lower }} units instantly. Fast, accurate, no registration required.{% endblock %}
 {% block og_title %}{{ converter.title }} - {{ SITE_NAME }}{% endblock %}
 {% block og_description %}Free online {{ converter.title|lower }} - Convert between different units instantly.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">{{ converter.title }}</h1>
+    <h1 class="card-title">{{ converter.title }} - Convert Units Online</h1>
     
     <form method="post" class="converter-tool">
         {% csrf_token %}

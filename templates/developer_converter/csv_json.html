@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}{% if conversion_type == 'csv_to_json' %}CSV to JSON{% else %}JSON to CSV{% endif %} - {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if conversion_type == 'csv_to_json' %}CSV JSON Converter - Convert CSV to JSON Online - {{ SITE_NAME }}{% else %}CSV JSON Converter - Convert JSON to CSV Online - {{ SITE_NAME }}{% endif %}{% endblock %}
+{% block meta_description %}Free online CSV JSON converter - Convert between CSV and JSON formats. Transform data between CSV and JSON structures.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">{% if conversion_type == 'csv_to_json' %}CSV → JSON{% else %}JSON → CSV{% endif %}</h1>
+    <h1 class="card-title">CSV JSON Converter - {% if conversion_type == 'csv_to_json' %}Convert CSV to JSON{% else %}Convert JSON to CSV{% endif %}</h1>
     
     {% if messages %}
         {% for message in messages %}

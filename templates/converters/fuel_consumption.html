@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ converter.title }} - {{ SITE_NAME }}{% endblock %}
+{% block title %}{{ converter.title }} - Convert Fuel Consumption Online - {{ SITE_NAME }}{% endblock %}
 {% block meta_description %}Free online {{ converter.title|lower }} - Convert between different units and calculate driving range. Fast, accurate, no registration required.{% endblock %}
 {% block og_title %}{{ converter.title }} - {{ SITE_NAME }}{% endblock %}
 {% block og_description %}Free online {{ converter.title|lower }} - Convert between different units and calculate driving range.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">{{ converter.title }}</h1>
+    <h1 class="card-title">{{ converter.title }} - Fuel Consumption Converter</h1>
     
     <form method="post" class="converter-tool">
         {% csrf_token %}

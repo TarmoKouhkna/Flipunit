@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}JWT Decoder - {{ SITE_NAME }}{% endblock %}
+{% block title %}JWT Decoder - Decode JWT Tokens Online - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online JWT decoder - Decode and view JWT token contents. Inspect JWT payload, header, and signature.{% endblock %}
 
 {% block content %}
 <div class="card">
-    <h1 class="card-title">JWT Decoder</h1>
+    <h1 class="card-title">JWT Decoder - Decode JWT Tokens</h1>
     
     {% if messages %}
         {% for message in messages %}

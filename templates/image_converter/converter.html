@@ -1,14 +1,23 @@
 {% extends 'base.html' %}
 
-{% block title %}Image Converter - {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if converter_type == 'jpeg-to-png' %}JPEG to PNG Converter - Convert JPEG to PNG Online - {{ SITE_NAME }}
+{% elif converter_type == 'png-to-jpg' %}PNG to JPG Converter - Convert PNG to JPG Online - {{ SITE_NAME }}
+{% elif converter_type == 'webp' %}WebP Converter - Convert Images to WebP Format - {{ SITE_NAME }}
+{% elif converter_type == 'svg-to-png' %}SVG to PNG Converter - Convert SVG to PNG Online - {{ SITE_NAME }}
+{% else %}Image Converter - {{ SITE_NAME }}{% endif %}{% endblock %}
+{% block meta_description %}{% if converter_type == 'jpeg-to-png' %}Free online JPEG to PNG converter - Convert JPEG images to PNG format. Preserve quality and transparency. Fast, secure, no registration required.
+{% elif converter_type == 'png-to-jpg' %}Free online PNG to JPG converter - Convert PNG images to JPG format. Fast, secure, no registration required.
+{% elif converter_type == 'webp' %}Free online WebP converter - Convert images to WebP format. Modern web image format with excellent compression.
+{% elif converter_type == 'svg-to-png' %}Free online SVG to PNG converter - Convert SVG vector images to PNG raster format. Fast, secure, no registration required.
+{% else %}Free online image converter - Convert images between different formats. Fast, secure, no registration required.{% endif %}{% endblock %}
 
 {% block content %}
 <div class="card">
     <h1 class="card-title">
-        {% if converter_type == 'jpeg-to-png' %}JPEG to PNG Converter
-        {% elif converter_type == 'png-to-jpg' %}PNG to JPG Converter
-        {% elif converter_type == 'webp' %}WebP Converter
-        {% elif converter_type == 'svg-to-png' %}SVG to PNG Converter
+        {% if converter_type == 'jpeg-to-png' %}JPEG to PNG Converter - Convert JPEG to PNG
+        {% elif converter_type == 'png-to-jpg' %}PNG to JPG Converter - Convert PNG to JPG
+        {% elif converter_type == 'webp' %}WebP Converter - Convert Images to WebP
+        {% elif converter_type == 'svg-to-png' %}SVG to PNG Converter - Convert SVG to PNG
         {% else %}Image Converter{% endif %}
     </h1>
     
