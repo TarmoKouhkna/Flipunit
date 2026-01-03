@@ -79,6 +79,7 @@
 </div>
 
 <a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -128,8 +129,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Form submission
+    let isProcessing = false;
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        // Prevent duplicate submissions
+        if (isProcessing) {
+            return;
+        }
         
         if (!fileInput.files.length) {
             alert('Please select an audio file.');
@@ -141,6 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        isProcessing = true;
         submitBtn.disabled = true;
         submitBtn.textContent = 'Processing...';
         
@@ -176,24 +184,32 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         })
         .then(({ blob, filename }) => {
+            // Only trigger download once
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
             a.style.display = 'none';
             document.body.appendChild(a);
+            
+            // Use a single click event
             a.click();
             
+            // Clean up immediately after click
             setTimeout(() => {
                 window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
+                if (document.body.contains(a)) {
+                    document.body.removeChild(a);
+                }
             }, 100);
             
+            isProcessing = false;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Split & Download';
         })
         .catch(error => {
             console.error('Error:', error);
+            isProcessing = false;
             submitBtn.disabled = false;
             submitBtn.textContent = 'Split & Download';
             alert('Error: ' + error.message);
@@ -201,6 +217,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock %}
 {% endblock %}
 

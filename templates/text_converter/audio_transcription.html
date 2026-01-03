@@ -59,7 +59,10 @@
         <div style="background: var(--surface); padding: 1.5rem; border-radius: 6px; margin-top: 1rem;">
             <textarea class="form-control" rows="15" readonly style="font-family: monospace; white-space: pre-wrap;">{{ transcription }}</textarea>
         </div>
-        <button onclick="copyTranscription()" class="btn btn-secondary" style="margin-top: 1rem;">Copy to Clipboard</button>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <button onclick="copyTranscription()" class="btn btn-secondary">Copy to Clipboard</button>
+            <button onclick="downloadTranscription()" class="btn btn-primary">Download as .txt</button>
+        </div>
     </div>
     {% endif %}
     
@@ -213,6 +216,36 @@ function copyTranscription() {
         if (btn) {
             const originalText = btn.textContent;
             btn.textContent = 'Copied!';
+            setTimeout(function() {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+    }
+}
+
+function downloadTranscription() {
+    const textarea = document.querySelector('textarea[readonly]');
+    if (textarea && textarea.value) {
+        const text = textarea.value;
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        a.download = `transcription-${timestamp}.txt`;
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        // Show feedback
+        const btn = document.querySelector('button[onclick="downloadTranscription()"]');
+        if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = 'Downloaded!';
             setTimeout(function() {
                 btn.textContent = originalText;
             }, 2000);
