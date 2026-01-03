@@ -32,6 +32,7 @@ services:
       - ./templates:/app/templates  # Mount templates so changes are immediate without rebuild
       - ./flipunit:/app/flipunit  # Mount source code so Python changes are immediate without rebuild
       - ./pdf_tools:/app/pdf_tools  # Mount pdf_tools so changes are immediate without rebuild
+      - ./text_converter:/app/text_converter  # Mount text_converter so changes are immediate without rebuild
     depends_on:
       - postgres
     networks:
