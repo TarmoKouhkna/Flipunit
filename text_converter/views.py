@@ -562,7 +562,11 @@ def _transcribe_audio(file_path, api_key):
     Returns tuple: (transcription_text, detected_language) or (None, None) on error.
     """
     try:
-        client = OpenAI(api_key=api_key)
+        # Create client with extended timeout for large audio files (up to 10 minutes)
+        client = OpenAI(
+            api_key=api_key,
+            timeout=600.0  # 10 minutes timeout for large files
+        )
         
         with open(file_path, 'rb') as audio_file:
             transcript = client.audio.transcriptions.create(
