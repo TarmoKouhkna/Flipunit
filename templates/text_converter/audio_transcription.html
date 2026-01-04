@@ -70,7 +70,7 @@
         <h3>How to use:</h3>
         <ol class="list-indent" style="margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.8;">
             <li>Upload your audio file (MP3, WAV, M4A, or OGG format)</li>
-            <li>File duration must be 30 minutes or less</li>
+            <li>File duration must be 30 minutes (1800 seconds) or less</li>
             <li>Click "Transcribe Audio" to start transcription</li>
             <li>Wait for the AI to process your audio (may take a few moments)</li>
             <li>Copy the transcribed text from the results</li>
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
         if (!isValidDuration && audioDuration !== null) {
             e.preventDefault();
-            alert('Please ensure your audio file is 30 minutes or less before submitting.');
+                alert('Please ensure your audio file is 30 minutes (1800 seconds) or less before submitting.');
             return false;
         }
         
