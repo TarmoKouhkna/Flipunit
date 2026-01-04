@@ -34,7 +34,7 @@
         <div class="form-group">
             <label class="form-label">Select Audio File</label>
             <div class="file-upload-area" id="uploadArea">
-                <input type="file" name="audio_file" id="audio_file" accept="audio/mp3,audio/wav,audio/m4a,audio/ogg" required>
+                <input type="file" name="audio_file" id="audio_file" accept="audio/*,.mp3,.wav,.m4a,.ogg" required>
                 <div id="uploadContent">
                     <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop</p>
                     <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">Supports: MP3, WAV, M4A, OGG (max 30 minutes)</p>
@@ -76,7 +76,7 @@
             <li>Copy the transcribed text from the results</li>
         </ol>
         <p style="margin-top: 1rem; color: var(--text-secondary);">
-            <strong>Note:</strong> If your audio file is longer than 30 minutes, use our <a href="{% url 'media_converter:audio_splitter' %}" style="color: var(--primary-color);">Audio Splitter tool</a> to split it into smaller segments first.
+            <strong>Note:</strong> If your audio file is longer than 30 minutes, use our <a href="{% url 'media_converter:audio_splitter' %}" style="color: var(--primary-color);">Audio Splitter tool</a> to split it into smaller segments first. If you have an audio file in a different format, use our <a href="{% url 'media_converter:audio_converter' %}" style="color: var(--primary-color);">Audio Converter tool</a> to convert it to MP3, WAV, M4A, or OGG format.
         </p>
     </div>
 </div>
@@ -106,16 +106,20 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadContent.querySelector('p').textContent = 'Selected: ' + file.name;
             
             // Validate file type
-            const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/ogg', 'audio/x-m4a'];
+            const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/x-m4a', 'audio/mp4', 'audio/mp4a-latm', 'audio/ogg', 'audio/vorbis'];
             const fileExt = '.' + file.name.split('.').pop().toLowerCase();
             const allowedExts = ['.mp3', '.wav', '.m4a', '.ogg'];
             
-            if (!allowedExts.includes(fileExt) && !allowedTypes.includes(file.type)) {
-                durationError.style.display = 'block';
-                durationError.innerHTML = 'Invalid file type. Please upload MP3, WAV, M4A, or OGG files.';
-                isValidDuration = false;
-                submitBtn.disabled = true;
-                return;
+            // Check by extension first (more reliable than MIME type)
+            if (!allowedExts.includes(fileExt)) {
+                // If extension doesn't match, check MIME type as fallback
+                if (!allowedTypes.includes(file.type)) {
+                    durationError.style.display = 'block';
+                    durationError.innerHTML = 'Invalid file type. Please upload MP3, WAV, M4A, or OGG files.';
+                    isValidDuration = false;
+                    submitBtn.disabled = true;
+                    return;
+                }
             }
             
             // Check audio duration
@@ -128,32 +132,58 @@ document.addEventListener('DOMContentLoaded', function() {
             const audio = new Audio();
             const url = URL.createObjectURL(file);
             
+            // Set timeout for duration check (some formats may take longer)
+            const durationTimeout = setTimeout(function() {
+                URL.revokeObjectURL(url);
+                // If we can't determine duration client-side, allow upload (server will validate)
+                durationInfo.textContent = 'File selected. Duration will be validated on server.';
+                isValidDuration = true;
+                submitBtn.disabled = false;
+            }, 5000); // 5 second timeout
+            
             audio.addEventListener('loadedmetadata', function() {
+                clearTimeout(durationTimeout);
                 audioDuration = audio.duration;
                 URL.revokeObjectURL(url);
                 
-                const minutes = Math.floor(audioDuration / 60);
-                const seconds = Math.floor(audioDuration % 60);
-                durationInfo.textContent = `Duration: ${minutes}:${seconds.toString().padStart(2, '0')} (${(audioDuration / 60).toFixed(1)} minutes)`;
-                
-                if (audioDuration > MAX_DURATION) {
-                    durationError.style.display = 'block';
-                    durationError.innerHTML = `Audio duration (${(audioDuration / 60).toFixed(1)} minutes) exceeds the 30-minute limit. ` +
-                        `Please use the <a href="{% url 'media_converter:audio_splitter' %}" style="color: var(--primary-color); text-decoration: underline;">Audio Splitter tool</a> to shorten your file first.`;
-                    isValidDuration = false;
-                    submitBtn.disabled = true;
+                if (audioDuration && !isNaN(audioDuration)) {
+                    const minutes = Math.floor(audioDuration / 60);
+                    const seconds = Math.floor(audioDuration % 60);
+                    durationInfo.textContent = `Duration: ${minutes}:${seconds.toString().padStart(2, '0')} (${(audioDuration / 60).toFixed(1)} minutes)`;
+                    
+                    if (audioDuration > MAX_DURATION) {
+                        durationError.style.display = 'block';
+                        durationError.innerHTML = `Audio duration (${(audioDuration / 60).toFixed(1)} minutes) exceeds the 30-minute limit. ` +
+                            `Please use the <a href="{% url 'media_converter:audio_splitter' %}" style="color: var(--primary-color); text-decoration: underline;">Audio Splitter tool</a> to shorten your file first.`;
+                        isValidDuration = false;
+                        submitBtn.disabled = true;
+                    } else {
+                        durationError.style.display = 'none';
+                        isValidDuration = true;
+                        submitBtn.disabled = false;
+                    }
                 } else {
-                    durationError.style.display = 'none';
+                    // Duration couldn't be determined, allow upload (server will validate)
+                    durationInfo.textContent = 'File selected. Duration will be validated on server.';
                     isValidDuration = true;
                     submitBtn.disabled = false;
                 }
             });
             
             audio.addEventListener('error', function() {
+                clearTimeout(durationTimeout);
                 URL.revokeObjectURL(url);
-                durationInfo.textContent = 'Could not read audio file. Please ensure it is a valid audio file.';
-                isValidDuration = false;
-                submitBtn.disabled = true;
+                // Some audio formats (like M4A) may not be readable by HTML5 Audio API
+                // Allow upload and let server validate
+                if (allowedExts.includes(fileExt)) {
+                    durationInfo.textContent = 'File selected. Duration will be validated on server.';
+                    isValidDuration = true;
+                    submitBtn.disabled = false;
+                } else {
+                    durationInfo.textContent = 'Could not read audio file. Please ensure it is a valid audio file.';
+                    isValidDuration = false;
+                    submitBtn.disabled = true;
+                }
             });
             
             audio.src = url;
