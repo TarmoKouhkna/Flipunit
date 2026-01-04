@@ -41,7 +41,7 @@ RUN echo '#!/bin/bash\n\
 set -e\n\
 python manage.py migrate\n\
 python manage.py collectstatic --noinput\n\
-exec gunicorn flipunit.wsgi:application --bind 0.0.0.0:8000 --workers 3\n\
+exec gunicorn flipunit.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 600\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Use entrypoint script
