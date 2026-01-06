@@ -31,6 +31,12 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
+try:
+    from docx import Document
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
 
 def index(request):
     """Text converters main page"""
@@ -594,6 +600,7 @@ def audio_transcription(request):
     if request.method != 'POST':
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
+            'docx_available': DOCX_AVAILABLE,
         })
     
     # Check if OpenAI is available
@@ -601,6 +608,7 @@ def audio_transcription(request):
         messages.error(request, 'OpenAI library is not installed. Please install with: pip install openai')
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
+            'docx_available': DOCX_AVAILABLE,
         })
     
     # Check for API key
@@ -610,6 +618,7 @@ def audio_transcription(request):
         messages.error(request, 'OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file.')
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
+            'docx_available': DOCX_AVAILABLE,
         })
     
     # Check for uploaded file
@@ -617,6 +626,7 @@ def audio_transcription(request):
         messages.error(request, 'Please upload an audio file.')
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
+            'docx_available': DOCX_AVAILABLE,
         })
     
     uploaded_file = request.FILES['audio_file']
@@ -627,6 +637,7 @@ def audio_transcription(request):
         messages.error(request, f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.')
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
+            'docx_available': DOCX_AVAILABLE,
         })
     
     # Validate file type
@@ -637,6 +648,7 @@ def audio_transcription(request):
         messages.error(request, 'Invalid file type. Please upload MP3, WAV, M4A, or OGG files.')
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
+            'docx_available': DOCX_AVAILABLE,
         })
     
     # Check ffprobe for duration validation
@@ -666,6 +678,7 @@ def audio_transcription(request):
                     messages.error(request, f'Audio duration ({duration / 60:.1f} minutes) exceeds the 30-minute limit. Please use the audio splitter tool to shorten your file.')
                     return render(request, 'text_converter/audio_transcription.html', {
                         'openai_available': OPENAI_AVAILABLE,
+                        'docx_available': DOCX_AVAILABLE,
                         'duration_exceeded': True,
                     })
         
@@ -676,6 +689,7 @@ def audio_transcription(request):
             messages.error(request, 'Failed to transcribe audio. Please check your API key and try again.')
             return render(request, 'text_converter/audio_transcription.html', {
                 'openai_available': OPENAI_AVAILABLE,
+                'docx_available': DOCX_AVAILABLE,
             })
         
         # Return results
@@ -683,12 +697,14 @@ def audio_transcription(request):
             'openai_available': OPENAI_AVAILABLE,
             'transcription': transcription_text,
             'detected_language': detected_language,
+            'docx_available': DOCX_AVAILABLE,
         })
         
     except Exception as e:
         messages.error(request, f'Error processing file: {str(e)}')
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
+            'docx_available': DOCX_AVAILABLE,
         })
     finally:
         # Clean up temporary files
@@ -697,4 +713,65 @@ def audio_transcription(request):
                 shutil.rmtree(temp_dir)
             except (OSError, PermissionError):
                 pass
+
+
+def download_transcription_docx(request):
+    """Download transcription as .docx file"""
+    if request.method != 'POST':
+        return HttpResponse('Method not allowed', status=405)
+    
+    if not DOCX_AVAILABLE:
+        return HttpResponse('python-docx library is not installed', status=503)
+    
+    transcription_text = request.POST.get('transcription', '').strip()
+    
+    if not transcription_text:
+        return HttpResponse('No transcription text provided', status=400)
+    
+    try:
+        import io
+        from datetime import datetime
+        
+        # Create a new Document
+        doc = Document()
+        
+        # Add title
+        doc.add_heading('Audio Transcription', 0)
+        
+        # Add transcription text
+        # Split by paragraphs (double newlines) for better formatting
+        # If no double newlines, split by single newlines
+        if '\n\n' in transcription_text:
+            paragraphs = transcription_text.split('\n\n')
+        else:
+            # Split by single newlines if no double newlines found
+            paragraphs = transcription_text.split('\n')
+        
+        for para in paragraphs:
+            if para.strip():
+                doc.add_paragraph(para.strip())
+        
+        # Save to BytesIO buffer
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        filename = f'transcription-{timestamp}.docx'
+        
+        # Create HTTP response
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error creating DOCX: {str(e)}')
+        return HttpResponse(f'Error creating document: {str(e)}', status=500)
 

@@ -59,9 +59,16 @@
         <div style="background: var(--surface); padding: 1.5rem; border-radius: 6px; margin-top: 1rem;">
             <textarea class="form-control" rows="15" readonly style="font-family: monospace; white-space: pre-wrap;">{{ transcription }}</textarea>
         </div>
-        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
             <button onclick="copyTranscription()" class="btn btn-secondary">Copy to Clipboard</button>
-            <button onclick="downloadTranscription()" class="btn btn-primary">Download as .txt</button>
+            <button onclick="downloadTranscription()" class="btn btn-secondary">Download as .txt</button>
+            {% if docx_available %}
+            <form method="post" action="{% url 'text_converter:download_transcription_docx' %}" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="transcription" value="{{ transcription }}">
+                <button type="submit" class="btn btn-primary">Download as .docx</button>
+            </form>
+            {% endif %}
         </div>
     </div>
     {% endif %}

@@ -16,5 +16,6 @@ urlpatterns = [
     path('text-base64/', views.text_base64, name='text_base64'),
     path('word-counter/', views.word_counter, name='word_counter'),
     path('audio-transcription/', views.audio_transcription, name='audio_transcription'),
+    path('audio-transcription/download-docx/', views.download_transcription_docx, name='download_transcription_docx'),
 ]
 
