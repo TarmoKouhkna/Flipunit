@@ -242,6 +242,7 @@ def _get_all_tools():
         {'name': 'HTML ↔ Markdown', 'url': 'text_converter:html_markdown', 'category': 'Text Converters', 'description': 'Convert between HTML and Markdown', 'keywords': 'HTML Markdown MD'},
         {'name': 'Text ↔ Base64', 'url': 'text_converter:text_base64', 'category': 'Text Converters', 'description': 'Encode/decode Base64', 'keywords': 'Base64 encode decode'},
         {'name': 'Word Counter', 'url': 'text_converter:word_counter', 'category': 'Text Converters', 'description': 'Count words, characters, lines, and more', 'keywords': 'word count character'},
+        {'name': 'Audio Transcription', 'url': 'text_converter:audio_transcription', 'category': 'Text Converters', 'description': 'Transcribe audio files to text using AI', 'keywords': 'audio transcription transcribe speech to text MP3 WAV M4A OGG Whisper AI'},
         {'name': 'Text-to-Speech', 'url': 'utilities:text_to_speech', 'category': 'Text Converters', 'description': 'Convert text to speech audio', 'keywords': 'text speech audio TTS'},
     ])
     

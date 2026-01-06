@@ -127,6 +127,7 @@ class StaticViewSitemap(Sitemap):
             'text_converter:html_markdown',
             'text_converter:text_base64',
             'text_converter:word_counter',
+            'text_converter:audio_transcription',
             
             # Developer converters
             'developer_converter:minify',
