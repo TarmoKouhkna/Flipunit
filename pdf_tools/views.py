@@ -388,45 +388,81 @@ def universal_converter(request):
         messages.error(request, f'File size exceeds 50MB limit. Your file is {input_file.size / (1024 * 1024):.1f}MB.')
         return render(request, 'pdf_tools/universal.html', _get_universal_context())
     
-    # PDF to Images
+    # PDF to Images - Use async processing (same as dedicated PDF to Images page)
     if output_format in ['png', 'jpg', 'jpeg']:
         if not PDF2IMAGE_AVAILABLE:
-            messages.error(request, 'PDF to images conversion requires pdf2image and poppler. Install with: brew install poppler (macOS) or apt-get install poppler-utils (Linux)')
+            error_msg = 'PDF to images conversion requires pdf2image and poppler. Install with: brew install poppler (macOS) or apt-get install poppler-utils (Linux)'
+            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+            if is_ajax:
+                return JsonResponse({'error': error_msg}, status=400)
+            messages.error(request, error_msg)
             return render(request, 'pdf_tools/universal.html', _get_universal_context())
         
         if not input_file.name.lower().endswith('.pdf'):
-            messages.error(request, 'Please upload a valid PDF file.')
+            error_msg = 'Please upload a valid PDF file.'
+            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+            if is_ajax:
+                return JsonResponse({'error': error_msg}, status=400)
+            messages.error(request, error_msg)
             return render(request, 'pdf_tools/universal.html', _get_universal_context())
         
+        # Check if this is an AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        logger = logging.getLogger(__name__)
+        
         try:
-            pdf_data = input_file.read()
-            images = convert_from_bytes(pdf_data, dpi=200)
+            # Save file to shared media directory (accessible by both web and worker containers)
+            media_dir = os.path.join(settings.MEDIA_ROOT, 'pdf_conversions')
+            os.makedirs(media_dir, exist_ok=True)
             
-            if not images:
-                messages.error(request, 'No images could be extracted from the PDF.')
-                return render(request, 'pdf_tools/universal.html', _get_universal_context())
+            # Create unique filename
+            unique_id = uuid.uuid4().hex[:8]
+            temp_filename = f'temp_{unique_id}.pdf'
+            input_path = os.path.join(media_dir, temp_filename)
             
-            image_format = 'JPEG' if output_format in ['jpg', 'jpeg'] else 'PNG'
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for i, image in enumerate(images):
-                    img_buffer = io.BytesIO()
-                    image.save(img_buffer, format=image_format)
-                    img_buffer.seek(0)
-                    ext = 'jpg' if output_format in ['jpg', 'jpeg'] else 'png'
-                    zip_file.writestr(f'page_{i + 1}.{ext}', img_buffer.read())
+            # Save uploaded file
+            with open(input_path, 'wb') as f:
+                for chunk in input_file.chunks():
+                    f.write(chunk)
             
-            zip_buffer.seek(0)
-            response = HttpResponse(zip_buffer.read(), content_type='application/zip')
-            response['Content-Disposition'] = 'attachment; filename="pdf_images.zip"'
-            return response
+            # Get user IP for quota tracking
+            user_ip = request.META.get('REMOTE_ADDR')
+            if not user_ip:
+                user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+            
+            # Import here to avoid circular imports
+            from .models import PDFJob
+            from .tasks import pdf_to_images_task
+            
+            # Create PDFJob
+            job = PDFJob.objects.create(
+                operation='pdf_to_images',
+                file_key=input_path,
+                file_size=input_file.size,
+                user_ip=user_ip,
+                status='pending'
+            )
+            
+            # Enqueue conversion task
+            logger.info(f'Enqueuing async PDF to images task for job {job.job_id} (from Universal Converter)')
+            pdf_to_images_task.delay(str(job.job_id), input_path)
+            
+            logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+            if is_ajax:
+                return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+            else:
+                return render(request, 'pdf_tools/universal.html', {
+                    'job_id': str(job.job_id),
+                    'status': 'pending',
+                    **(_get_universal_context())
+                })
             
         except Exception as e:
-            error_msg = str(e)
-            if 'poppler' in error_msg.lower() or 'pdftoppm' in error_msg.lower():
-                messages.error(request, 'Poppler is required for PDF to images conversion. Install with: brew install poppler (macOS)')
-            else:
-                messages.error(request, f'Error converting PDF to images: {error_msg}')
+            logger.error(f'Error initiating PDF to images conversion: {str(e)}', exc_info=True)
+            error_msg = f'Error initiating PDF to images conversion: {str(e)}'
+            if is_ajax:
+                return JsonResponse({'error': error_msg}, status=500)
+            messages.error(request, error_msg)
             return render(request, 'pdf_tools/universal.html', _get_universal_context())
     
     # PDF to HTML

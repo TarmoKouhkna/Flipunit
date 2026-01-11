@@ -55,6 +55,24 @@
         <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Convert</button>
     </form>
     
+    <!-- Job Status Area (for async processing - PDF to Images) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div id="jobStatusMessage" style="text-align: center; font-size: 1.1rem; margin-bottom: 1rem;">
+            <div class="spinner"></div> Processing...
+        </div>
+        <div id="jobIdDisplay" style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+        <div id="jobError" style="display: none; color: var(--error-color); text-align: center; margin-top: 1rem;"></div>
+    </div>
+    
+    <!-- Results Area (for completed async jobs - PDF to Images) -->
+    <div id="resultsArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div style="text-align: center;">
+            <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ Conversion Completed!</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">Your PDF has been converted to images. Click below to download the ZIP file.</p>
+            <a id="downloadBtn" href="#" class="btn btn-primary" style="min-width: 220px; font-size: 1rem;">⬇️ Download Images ZIP</a>
+        </div>
+    </div>
+    
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>Supported Conversions:</h3>
         <ul class="list-indent" style="margin-top: 0.5rem;">
@@ -73,6 +91,23 @@
 </div>
 
 <a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+
+<style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 0.5rem;
+    }
+</style>
 
 {% block extra_js %}
 <script>
@@ -197,10 +232,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle form submission
     const originalText = submitBtn.textContent;
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
         // Validate form before submission
         if (!outputFormat.value) {
-            e.preventDefault();
             alert('Please select an output format.');
             return false;
         }
@@ -210,22 +246,206 @@ document.addEventListener('DOMContentLoaded', function() {
             if (outputFormat.value === 'pdf' && htmlContentSection.value.trim()) {
                 // HTML to PDF - allow submission
             } else {
-                e.preventDefault();
                 alert('Please upload a file.');
                 return false;
             }
         }
         
-        submitBtn.textContent = 'Processing...';
-        submitBtn.disabled = true;
+        // Check if this is PDF to Images (async operation)
+        const isPdfToImages = outputFormat.value === 'png' || outputFormat.value === 'jpg' || outputFormat.value === 'jpeg';
         
-        // Reset button after a delay (for file downloads that don't reload the page)
-        // If the page reloads (error case), the button will be reset automatically
-        setTimeout(function() {
-            submitBtn.textContent = originalText;
-            submitBtn.disabled = false;
-        }, 2000); // Reset after 2 seconds - enough time for download to start
+        if (isPdfToImages) {
+            // Use async pattern for PDF to Images
+            submitBtn.textContent = 'Uploading...';
+            submitBtn.disabled = true;
+            
+            // Hide previous results
+            document.getElementById('resultsArea').style.display = 'none';
+            document.getElementById('jobStatusArea').style.display = 'none';
+            
+            const formData = new FormData(form);
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            try {
+                const response = await fetch(form.action || window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrftoken,
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const contentType = response.headers.get('content-type');
+                
+                if (!response.ok) {
+                    let errorMessage = 'Conversion failed';
+                    try {
+                        if (contentType?.includes('application/json')) {
+                            const errorData = await response.json();
+                            errorMessage = errorData.error || errorMessage;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing error response:', e);
+                    }
+                    throw new Error(errorMessage || `Server returned status ${response.status}`);
+                }
+                
+                if (contentType?.includes('application/json')) {
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    if (data.job_id) {
+                        // Async job created - start polling
+                        submitBtn.textContent = 'Processing...';
+                        document.getElementById('jobStatusArea').style.display = 'block';
+                        document.getElementById('resultsArea').style.display = 'none';
+                        document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
+                        document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
+                        document.getElementById('jobError').style.display = 'none';
+                        
+                        startJobPolling(data.job_id);
+                        return;
+                    }
+                }
+                
+                // Fallback: if not async, allow normal form submission
+                form.submit();
+                
+            } catch (err) {
+                console.error('Conversion error:', err);
+                alert(err.message || 'Conversion failed. Please try again.');
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        } else {
+            // Synchronous operations - allow normal form submission
+            submitBtn.textContent = 'Processing...';
+            submitBtn.disabled = true;
+            
+            // Reset button after a delay (for file downloads that don't reload the page)
+            setTimeout(function() {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }, 2000);
+            
+            // Allow normal form submission
+            form.submit();
+        }
     });
+    
+    // Job polling functions for async PDF to Images
+    let pollInterval = null;
+    
+    function startJobPolling(jobId) {
+        clearInterval(pollInterval);
+        
+        console.log('🔄 Starting job polling for jobId:', jobId);
+        pollInterval = setInterval(() => {
+            fetch(`/pdf-tools/job/status/${jobId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    updateJobStatus(data);
+                    
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        console.log('🛑 Polling stopped, job status:', data.status);
+                        
+                        if (data.status === 'completed') {
+                            console.log('✅ Job completed, calling showConversionResult');
+                            showConversionResult(data, jobId);
+                        } else {
+                            console.log('❌ Job failed');
+                            showJobError(data.error_message || 'Conversion failed. Please try again.');
+                            submitBtn.textContent = originalText;
+                            submitBtn.disabled = false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                });
+        }, 2000); // Poll every 2 seconds
+    }
+    
+    function updateJobStatus(data) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobIdDisplay = document.getElementById('jobIdDisplay');
+        const jobError = document.getElementById('jobError');
+        
+        if (!jobStatusMessage || !jobIdDisplay || !jobError) return;
+        
+        jobIdDisplay.textContent = `Job ID: ${data.job_id}`;
+        jobError.style.display = 'none';
+        
+        let statusText = '';
+        let spinner = '<div class="spinner"></div>';
+        
+        switch (data.status) {
+            case 'pending':
+                statusText = `${spinner} Job created. Waiting to process...`;
+                break;
+            case 'processing':
+                statusText = `${spinner} Converting PDF to images...`;
+                break;
+            case 'completed':
+                statusText = '✅ Conversion completed!';
+                break;
+            case 'failed':
+                statusText = '❌ Conversion failed.';
+                jobError.textContent = data.error_message || 'An unknown error occurred.';
+                jobError.style.display = 'block';
+                break;
+            default:
+                statusText = `${spinner} Unknown status: ${data.status}`;
+        }
+        jobStatusMessage.innerHTML = statusText;
+    }
+    
+    function showConversionResult(data, jobId) {
+        console.log('🎯 showConversionResult called with jobId:', jobId);
+        const resultsArea = document.getElementById('resultsArea');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if (!resultsArea || !downloadBtn) {
+            console.error('❌ Results area or download button not found!');
+            return;
+        }
+        
+        console.log('✅ Found results area and download button');
+        
+        downloadBtn.href = `/pdf-tools/job/download/${jobId}/`;
+        console.log('✅ Download link set to:', downloadBtn.href);
+        
+        downloadBtn.onclick = function resetButtonAfterDownload(e) {
+            console.log('🔵🔵🔵 Download button clicked, resetting form button');
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            console.log('✅✅✅ Form button reset');
+            
+            return true;
+        };
+        
+        console.log('✅ Download button onclick handler attached');
+        
+        resultsArea.style.display = 'block';
+        document.getElementById('jobStatusArea').style.display = 'none';
+        console.log('✅ Results area displayed');
+    }
+    
+    function showJobError(message) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobError = document.getElementById('jobError');
+        if (!jobStatusMessage || !jobError) return;
+        jobStatusMessage.innerHTML = '❌ Error occurred.';
+        jobError.textContent = message;
+        jobError.style.display = 'block';
+    }
 });
 </script>
 {% endblock %}
