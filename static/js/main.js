@@ -82,6 +82,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        // Skip elements with data-custom-handler attribute (handled by page-specific code)
+        if (area.hasAttribute('data-custom-handler')) {
+            return; // Skip this upload area - it has custom handling
+        }
+        
         area.addEventListener('click', function(e) {
             // Only trigger file input if click is not directly on the input itself
             if (e.target !== input && !input.contains(e.target)) {
