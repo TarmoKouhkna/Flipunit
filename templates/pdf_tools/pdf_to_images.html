@@ -288,58 +288,72 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
     };
 
-    // File input handling - override main.js handler to prevent double-triggering
-    setTimeout(() => {
-        const fileInput = form.querySelector('#pdf_file');
-        const uploadArea = form.querySelector('.file-upload-area');
+    // File input handling - prevent double dialog from main.js global handler
+    // Use capture phase to intercept BEFORE main.js handler runs
+    const fileInput = form.querySelector('#pdf_file');
+    const uploadArea = form.querySelector('.file-upload-area');
+    
+    if (fileInput && uploadArea) {
+        let isOpeningDialog = false;
+        let dialogOpened = false;
         
-        if (fileInput && uploadArea) {
-            // Remove all existing click listeners from upload area by cloning
-            const newUploadArea = uploadArea.cloneNode(true);
-            uploadArea.parentNode.replaceChild(newUploadArea, uploadArea);
-            
-            // Get updated references after cloning
-            const updatedFileInput = document.getElementById('pdf_file');
-            const updatedUploadArea = form.querySelector('.file-upload-area');
-            
-            // Flag to prevent double-triggering
-            let isOpeningDialog = false;
-            
-            // Add our own click handler that only triggers once
-            updatedUploadArea.addEventListener('click', function(e) {
-                // Only trigger if click is NOT on the input itself and dialog isn't already opening
-                if (e.target !== updatedFileInput && !updatedFileInput.contains(e.target) && !isOpeningDialog) {
+        // Remove all existing click listeners from upload area by cloning
+        const newUploadArea = uploadArea.cloneNode(true);
+        uploadArea.parentNode.replaceChild(newUploadArea, uploadArea);
+        
+        // Re-select elements after cloning
+        const updatedFileInput = document.getElementById('pdf_file');
+        const updatedUploadArea = form.querySelector('.file-upload-area');
+        
+        // CRITICAL: Intercept clicks in CAPTURE phase BEFORE main.js handler runs
+        // This prevents the global handler in main.js from triggering
+        updatedUploadArea.addEventListener('click', function(e) {
+            // Only trigger if click is NOT on the input itself
+            if (e.target !== updatedFileInput && !updatedFileInput.contains(e.target)) {
+                // Prevent the event from reaching main.js handler
+                e.stopImmediatePropagation();
+                e.stopPropagation();
+                e.preventDefault();
+                
+                // Only open dialog if not already opening/opened
+                if (!isOpeningDialog && !dialogOpened) {
                     isOpeningDialog = true;
+                    dialogOpened = true;
+                    
+                    // Open file dialog
                     updatedFileInput.click();
-                    // Reset flag after a short delay
+                    
+                    // Reset flags after dialog interaction completes
                     setTimeout(() => {
                         isOpeningDialog = false;
-                    }, 100);
+                        // Reset dialogOpened after a longer delay to prevent rapid re-triggers
+                        setTimeout(() => {
+                            dialogOpened = false;
+                        }, 1000);
+                    }, 300);
                 }
-            }, { capture: false });
-            
-            // Stop propagation on file input click to prevent bubbling to upload area
-            updatedFileInput.addEventListener('click', function(e) {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                isOpeningDialog = true;
-                setTimeout(() => {
-                    isOpeningDialog = false;
-                }, 100);
-            }, { capture: true });
-            
-            // Handle file selection
-            updatedFileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    const p = updatedUploadArea.querySelector('p');
-                    if (p) {
-                        p.textContent = 'Selected: ' + e.target.files[0].name;
-                    }
+            }
+        }, { capture: true }); // CAPTURE phase - runs BEFORE main.js
+        
+        // Stop propagation on file input click to prevent bubbling
+        updatedFileInput.addEventListener('click', function(e) {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }, { capture: true });
+        
+        // Handle file selection
+        updatedFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const p = updatedUploadArea.querySelector('p');
+                if (p) {
+                    p.textContent = 'Selected: ' + e.target.files[0].name;
                 }
+                // Reset dialog flag when file is actually selected
+                dialogOpened = false;
                 isOpeningDialog = false;
-            }, { once: false });
-        }
-    }, 100); // Wait for main.js to finish attaching its handlers
+            }
+        }, { once: false });
+    }
     
     // Async job polling functions
     let pollInterval = null;
