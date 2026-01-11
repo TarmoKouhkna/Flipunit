@@ -18,6 +18,7 @@ class MediaJob(models.Model):
         ('audio_merge', 'Audio Merge'),
         ('video_to_gif', 'Video to GIF'),
         ('video_compressor', 'Video Compressor'),
+        ('mp4_to_mp3', 'MP4 to MP3'),
     ]
     
     job_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

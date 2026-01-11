@@ -25,7 +25,7 @@
         {% csrf_token %}
         <div class="form-group">
             <label class="form-label">Select Video File</label>
-            <div class="file-upload-area">
+            <div class="file-upload-area" data-custom-handler="true">
                 <input type="file" name="video_file" id="video_file" accept="video/*" required>
                 <div style="text-align: center; padding: 2rem;">
                     <p style="font-size: 1.1rem; margin-bottom: 1rem;">Click to select or drag and drop</p>
@@ -34,8 +34,43 @@
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block">Extract Audio & Download</button>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Extract Audio & Download</button>
     </form>
+    
+    <!-- Job Status Area (for async processing) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div id="jobStatusMessage" style="text-align: center; font-size: 1.1rem; margin-bottom: 1rem;">
+            <div class="spinner"></div> Processing...
+        </div>
+        <div id="jobIdDisplay" style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+        <div id="jobError" style="display: none; color: var(--error-color); text-align: center; margin-top: 1rem;"></div>
+    </div>
+    
+    <!-- Results Area (for completed jobs) -->
+    <div id="resultsArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div style="text-align: center;">
+            <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ Extraction Completed!</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">Your audio has been extracted successfully. Click below to download.</p>
+            <a id="downloadBtn" href="#" class="btn btn-primary" style="min-width: 220px; font-size: 1rem;">⬇️ Download MP3 File</a>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+    </style>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
@@ -58,16 +93,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('.converter-tool');
     const fileInput = document.getElementById('video_file');
     const uploadArea = document.querySelector('.file-upload-area');
-    const submitBtn = form.querySelector('button[type="submit"]');
+    const submitBtn = document.getElementById('submit-btn');
     
     // Update UI when file is selected
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
             const fileName = e.target.files[0].name;
-            uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
+            const p = uploadArea.querySelector('p');
+            if (p) {
+                p.textContent = 'Selected: ' + fileName;
+            }
         }
     });
     
+    // Prevent default file input click behavior (handled by main.js or custom handler)
     fileInput.addEventListener('click', function(e) {
         e.stopPropagation();
     });
@@ -75,10 +114,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission with fetch to keep page responsive
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         
         if (!fileInput.files.length) {
             alert('Please select a video file.');
-            return;
+            return false;
         }
         
         // Disable button during processing
@@ -91,6 +132,10 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData,
             credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
         })
         .then(response => {
             if (!response.ok) {
@@ -99,8 +144,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
             
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('audio/')) {
+            const contentType = response.headers.get('content-type') || '';
+            
+            // Check if response is JSON (async job)
+            if (contentType.includes('application/json')) {
+                return response.json().then(data => {
+                    if (data.job_id) {
+                        // Async job created - start polling
+                        console.log('✅ Async job created:', data.job_id);
+                        
+                        // Show job status area
+                        document.getElementById('jobStatusArea').style.display = 'block';
+                        document.getElementById('resultsArea').style.display = 'none';
+                        document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
+                        document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
+                        document.getElementById('jobError').style.display = 'none';
+                        
+                        // Start polling
+                        startJobPolling(data.job_id);
+                        return null; // Exit early - polling will handle completion
+                    } else if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    throw new Error('Unexpected response format');
+                });
+            }
+            
+            // Legacy synchronous response (should not happen with async view)
+            if (contentType.includes('audio/')) {
                 return response.blob().then(blob => {
                     const filename = response.headers.get('x-filename') || 'converted.mp3';
                     return { blob, filename };
@@ -111,8 +182,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 return Promise.reject(new Error('Expected audio file but got HTML response'));
             }
         })
-        .then(({ blob, filename }) => {
-            // Create download link
+        .then((result) => {
+            // Skip if async job (result is null)
+            if (result === null) {
+                return; // Polling will handle completion
+            }
+            
+            const { blob, filename } = result;
+            // Legacy synchronous download (should not happen)
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -121,25 +198,154 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.appendChild(a);
             a.click();
             
-            // Clean up
             setTimeout(function() {
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
             }, 100);
             
-            // Re-enable button
             submitBtn.disabled = false;
             submitBtn.textContent = 'Extract Audio & Download';
         })
         .catch(error => {
             console.error('Error:', error);
-            // Re-enable button
             submitBtn.disabled = false;
             submitBtn.textContent = 'Extract Audio & Download';
             // Reload to show error message
             window.location.reload();
         });
+        
+        return false;
     });
+    
+    // Async job polling functions
+    let pollInterval = null;
+    
+    function startJobPolling(jobId) {
+        clearInterval(pollInterval);
+        
+        console.log('🔄 Starting job polling for jobId:', jobId);
+        pollInterval = setInterval(() => {
+            fetch(`/media-converter/job/status/${jobId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    updateJobStatus(data);
+
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        console.log('🛑 Polling stopped, job status:', data.status);
+                        
+                        if (data.status === 'completed') {
+                            console.log('✅ Job completed, calling showConversionResult');
+                            showConversionResult(data, jobId);
+                        } else {
+                            console.log('❌ Job failed');
+                            showJobError(data.error_message || 'Extraction failed. Please try again.');
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Extract Audio & Download';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                    // Continue polling on error (might be temporary network issue)
+                });
+        }, 2000); // Poll every 2 seconds
+    }
+    
+    function updateJobStatus(data) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobIdDisplay = document.getElementById('jobIdDisplay');
+        const jobError = document.getElementById('jobError');
+        
+        if (!jobStatusMessage || !jobIdDisplay || !jobError) return;
+        
+        jobIdDisplay.textContent = `Job ID: ${data.job_id}`;
+        jobError.style.display = 'none';
+        
+        let statusText = '';
+        let spinner = '<div class="spinner"></div>';
+        
+        switch (data.status) {
+            case 'pending':
+                statusText = `${spinner} Job created. Waiting to process...`;
+                break;
+            case 'processing':
+                statusText = `${spinner} Extracting audio from video...`;
+                break;
+            case 'completed':
+                statusText = '✅ Extraction completed!';
+                break;
+            case 'failed':
+                statusText = '❌ Extraction failed.';
+                jobError.textContent = data.error_message || 'An unknown error occurred.';
+                jobError.style.display = 'block';
+                break;
+            default:
+                statusText = `${spinner} Unknown status: ${data.status}`;
+        }
+        jobStatusMessage.innerHTML = statusText;
+    }
+    
+    function showConversionResult(data, jobId) {
+        console.log('🎯 showConversionResult called with jobId:', jobId);
+        const resultsArea = document.getElementById('resultsArea');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if (!resultsArea || !downloadBtn) {
+            console.error('❌ Results area or download button not found!', { resultsArea, downloadBtn });
+            return;
+        }
+        
+        console.log('✅ Found results area and download button');
+        
+        // Update download link
+        downloadBtn.href = `/media-converter/job/download/${jobId}/`;
+        console.log('✅ Download link set to:', downloadBtn.href);
+        
+        // Use onclick to reset button after download (prevent duplicate downloads)
+        let downloadTriggered = false;
+        downloadBtn.onclick = function resetButtonAfterDownload(e) {
+            e.preventDefault();
+            
+            if (downloadTriggered) {
+                console.log('⚠️ Download already triggered, preventing duplicate');
+                return false;
+            }
+            
+            downloadTriggered = true;
+            console.log('🔵 Download button clicked, resetting submit button');
+            
+            // Reset the submit button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Extract Audio & Download';
+            
+            console.log('✅ Submit button reset');
+            
+            // Trigger download
+            window.location.href = downloadBtn.href;
+            
+            return false;
+        };
+        
+        console.log('✅ Download button onclick handler attached');
+        
+        // Show results area
+        resultsArea.style.display = 'block';
+        document.getElementById('jobStatusArea').style.display = 'none';
+        
+        // Scroll to results
+        resultsArea.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function showJobError(errorMessage) {
+        const jobStatusArea = document.getElementById('jobStatusArea');
+        const jobError = document.getElementById('jobError');
+        
+        if (jobStatusArea && jobError) {
+            jobError.textContent = errorMessage;
+            jobError.style.display = 'block';
+        }
+    }
 });
 </script>
 {% endblock %}

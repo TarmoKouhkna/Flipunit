@@ -13,7 +13,7 @@ import zipfile
 import io
 import uuid
 from .models import MediaJob
-from .tasks import audio_converter_task, video_converter_task, video_merge_task, audio_merge_task
+from .tasks import audio_converter_task, video_converter_task, video_merge_task, audio_merge_task, mp4_to_mp3_task
 
 def index(request):
     """Media converters index page"""
@@ -93,11 +93,14 @@ def _check_ffmpeg():
     return ffmpeg_path, ffprobe_path, None
 
 def mp4_to_mp3(request):
-    """Extract audio from MP4 video files"""
+    """Extract audio from MP4 video files (async)"""
     if request.method != 'POST':
         return render(request, 'media_converter/mp4_to_mp3.html')
     
     if 'video_file' not in request.FILES:
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': 'Please upload a video file.'}, status=400)
         return render(request, 'media_converter/mp4_to_mp3.html', {
             'error': 'Please upload a video file.'
         })
@@ -106,95 +109,84 @@ def mp4_to_mp3(request):
     
     # Validate file size (max 700MB for videos)
     max_size = 700 * 1024 * 1024  # 700MB
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     if uploaded_file.size > max_size:
-        return render(request, 'media_converter/mp4_to_mp3.html', {
-            'error': f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
-        })
+        error_msg = f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        return render(request, 'media_converter/mp4_to_mp3.html', {'error': error_msg})
     
     # Validate file type
     allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.3gp']
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
     
     if file_ext not in allowed_extensions:
-        return render(request, 'media_converter/mp4_to_mp3.html', {
-            'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
-        })
+        error_msg = 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        return render(request, 'media_converter/mp4_to_mp3.html', {'error': error_msg})
     
     # Check FFmpeg
     ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
     if error:
+        if is_ajax:
+            return JsonResponse({'error': error}, status=400)
         return render(request, 'media_converter/mp4_to_mp3.html', {'error': error})
     
-    temp_dir = None
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
-        input_path = os.path.join(temp_dir, f'input{file_ext}')
-        output_path = os.path.join(temp_dir, 'output.mp3')
+        # Save file to shared media directory (accessible by both web and worker containers)
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'video_conversions')
+        os.makedirs(media_dir, exist_ok=True)
+        
+        # Create unique filename
+        unique_id = uuid.uuid4().hex[:8]
+        temp_filename = f'temp_{unique_id}{file_ext}'
+        input_path = os.path.join(media_dir, temp_filename)
         
         # Save uploaded file
         with open(input_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         
-        # Extract audio using FFmpeg
-        cmd = [
-            ffmpeg_path,
-            '-i', input_path,
-            '-vn',  # No video
-            '-acodec', 'libmp3lame',
-            '-ab', '192k',  # Audio bitrate
-            '-ar', '44100',  # Sample rate
-            '-y',  # Overwrite output file
-            output_path
-        ]
+        # Get user IP for quota tracking
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # Create MediaJob
+        job = MediaJob.objects.create(
+            operation='mp4_to_mp3',
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        if not os.path.exists(output_path):
-            # Clean up before returning error
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
+        # Enqueue extraction task
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'Enqueuing async MP4 to MP3 extraction task for job {job.job_id}')
+        mp4_to_mp3_task.delay(str(job.job_id), input_path, uploaded_file.name)
+        
+        logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+        else:
             return render(request, 'media_converter/mp4_to_mp3.html', {
-                'error': f'Conversion failed: {result.stderr}'
+                'job_id': str(job.job_id),
+                'status': 'pending',
             })
         
-        # Read output file
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Create response
-        # Note: We don't set Content-Disposition here to prevent browser auto-download
-        # JavaScript will handle the download programmatically to keep page responsive
-        safe_filename = os.path.splitext(uploaded_file.name)[0] + '.mp3'
-        safe_filename = re.sub(r'[^\w\s-]', '', safe_filename).strip()
-        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
-        
-        response = HttpResponse(file_content, content_type='audio/mpeg')
-        response['Content-Length'] = len(file_content)
-        response['X-Filename'] = safe_filename
-        return response
-        
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError) as cleanup_error:
-                # Log cleanup errors but don't fail the request
-                print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
-                pass
-        return render(request, 'media_converter/mp4_to_mp3.html', {
-            'error': f'Error processing file: {str(e)}'
-        })
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error initiating MP4 to MP3 extraction: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating MP4 to MP3 extraction: {str(e)}'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
+        return render(request, 'media_converter/mp4_to_mp3.html', {'error': error_msg})
 
 def _convert_single_audio(uploaded_file, output_format, ffmpeg_path, logger):
     """Helper function to convert a single audio file. Returns (file_content, output_ext, safe_filename) or raises exception."""

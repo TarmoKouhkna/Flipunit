@@ -647,6 +647,89 @@ def video_to_gif_task(self, job_id, file_path):
 
 @shared_task(
     bind=True,
+    soft_time_limit=600,  # 10 minutes
+    time_limit=660,  # 11 minutes
+    max_retries=0,
+    queue='media_processing'
+)
+def mp4_to_mp3_task(self, job_id, file_path, original_filename):
+    """Extract audio from video file (MP4 to MP3)"""
+    import re
+    from django.conf import settings
+    
+    job = MediaJob.objects.get(job_id=job_id)
+    
+    try:
+        job.status = 'processing'
+        job.save()
+        
+        ffmpeg_path, _, error = _check_ffmpeg()
+        if error:
+            raise Exception(error)
+        
+        # Use same directory as input file (shared media directory)
+        output_path = os.path.join(os.path.dirname(file_path), f'output_{job_id}.mp3')
+        
+        # Extract audio using FFmpeg
+        cmd = [
+            ffmpeg_path,
+            '-i', file_path,
+            '-vn',  # No video
+            '-acodec', 'libmp3lame',
+            '-ab', '192k',  # Audio bitrate
+            '-ar', '44100',  # Sample rate
+            '-y',  # Overwrite output file
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        
+        if result.returncode != 0:
+            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
+            error_lines = error_msg.split('\n')
+            relevant_error = '\n'.join([line for line in error_lines if line.strip() and not line.startswith('frame=')][-5:])
+            if not relevant_error.strip():
+                relevant_error = error_msg[:500]
+            raise Exception(f'Extraction failed: {relevant_error[:500]}')
+        
+        if not os.path.exists(output_path):
+            raise Exception('Output file was not created')
+        
+        # Generate safe filename
+        base_name = os.path.splitext(original_filename)[0]
+        base_name = re.sub(r'[^\w\s.-]', '', base_name).strip()
+        base_name = re.sub(r'[-\s]+', '-', base_name)
+        safe_filename = f'{base_name}.mp3'
+        
+        job.status = 'completed'
+        job.output_file_key = output_path
+        job.output_format = 'mp3'
+        job.completed_at = timezone.now()
+        job.save()
+        
+        logger.info(f"MP4 to MP3 extraction completed for job {job_id}")
+        return output_path
+        
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"MP4 to MP3 extraction failed for job {job_id}: {error_msg}")
+        job.status = 'failed'
+        job.error_message = error_msg
+        job.completed_at = timezone.now()
+        job.save()
+        raise
+    finally:
+        # Clean up input file after processing
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"Cleaned up input file: {file_path}")
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to clean up file {file_path}: {cleanup_error}")
+
+
+@shared_task(
+    bind=True,
     soft_time_limit=1200,  # 20 minutes
     time_limit=1260,  # 21 minutes
     max_retries=0,
