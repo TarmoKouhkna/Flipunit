@@ -3,9 +3,11 @@ Celery tasks for PDF tools operations
 """
 import os
 import tempfile
+import shutil
 import logging
 from celery import shared_task
 from django.utils import timezone
+from django.conf import settings
 from .models import PDFJob
 
 logger = logging.getLogger(__name__)
