@@ -58,6 +58,41 @@
         </div>
     </form>
     
+    <!-- Job Status Area (for async processing) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div id="jobStatusMessage" style="text-align: center; font-size: 1.1rem; margin-bottom: 1rem;">
+            <div class="spinner"></div> Processing...
+        </div>
+        <div id="jobIdDisplay" style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+        <div id="jobError" style="display: none; color: var(--error-color); text-align: center; margin-top: 1rem;"></div>
+    </div>
+    
+    <!-- Results Area (for completed jobs) -->
+    <div id="resultsArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div style="text-align: center;">
+            <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ Merge Completed!</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">Your videos have been merged successfully. Click below to download.</p>
+            <a id="downloadJobBtn" href="#" class="btn btn-primary" style="min-width: 220px; font-size: 1rem;">⬇️ Download Merged Video</a>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+    </style>
+    
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
         <ol class="list-indent" style="margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.8;">
@@ -599,7 +634,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(window.location.href, {
                 method: 'POST',
                 body: formData,
-                credentials: 'same-origin'
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
             });
             
             if (!response.ok) {
@@ -607,6 +646,45 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const contentType = response.headers.get('content-type') || '';
+            
+            // Check if response is JSON (async job)
+            if (contentType.includes('application/json')) {
+                const data = await response.json();
+                
+                if (data.job_id) {
+                    // Async job created - start polling
+                    console.log('✅ Async job created:', data.job_id);
+                    
+                    // Remove progress indicator
+                    if (progressInterval !== null) {
+                        clearInterval(progressInterval);
+                        progressInterval = null;
+                    }
+                    const progressDiv = document.getElementById('mergeProgress');
+                    if (progressDiv) {
+                        progressDiv.remove();
+                    }
+                    
+                    // Hide preview section and action buttons
+                    previewSection.style.display = 'none';
+                    actionButtons.style.display = 'none';
+                    
+                    // Show job status area
+                    document.getElementById('jobStatusArea').style.display = 'block';
+                    document.getElementById('resultsArea').style.display = 'none';
+                    document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
+                    document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
+                    document.getElementById('jobError').style.display = 'none';
+                    
+                    // Start polling
+                    startJobPolling(data.job_id);
+                    return; // Exit early - polling will handle completion
+                } else if (data.error) {
+                    throw new Error(data.error);
+                }
+            }
+            
+            // Legacy synchronous response (should not happen with async view)
             if (contentType.includes('video/')) {
                 // Update progress to 100%
                 if (progressBar) {
@@ -684,6 +762,140 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Back to edit
+    backToEditBtn.addEventListener('click', function() {
+        previewSection.style.display = 'none';
+        actionButtons.style.display = 'flex';
+        if (previewVideo.src && previewVideo.src.startsWith('blob:')) {
+            URL.revokeObjectURL(previewVideo.src);
+        }
+    });
+    
+    // Async job polling functions
+    let pollInterval = null;
+    
+    function startJobPolling(jobId) {
+        clearInterval(pollInterval);
+        
+        console.log('🔄 Starting job polling for jobId:', jobId);
+        pollInterval = setInterval(() => {
+            fetch(`/media-converter/job/status/${jobId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    updateJobStatus(data);
+
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        console.log('🛑 Polling stopped, job status:', data.status);
+                        
+                        if (data.status === 'completed') {
+                            console.log('✅ Job completed, calling showConversionResult');
+                            showConversionResult(data, jobId);
+                        } else {
+                            console.log('❌ Job failed');
+                            showJobError(data.error_message || 'Merge failed. Please try again.');
+                            mergePreviewBtn.disabled = false;
+                            mergePreviewBtn.textContent = 'Merge & Preview';
+                            mergePreviewBtn.style.opacity = '1';
+                            mergePreviewBtn.style.cursor = 'pointer';
+                            isProcessing = false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                    // Continue polling on error (might be temporary network issue)
+                });
+        }, 2000); // Poll every 2 seconds
+    }
+    
+    function updateJobStatus(data) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobIdDisplay = document.getElementById('jobIdDisplay');
+        const jobError = document.getElementById('jobError');
+        
+        if (!jobStatusMessage || !jobIdDisplay || !jobError) return;
+        
+        jobIdDisplay.textContent = `Job ID: ${data.job_id}`;
+        jobError.style.display = 'none';
+        
+        let statusText = '';
+        let spinner = '<div class="spinner"></div>';
+        
+        switch (data.status) {
+            case 'pending':
+                statusText = `${spinner} Job created. Waiting to process...`;
+                break;
+            case 'processing':
+                statusText = `${spinner} Merging video files...`;
+                break;
+            case 'completed':
+                statusText = '✅ Merge completed!';
+                break;
+            case 'failed':
+                statusText = '❌ Merge failed.';
+                jobError.textContent = data.error_message || 'An unknown error occurred.';
+                jobError.style.display = 'block';
+                break;
+            default:
+                statusText = `${spinner} Unknown status: ${data.status}`;
+        }
+        jobStatusMessage.innerHTML = statusText;
+    }
+    
+    function showConversionResult(data, jobId) {
+        console.log('🎯 showConversionResult called with jobId:', jobId);
+        const resultsArea = document.getElementById('resultsArea');
+        const downloadJobBtn = document.getElementById('downloadJobBtn');
+        
+        if (!resultsArea || !downloadJobBtn) {
+            console.error('❌ Results area or download button not found!', { resultsArea, downloadJobBtn });
+            return;
+        }
+        
+        console.log('✅ Found results area and download button');
+        
+        // Update download link
+        downloadJobBtn.href = `/media-converter/job/download/${jobId}/`;
+        console.log('✅ Download link set to:', downloadJobBtn.href);
+        
+        // Use onclick to reset button after download
+        downloadJobBtn.onclick = function resetButtonAfterDownload(e) {
+            console.log('🔵 Download button clicked, resetting merge button');
+            
+            // Reset the merge button
+            mergePreviewBtn.disabled = false;
+            mergePreviewBtn.textContent = 'Merge & Preview';
+            mergePreviewBtn.style.opacity = '1';
+            mergePreviewBtn.style.cursor = 'pointer';
+            isProcessing = false;
+            
+            console.log('✅ Merge button reset');
+            
+            // Allow default download behavior
+            return true;
+        };
+        
+        console.log('✅ Download button onclick handler attached');
+        
+        // Show results area
+        resultsArea.style.display = 'block';
+        document.getElementById('jobStatusArea').style.display = 'none';
+        
+        // Scroll to results
+        resultsArea.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function showJobError(errorMessage) {
+        const jobStatusArea = document.getElementById('jobStatusArea');
+        const jobError = document.getElementById('jobError');
+        
+        if (jobStatusArea && jobError) {
+            jobError.textContent = errorMessage;
+            jobError.style.display = 'block';
+        }
+    }
+    
+    // Back to edit (duplicate handler removed)
     backToEditBtn.addEventListener('click', function() {
         previewSection.style.display = 'none';
         actionButtons.style.display = 'flex';

@@ -13,7 +13,7 @@ import zipfile
 import io
 import uuid
 from .models import MediaJob
-from .tasks import audio_converter_task, video_converter_task
+from .tasks import audio_converter_task, video_converter_task, video_merge_task, audio_merge_task
 
 def index(request):
     """Media converters index page"""
@@ -1445,11 +1445,14 @@ def audio_splitter(request):
         })
 
 def audio_merge(request):
-    """Merge multiple audio files into one"""
+    """Merge multiple audio files into one (async)"""
     if request.method != 'POST':
         return render(request, 'media_converter/audio_merge.html')
     
     if 'audio_files' not in request.FILES:
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': 'Please upload at least one audio file.'}, status=400)
         return render(request, 'media_converter/audio_merge.html', {
             'error': 'Please upload at least one audio file.'
         })
@@ -1457,6 +1460,9 @@ def audio_merge(request):
     uploaded_files = request.FILES.getlist('audio_files')
     
     if len(uploaded_files) < 2:
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': 'Please upload at least 2 audio files to merge.'}, status=400)
         return render(request, 'media_converter/audio_merge.html', {
             'error': 'Please upload at least 2 audio files to merge.'
         })
@@ -1465,190 +1471,102 @@ def audio_merge(request):
     max_size = 700 * 1024 * 1024
     allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.aiff', '.aif']
     
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     for uploaded_file in uploaded_files:
         if uploaded_file.size > max_size:
-            return render(request, 'media_converter/audio_merge.html', {
-                'error': f'File {uploaded_file.name} exceeds 700MB limit.'
-            })
+            error_msg = f'File {uploaded_file.name} exceeds 700MB limit.'
+            if is_ajax:
+                return JsonResponse({'error': error_msg}, status=400)
+            return render(request, 'media_converter/audio_merge.html', {'error': error_msg})
         
         file_ext = os.path.splitext(uploaded_file.name)[1].lower()
         if file_ext not in allowed_extensions:
-            return render(request, 'media_converter/audio_merge.html', {
-                'error': f'Invalid file type: {uploaded_file.name}'
-            })
+            error_msg = f'Invalid file type: {uploaded_file.name}'
+            if is_ajax:
+                return JsonResponse({'error': error_msg}, status=400)
+            return render(request, 'media_converter/audio_merge.html', {'error': error_msg})
     
     # Check FFmpeg
     ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
     if error:
+        if is_ajax:
+            return JsonResponse({'error': error}, status=400)
         return render(request, 'media_converter/audio_merge.html', {'error': error})
     
-    temp_dir = None
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
+        # Save files to shared media directory (accessible by both web and worker containers)
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'audio_conversions')
+        os.makedirs(media_dir, exist_ok=True)
+        
+        # Create unique directory for this merge job
+        unique_id = uuid.uuid4().hex[:8]
+        job_dir = os.path.join(media_dir, f'merge_{unique_id}')
+        os.makedirs(job_dir, exist_ok=True)
+        
         input_paths = []
-        file_list_path = os.path.join(temp_dir, 'file_list.txt')
         
         # Save all uploaded files
         for i, uploaded_file in enumerate(uploaded_files):
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            input_path = os.path.join(temp_dir, f'input_{i}{file_ext}')
+            input_filename = f'input_{i}{file_ext}'
+            input_path = os.path.join(job_dir, input_filename)
             input_paths.append(input_path)
             
             with open(input_path, 'wb') as f:
                 for chunk in uploaded_file.chunks():
                     f.write(chunk)
         
-        # Create file list for FFmpeg concat
-        with open(file_list_path, 'w') as f:
-            for input_path in input_paths:
-                # Escape single quotes and backslashes for FFmpeg
-                escaped_path = input_path.replace("'", "'\\''").replace("\\", "\\\\")
-                f.write(f"file '{escaped_path}'\n")
-        
         # Determine output format (use first file's format or MP3)
         output_ext = os.path.splitext(uploaded_files[0].name)[1].lower()
         if output_ext not in allowed_extensions:
             output_ext = '.mp3'
         
-        output_path = os.path.join(temp_dir, f'merged{output_ext}')
+        # Calculate total size
+        total_size = sum(f.size for f in uploaded_files)
         
-        # Build FFmpeg command to merge
-        # First, convert all to same format if needed, then concat
-        cmd = [
-            ffmpeg_path,
-            '-f', 'concat',
-            '-safe', '0',
-            '-i', file_list_path,
-            '-c', 'copy',  # Copy streams (fast, no re-encoding if formats match)
-            '-y',
-            output_path
-        ]
+        # Get user IP for quota tracking
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        # Create MediaJob
+        job = MediaJob.objects.create(
+            operation='audio_merge',
+            file_key=job_dir,  # Store directory path
+            file_size=total_size,
+            output_format=output_ext.lstrip('.'),
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        # If concat with copy fails (different formats), re-encode
-        if result.returncode != 0:
-            # Re-encode all to same format
-            codec_map = {
-                '.mp3': 'libmp3lame',
-                '.wav': 'pcm_s16le',
-                '.ogg': 'libvorbis',
-                '.flac': 'flac',
-                '.aac': 'aac',
-                '.m4a': 'aac',
-                '.aiff': 'pcm_s16be',
-                '.aif': 'pcm_s16be',
-            }
-            
-            codec = codec_map.get(output_ext, 'libmp3lame')
-            format_map = {
-                '.mp3': 'mp3',
-                '.wav': 'wav',
-                '.ogg': 'ogg',
-                '.flac': 'flac',
-                '.aac': 'mp4',
-                '.m4a': 'mp4',
-                '.aiff': 'aiff',
-                '.aif': 'aiff',
-            }
-            output_format = format_map.get(output_ext, 'mp3')
-            
-            cmd = [
-                ffmpeg_path,
-                '-f', 'concat',
-                '-safe', '0',
-                '-i', file_list_path,
-                '-c:a', codec,
-                '-ar', '44100',
-                '-ac', '2',
-            ]
-            
-            if output_format == 'mp3':
-                cmd.extend(['-b:a', '192k'])
-            elif output_format == 'wav':
-                cmd.extend(['-sample_fmt', 's16'])
-            elif output_format in ['mp4', 'aac', 'm4a']:
-                cmd.extend(['-b:a', '192k'])
-                cmd.extend(['-movflags', '+faststart'])
-            
-            cmd.extend(['-f', output_format, '-y', output_path])
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        # Enqueue merge task
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'Enqueuing async audio merge task for job {job.job_id}')
+        audio_merge_task.delay(str(job.job_id), input_paths, output_ext)
         
-        if result.returncode != 0 or not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
+        logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+        else:
             return render(request, 'media_converter/audio_merge.html', {
-                'error': f'Merging failed: {full_error}'
+                'job_id': str(job.job_id),
+                'status': 'pending',
             })
         
-        # Read output file
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-        
-        if len(file_content) == 0:
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/audio_merge.html', {
-                'error': 'Merging failed - output file is empty.'
-            })
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Determine content type
-        content_type_map = {
-            '.mp3': 'audio/mpeg',
-            '.wav': 'audio/wav',
-            '.ogg': 'audio/ogg',
-            '.flac': 'audio/flac',
-            '.aac': 'audio/aac',
-            '.m4a': 'audio/mp4',
-            '.aiff': 'audio/x-aiff',
-            '.aif': 'audio/x-aiff',
-        }
-        content_type = content_type_map.get(output_ext, 'audio/mpeg')
-        
-        # Create response
-        safe_filename = 'merged_audio' + output_ext
-        response = HttpResponse(file_content, content_type=content_type)
-        response['Content-Length'] = len(file_content)
-        response['X-Filename'] = safe_filename
-        return response
-        
-    except subprocess.TimeoutExpired:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
-        return render(request, 'media_converter/audio_merge.html', {
-            'error': 'Processing timed out. Please try again.'
-        })
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
-        return render(request, 'media_converter/audio_merge.html', {
-            'error': f'Error processing files: {str(e)}'
-        })
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error initiating audio merge: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating audio merge: {str(e)}'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
+        return render(request, 'media_converter/audio_merge.html', {'error': error_msg})
 
 def video_merge(request):
-    """Merge multiple video files into one with trimming and reordering support"""
+    """Merge multiple video files into one with trimming and reordering support (async)"""
     if request.method != 'POST':
         return render(request, 'media_converter/video_merge.html')
     
@@ -1660,6 +1578,9 @@ def video_merge(request):
         file_count = 0
     
     if file_count < 2:
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': 'Please upload at least 2 video files to merge.'}, status=400)
         return render(request, 'media_converter/video_merge.html', {
             'error': 'Please upload at least 2 video files to merge.'
         })
@@ -1670,11 +1591,12 @@ def video_merge(request):
         if file_key in request.FILES:
             uploaded_files.append(request.FILES[file_key])
         else:
+            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+            if is_ajax:
+                return JsonResponse({'error': f'Missing file at index {i}. Please try uploading again.'}, status=400)
             return render(request, 'media_converter/video_merge.html', {
                 'error': f'Missing file at index {i}. Please try uploading again.'
             })
-    
-    action = request.POST.get('action', 'download')  # 'preview' or 'download'
     
     # Debug: Log received files order
     import logging
@@ -1720,244 +1642,98 @@ def video_merge(request):
     allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.3gp']
     
     total_size = 0
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     for uploaded_file in uploaded_files:
         if uploaded_file.size > max_size:
-            return render(request, 'media_converter/video_merge.html', {
-                'error': f'File {uploaded_file.name} exceeds 1000MB limit.'
-            })
+            error_msg = f'File {uploaded_file.name} exceeds 1000MB limit.'
+            if is_ajax:
+                return JsonResponse({'error': error_msg}, status=400)
+            return render(request, 'media_converter/video_merge.html', {'error': error_msg})
         
         total_size += uploaded_file.size
         file_ext = os.path.splitext(uploaded_file.name)[1].lower()
         if file_ext not in allowed_extensions:
-            return render(request, 'media_converter/video_merge.html', {
-                'error': f'Invalid file type: {uploaded_file.name}. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
-            })
+            error_msg = f'Invalid file type: {uploaded_file.name}. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
+            if is_ajax:
+                return JsonResponse({'error': error_msg}, status=400)
+            return render(request, 'media_converter/video_merge.html', {'error': error_msg})
     
     # Check total size limit
     if total_size > max_total_size:
         total_size_mb = total_size / (1024 * 1024)
-        return render(request, 'media_converter/video_merge.html', {
-            'error': f'Total file size ({total_size_mb:.1f}MB) exceeds 5000MB limit. Please use smaller files or fewer files.'
-        })
+        error_msg = f'Total file size ({total_size_mb:.1f}MB) exceeds 5000MB limit. Please use smaller files or fewer files.'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        return render(request, 'media_converter/video_merge.html', {'error': error_msg})
     
     # Check FFmpeg
     ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
     if error:
+        if is_ajax:
+            return JsonResponse({'error': error}, status=400)
         return render(request, 'media_converter/video_merge.html', {'error': error})
     
-    temp_dir = None
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
+        # Save files to shared media directory (accessible by both web and worker containers)
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'video_conversions')
+        os.makedirs(media_dir, exist_ok=True)
+        
+        # Create unique directory for this merge job
+        unique_id = uuid.uuid4().hex[:8]
+        job_dir = os.path.join(media_dir, f'merge_{unique_id}')
+        os.makedirs(job_dir, exist_ok=True)
+        
         input_paths = []
-        file_list_path = os.path.join(temp_dir, 'file_list.txt')
         
         # Save all uploaded files
         for i, uploaded_file in enumerate(uploaded_files):
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            input_path = os.path.join(temp_dir, f'input_{i}{file_ext}')
+            input_filename = f'input_{i}{file_ext}'
+            input_path = os.path.join(job_dir, input_filename)
             input_paths.append(input_path)
             
             with open(input_path, 'wb') as f:
                 for chunk in uploaded_file.chunks():
                     f.write(chunk)
         
-        # Always use MP4 format for output (most compatible)
-        output_ext = '.mp4'
-        output_path = os.path.join(temp_dir, f'merged{output_ext}')
-        output_format = 'mp4'
+        # Calculate total size in MB for timeout calculation
+        total_size_mb = total_size / (1024 * 1024)
         
-        # Adjust timeout based on total file size
-        total_size_mb = sum(f.size for f in uploaded_files) / (1024 * 1024)
-        timeout_seconds = 600  # 10 minutes default
-        if total_size_mb > 3000:
-            timeout_seconds = 2400  # 40 minutes for very large files (up to 5GB)
-        elif total_size_mb > 2000:
-            timeout_seconds = 1800  # 30 minutes for large files
-        elif total_size_mb > 1000:
-            timeout_seconds = 1200  # 20 minutes for medium-large files
-        elif total_size_mb > 500:
-            timeout_seconds = 900  # 15 minutes for medium files
+        # Get user IP for quota tracking
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        # Use concat filter instead of concat demuxer for better compatibility
-        # The concat filter can handle videos with different properties
-        # Build filter_complex string to normalize and concatenate all videos
-        filter_parts = []
-        input_args = []
+        # Create MediaJob
+        job = MediaJob.objects.create(
+            operation='video_merge',
+            file_key=job_dir,  # Store directory path
+            file_size=total_size,
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        # Add all inputs
-        for input_path in input_paths:
-            input_args.extend(['-i', input_path])
+        # Enqueue merge task
+        logger.info(f'Enqueuing async video merge task for job {job.job_id}')
+        video_merge_task.delay(str(job.job_id), input_paths, trim_params, total_size_mb)
         
-        # Process each video: trim if needed, then normalize
-        for i in range(len(input_paths)):
-            trim = trim_params[i] if i < len(trim_params) else {'start': 0.0, 'end': None}
-            
-            # Apply trimming using trim filter if needed
-            needs_trimming = (trim['start'] > 0) or (trim['end'] is not None)
-            
-            # Debug: Log trimming decision
-            logger.info(f'Video {i} ({input_paths[i]}): needs_trimming={needs_trimming}, start={trim["start"]}, end={trim["end"]}')
-            
-            if needs_trimming:
-                if trim['end'] is not None and trim['end'] > trim['start']:
-                    # Trim with start and end (end is absolute time, not duration)
-                    # Use duration instead of end for more reliable trimming
-                    duration = trim['end'] - trim['start']
-                    logger.info(f'Video {i}: Applying trim start={trim["start"]}, duration={duration}')
-                    filter_parts.append(f'[{i}:v]trim=start={trim["start"]}:duration={duration},setpts=PTS-STARTPTS[v{i}_trim]')
-                    filter_parts.append(f'[{i}:a]atrim=start={trim["start"]}:duration={duration},asetpts=PTS-STARTPTS[a{i}_trim]')
-                elif trim['start'] > 0:
-                    # Trim from start only (remove beginning)
-                    logger.info(f'Video {i}: Applying trim start={trim["start"]} (no end)')
-                    filter_parts.append(f'[{i}:v]trim=start={trim["start"]},setpts=PTS-STARTPTS[v{i}_trim]')
-                    filter_parts.append(f'[{i}:a]atrim=start={trim["start"]},asetpts=PTS-STARTPTS[a{i}_trim]')
-                else:
-                    logger.info(f'Video {i}: Skipping trim (invalid parameters)')
-                
-                # Normalize the trimmed video
-                filter_parts.append(f'[v{i}_trim]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v{i}]')
-                filter_parts.append(f'[a{i}_trim]aformat=sample_rates=44100:channel_layouts=stereo[a{i}]')
-            else:
-                # No trimming, just normalize
-                filter_parts.append(f'[{i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v{i}]')
-                filter_parts.append(f'[{i}:a]aformat=sample_rates=44100:channel_layouts=stereo[a{i}]')
-        
-        # Concatenate all normalized videos
-        # Build concat inputs (no semicolons between inputs in concat filter)
-        concat_video_inputs = ''.join([f'[v{i}]' for i in range(len(input_paths))])
-        concat_audio_inputs = ''.join([f'[a{i}]' for i in range(len(input_paths))])
-        filter_parts.append(f'{concat_video_inputs}concat=n={len(input_paths)}:v=1:a=0[outv]')
-        filter_parts.append(f'{concat_audio_inputs}concat=n={len(input_paths)}:v=0:a=1[outa]')
-        
-        filter_complex = ';'.join(filter_parts)
-        
-        # Always use MP4 format with H.264/AAC codecs
-        cmd = [
-            ffmpeg_path,
-        ] + input_args + [
-            '-filter_complex', filter_complex,
-            '-map', '[outv]',
-            '-map', '[outa]',
-            '-c:v', 'libx264',  # Video codec
-            '-c:a', 'aac',  # Audio codec
-            '-preset', 'fast',  # Balance between speed and quality
-            '-crf', '23',  # Good quality
-            '-threads', '2',  # Limit threads to prevent system overload
-            '-movflags', '+faststart',  # Optimize for web playback
-            '-f', 'mp4',
-            '-y',
-            output_path
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
-        
-        if result.returncode != 0 or not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
-            
-            # Filter out FFmpeg version dumps and extract meaningful errors
-            error_stripped = error_msg.strip()
-            if error_stripped.startswith('ffmpeg version'):
-                # This is a version dump, use friendly message
-                full_error = 'Video merging failed. The video files may be corrupted, in incompatible formats, or have codec conflicts. Try using videos in the same format.'
-            else:
-                # Filter out version/config lines and extract actual error
-                error_lines = error_msg.split('\n')
-                meaningful_errors = []
-                
-                skip_patterns = [
-                    'ffmpeg version', 'built with', 'configuration:', 'copyright',
-                    'the ffmpeg developers', 'toolchain', 'libdir=', 'incdir=', 'arch=',
-                    '--prefix=', '--extra-version=', '--enable-', '--disable-'
-                ]
-                
-                for line in error_lines:
-                    line_lower = line.lower().strip()
-                    if not line_lower:
-                        continue
-                    should_skip = any(pattern in line_lower for pattern in skip_patterns) or line.strip().startswith('--')
-                    if not should_skip:
-                        meaningful_errors.append(line.strip())
-                
-                if meaningful_errors:
-                    # Take last few meaningful error lines
-                    error_text = '\n'.join(meaningful_errors[-5:])
-                    full_error = error_text[:500].strip() if len(error_text) > 500 else error_text.strip()
-                    if not full_error or len(full_error) < 10:
-                        full_error = 'Video merging failed. The video files may be corrupted, in incompatible formats, or have codec conflicts.'
-                else:
-                    full_error = 'Video merging failed. The video files may be corrupted, in incompatible formats, or have codec conflicts.'
-            
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
+        logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+        else:
             return render(request, 'media_converter/video_merge.html', {
-                'error': f'Merging failed: {full_error}'
+                'job_id': str(job.job_id),
+                'status': 'pending',
             })
         
-        # Read output file
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-        
-        if len(file_content) == 0:
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/video_merge.html', {
-                'error': 'Merging failed - output file is empty.'
-            })
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Always use MP4 content type
-        content_type = 'video/mp4'
-        
-        # Create response
-        safe_filename = 'merged_video.mp4'
-        
-        # For preview action, return video for streaming
-        if action == 'preview':
-            response = HttpResponse(file_content, content_type=content_type)
-            response['Content-Length'] = len(file_content)
-            response['X-Filename'] = safe_filename
-            response['Accept-Ranges'] = 'bytes'
-            # Enable streaming
-            response['Cache-Control'] = 'no-cache'
-            return response
-        
-        # For download action, trigger download
-        response = HttpResponse(file_content, content_type=content_type)
-        response['Content-Length'] = len(file_content)
-        response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
-        response['X-Filename'] = safe_filename
-        return response
-        
-    except subprocess.TimeoutExpired:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
-        return render(request, 'media_converter/video_merge.html', {
-            'error': 'Processing timed out. The videos might be too long or complex. Try smaller files.'
-        })
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
-        return render(request, 'media_converter/video_merge.html', {
-            'error': f'Error processing files: {str(e)}'
-        })
+        logger.error(f'Error initiating video merge: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating video merge: {str(e)}'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
+        return render(request, 'media_converter/video_merge.html', {'error': error_msg})
 
 def video_preview(request):
     """Preview/stream a single video file with optional trimming"""
