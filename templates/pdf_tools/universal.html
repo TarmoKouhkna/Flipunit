@@ -38,7 +38,7 @@
         
         <div id="file-upload-section" class="form-group">
             <label class="form-label">Upload File</label>
-            <div class="file-upload-area" id="upload-area">
+            <div class="file-upload-area" id="upload-area" data-custom-handler="true">
                 <input type="file" name="input_file" id="input_file" accept=".pdf,.html,.htm,.svg,.svgz,.rtf,.png,.jpg,.jpeg,.txt">
                 <div id="upload-content">
                     <p style="margin-top: 1rem; font-size: 1.1rem;">📁 Click to select or drag and drop a file</p>
@@ -168,12 +168,31 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadArea.style.cursor = 'pointer';
         uploadArea.style.position = 'relative';
         
-        // Add a backup click handler in case main.js didn't attach one
+        // Add click handler (main.js will skip this due to data-custom-handler attribute)
+        let isOpeningDialog = false;
         uploadArea.addEventListener('click', function(e) {
             if (e.target !== inputFile && !inputFile.contains(e.target)) {
-                inputFile.click();
+                // Prevent any other handlers from running
+                e.stopImmediatePropagation();
+                e.stopPropagation();
+                
+                // Only open dialog if not already opening
+                if (!isOpeningDialog) {
+                    isOpeningDialog = true;
+                    inputFile.click();
+                    // Reset flag after dialog opens
+                    setTimeout(() => {
+                        isOpeningDialog = false;
+                    }, 500);
+                }
             }
-        }, { capture: false });
+        });
+        
+        // Stop propagation on file input click to prevent bubbling
+        inputFile.addEventListener('click', function(e) {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }, { capture: true });
     }
     
     // Handle form submission
