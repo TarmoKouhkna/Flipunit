@@ -47,6 +47,32 @@
         <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">Transcribe Audio</button>
     </form>
     
+    <!-- Job Status Display Area -->
+    <div id="jobStatusArea" style="display: none; margin-top: 2rem;">
+        <div class="card" style="background: var(--surface);">
+            <div id="jobStatusContent">
+                <!-- Status will be dynamically updated here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Results Display Area (for async results) -->
+    <div id="resultsArea" style="display: none; margin-top: 2rem;">
+        <h3>Transcription Result:</h3>
+        <div id="languageInfo" style="display: none; background: var(--surface); padding: 1rem; border-radius: 6px; margin-top: 1rem; margin-bottom: 1rem;"></div>
+        <div style="background: var(--surface); padding: 1.5rem; border-radius: 6px; margin-top: 1rem;">
+            <textarea id="transcriptionText" class="form-control" rows="15" readonly style="font-family: monospace; white-space: pre-wrap;"></textarea>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
+            <button onclick="copyTranscription()" class="btn btn-secondary">Copy to Clipboard</button>
+            <button onclick="downloadTranscription()" class="btn btn-secondary">Download as .txt</button>
+            {% if docx_available %}
+            <button onclick="downloadDocx()" class="btn btn-primary" id="downloadDocxBtn">Download as .docx</button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Legacy template result display (for backward compatibility) -->
     {% if transcription %}
     <div style="margin-top: 2rem;">
         <h3>Transcription Result:</h3>
@@ -202,24 +228,241 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Form submission validation
+    // Form submission with async job polling
     form.addEventListener('submit', function(e) {
+        e.preventDefault(); // Always prevent default for async handling
+        
         if (!isValidDuration && audioDuration !== null) {
-            e.preventDefault();
                 alert('Please ensure your audio file is 30 minutes (1800 seconds) or less before submitting.');
             return false;
         }
         
         if (!fileInput.files.length) {
-            e.preventDefault();
             alert('Please select an audio file.');
             return false;
         }
         
+        // Hide previous results
+        document.getElementById('resultsArea').style.display = 'none';
+        document.getElementById('jobStatusArea').style.display = 'none';
+        
         // Show loading state
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Transcribing... Please wait';
+        submitBtn.textContent = 'Uploading...';
+        
+        // Create FormData
+        const formData = new FormData(form);
+        
+        // Get CSRF token
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Submit via AJAX
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrftoken
+            }
+        })
+        .then(response => {
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                // Not JSON - might be HTML error page
+                return response.text().then(text => {
+                    throw new Error('Server returned non-JSON response. Please check the console for details.');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                // Show error
+                showJobError(data.error);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Transcribe Audio';
+                return;
+            }
+            
+            // Job created successfully
+            const jobId = data.job_id;
+            if (!jobId) {
+                showJobError('No job ID received from server. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Transcribe Audio';
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+            
+            // Show job status area
+            showJobStatus(jobId, 'pending', 'Job created. Processing in background...');
+            
+            // Start polling
+            pollJobStatus(jobId);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showJobError('An error occurred while uploading the file: ' + error.message + '. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Transcribe Audio';
+        });
     });
+    
+    // Poll job status
+    let pollInterval = null;
+    let pollAttempts = 0;
+    const MAX_POLL_ATTEMPTS = 300; // 5 minutes max (300 * 1 second)
+    
+    function pollJobStatus(jobId) {
+        pollAttempts = 0;
+        pollInterval = setInterval(function() {
+            pollAttempts++;
+            
+            if (pollAttempts > MAX_POLL_ATTEMPTS) {
+                clearInterval(pollInterval);
+                showJobError('Job is taking longer than expected. Please check back later or try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Transcribe Audio';
+                return;
+            }
+            
+            fetch(`/text-converter/audio-transcription/status/${jobId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    updateJobStatus(data);
+                    
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        
+                        if (data.status === 'completed') {
+                            showResults(data);
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Transcribe Audio';
+                        } else {
+                            showJobError(data.error_message || 'Transcription failed. Please try again.');
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Transcribe Audio';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                    // Continue polling on error (might be temporary)
+                });
+        }, 2000); // Poll every 2 seconds
+    }
+    
+    // Show job status
+    function showJobStatus(jobId, status, message) {
+        const statusArea = document.getElementById('jobStatusArea');
+        const statusContent = document.getElementById('jobStatusContent');
+        
+        let statusIcon = '⏳';
+        let statusClass = 'alert-info';
+        
+        if (status === 'processing') {
+            statusIcon = '⚙️';
+            statusClass = 'alert-info';
+        } else if (status === 'completed') {
+            statusIcon = '✅';
+            statusClass = 'alert-success';
+        } else if (status === 'failed') {
+            statusIcon = '❌';
+            statusClass = 'alert-error';
+        }
+        
+        statusContent.innerHTML = `
+            <div class="alert ${statusClass}" style="margin-bottom: 0;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span style="font-size: 1.5rem;">${statusIcon}</span>
+                    <div style="flex: 1;">
+                        <strong>${message || 'Processing...'}</strong>
+                        <div style="font-size: 0.9rem; margin-top: 0.5rem; color: var(--text-secondary);">
+                            Job ID: <code>${jobId}</code>
+                        </div>
+                        ${status === 'processing' ? '<div style="margin-top: 0.5rem;"><div class="spinner" style="display: inline-block; width: 20px; height: 20px; border: 3px solid var(--primary-color); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div></div>' : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        statusArea.style.display = 'block';
+    }
+    
+    // Update job status
+    function updateJobStatus(data) {
+        let message = 'Processing...';
+        if (data.status === 'processing') {
+            message = 'Transcribing audio file...';
+        } else if (data.status === 'completed') {
+            message = 'Transcription completed!';
+        } else if (data.status === 'failed') {
+            message = 'Transcription failed';
+        }
+        
+        showJobStatus(data.job_id, data.status, message);
+    }
+    
+    // Show job error
+    function showJobError(errorMessage) {
+        const statusArea = document.getElementById('jobStatusArea');
+        const statusContent = document.getElementById('jobStatusContent');
+        
+        statusContent.innerHTML = `
+            <div class="alert alert-error" style="margin-bottom: 0;">
+                <strong>❌ Error:</strong> ${errorMessage}
+            </div>
+        `;
+        
+        statusArea.style.display = 'block';
+    }
+    
+    // Show results
+    function showResults(data) {
+        const resultsArea = document.getElementById('resultsArea');
+        const transcriptionText = document.getElementById('transcriptionText');
+        const languageInfo = document.getElementById('languageInfo');
+        const downloadDocxBtn = document.getElementById('downloadDocxBtn');
+        
+        // Set transcription text
+        transcriptionText.value = data.transcription_text || '';
+        
+        // Show language info if available
+        if (data.detected_language) {
+            languageInfo.innerHTML = `
+                <strong style="color: var(--primary-color);">Detected Language:</strong>
+                <span style="text-transform: uppercase;">${data.detected_language}</span>
+            `;
+            languageInfo.style.display = 'block';
+        } else {
+            languageInfo.style.display = 'none';
+        }
+        
+        // Set download DOCX button
+        if (downloadDocxBtn) {
+            downloadDocxBtn.onclick = function() {
+                window.location.href = `/text-converter/audio-transcription/download-docx/${data.job_id}/`;
+            };
+        }
+        
+        // Show results area
+        resultsArea.style.display = 'block';
+        
+        // Scroll to results
+        resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    // Add spinner animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
     
     // Drag and drop support
     uploadArea.addEventListener('dragover', function(e) {
@@ -244,8 +487,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function copyTranscription() {
-    const textarea = document.querySelector('textarea[readonly]');
-    if (textarea) {
+    const textarea = document.getElementById('transcriptionText') || document.querySelector('textarea[readonly]');
+    if (textarea && textarea.value) {
         textarea.select();
         document.execCommand('copy');
         
@@ -261,7 +504,7 @@ function copyTranscription() {
 }
 
 function downloadTranscription() {
-    const textarea = document.querySelector('textarea[readonly]');
+    const textarea = document.getElementById('transcriptionText') || document.querySelector('textarea[readonly]');
     if (textarea && textarea.value) {
         const text = textarea.value;
         const blob = new Blob([text], { type: 'text/plain' });

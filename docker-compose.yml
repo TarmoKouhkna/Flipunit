@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build: .
@@ -25,6 +23,9 @@ services:
       - DB_PORT=5432
       - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
     volumes:
       - ./media:/app/media
       - ./staticfiles:/app/staticfiles
@@ -33,8 +34,12 @@ services:
       - ./flipunit:/app/flipunit  # Mount source code so Python changes are immediate without rebuild
       - ./pdf_tools:/app/pdf_tools  # Mount pdf_tools so changes are immediate without rebuild
       - ./text_converter:/app/text_converter  # Mount text_converter so changes are immediate without rebuild
+      - ./media_converter:/app/media_converter  # Mount media_converter so changes are immediate without rebuild
+      - ./image_converter:/app/image_converter  # Mount image_converter so changes are immediate without rebuild
+      - ./archive_converter:/app/archive_converter  # Mount archive_converter so changes are immediate without rebuild
     depends_on:
       - postgres
+      - redis
     networks:
       - flipunit-network
 
@@ -56,8 +61,254 @@ services:
     networks:
       - flipunit-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: flipunit-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - redis-data:/data
+    networks:
+      - flipunit-network
+    ports:
+      - "127.0.0.1:6379:6379"  # Expose only to localhost for security
+
+  celery_worker_io:
+    build: .
+    container_name: flipunit-celery-io
+    restart: unless-stopped
+    command: celery -A flipunit worker -Q transcription,api_calls --loglevel=info --concurrency=10 --hostname=io-worker@%h
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,217.146.78.140}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
+      - SITE_URL=${SITE_URL:-https://flipunit.eu}
+      - DB_NAME=${DB_NAME:-flipunit}
+      - DB_USER=${DB_USER:-flipunit_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./flipunit:/app/flipunit
+      - ./pdf_tools:/app/pdf_tools
+      - ./text_converter:/app/text_converter
+      - ./media_converter:/app/media_converter
+      - ./image_converter:/app/image_converter
+      - ./archive_converter:/app/archive_converter
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - flipunit-network
+
+  celery_worker_media:
+    build: .
+    container_name: flipunit-celery-media
+    restart: unless-stopped
+    command: celery -A flipunit worker -Q media_processing --loglevel=info --concurrency=2 --hostname=media-worker@%h
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,217.146.78.140}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
+      - SITE_URL=${SITE_URL:-https://flipunit.eu}
+      - DB_NAME=${DB_NAME:-flipunit}
+      - DB_USER=${DB_USER:-flipunit_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./flipunit:/app/flipunit
+      - ./pdf_tools:/app/pdf_tools
+      - ./text_converter:/app/text_converter
+      - ./media_converter:/app/media_converter
+      - ./image_converter:/app/image_converter
+      - ./archive_converter:/app/archive_converter
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - flipunit-network
+
+  celery_worker_pdf:
+    build: .
+    container_name: flipunit-celery-pdf
+    restart: unless-stopped
+    command: celery -A flipunit worker -Q pdf_processing --loglevel=info --concurrency=2 --hostname=pdf-worker@%h
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,217.146.78.140}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
+      - SITE_URL=${SITE_URL:-https://flipunit.eu}
+      - DB_NAME=${DB_NAME:-flipunit}
+      - DB_USER=${DB_USER:-flipunit_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./flipunit:/app/flipunit
+      - ./pdf_tools:/app/pdf_tools
+      - ./text_converter:/app/text_converter
+      - ./media_converter:/app/media_converter
+      - ./image_converter:/app/image_converter
+      - ./archive_converter:/app/archive_converter
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - flipunit-network
+
+  celery_worker_image:
+    build: .
+    container_name: flipunit-celery-image
+    restart: unless-stopped
+    command: celery -A flipunit worker -Q image_processing --loglevel=info --concurrency=6 --hostname=image-worker@%h
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,217.146.78.140}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
+      - SITE_URL=${SITE_URL:-https://flipunit.eu}
+      - DB_NAME=${DB_NAME:-flipunit}
+      - DB_USER=${DB_USER:-flipunit_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./flipunit:/app/flipunit
+      - ./pdf_tools:/app/pdf_tools
+      - ./text_converter:/app/text_converter
+      - ./media_converter:/app/media_converter
+      - ./image_converter:/app/image_converter
+      - ./archive_converter:/app/archive_converter
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - flipunit-network
+
+  celery_worker_archive:
+    build: .
+    container_name: flipunit-celery-archive
+    restart: unless-stopped
+    command: celery -A flipunit worker -Q archive_processing --loglevel=info --concurrency=2 --hostname=archive-worker@%h
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,217.146.78.140}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
+      - SITE_URL=${SITE_URL:-https://flipunit.eu}
+      - DB_NAME=${DB_NAME:-flipunit}
+      - DB_USER=${DB_USER:-flipunit_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./flipunit:/app/flipunit
+      - ./pdf_tools:/app/pdf_tools
+      - ./text_converter:/app/text_converter
+      - ./media_converter:/app/media_converter
+      - ./image_converter:/app/image_converter
+      - ./archive_converter:/app/archive_converter
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - flipunit-network
+
+  celery_worker_lightweight:
+    build: .
+    container_name: flipunit-celery-lightweight
+    restart: unless-stopped
+    command: celery -A flipunit worker -Q lightweight --loglevel=info --concurrency=20 --hostname=lightweight-worker@%h
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,217.146.78.140}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
+      - SITE_URL=${SITE_URL:-https://flipunit.eu}
+      - DB_NAME=${DB_NAME:-flipunit}
+      - DB_USER=${DB_USER:-flipunit_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./flipunit:/app/flipunit
+      - ./pdf_tools:/app/pdf_tools
+      - ./text_converter:/app/text_converter
+      - ./media_converter:/app/media_converter
+      - ./image_converter:/app/image_converter
+      - ./archive_converter:/app/archive_converter
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - flipunit-network
+
 volumes:
   postgres-data:
+  redis-data:
 
 networks:
   flipunit-network:

@@ -48,16 +48,35 @@
             </select>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block">Convert & Download</button>
+        <button type="submit" class="btn btn-primary btn-block" id="convertBtn">Convert Audio</button>
     </form>
+    
+    <!-- Job Status Area (for async processing) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div id="jobStatusMessage" style="text-align: center; font-size: 1.1rem; margin-bottom: 1rem;">
+            <div class="spinner"></div> Processing...
+        </div>
+        <div id="jobIdDisplay" style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+        <div id="jobError" style="display: none; color: var(--error-color); text-align: center; margin-top: 1rem;"></div>
+    </div>
+    
+    <!-- Results Area (for completed jobs) -->
+    <div id="resultsArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div style="text-align: center;">
+            <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ Conversion Completed!</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">Your audio file has been converted successfully. Click below to download.</p>
+            <a id="downloadBtn" href="#" class="btn btn-primary" style="min-width: 220px; font-size: 1rem;">⬇️ Download Converted File</a>
+        </div>
+    </div>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
         <ol class="list-indent" style="margin-top: 0.5rem;">
             <li>Upload an audio file (MP3, WAV, OGG, FLAC, AAC, M4A, or AIFF)</li>
             <li>Select the desired output format</li>
-            <li>Click "Convert & Download"</li>
-            <li>Download the converted audio file</li>
+            <li>Click "Convert Audio"</li>
+            <li>Wait for conversion to complete (you'll see progress updates)</li>
+            <li>Click "Download Converted File" when ready</li>
         </ol>
         <p style="margin-top: 1rem; color: var(--text-secondary);">
             <strong>Note:</strong> Lossy formats (MP3, OGG, AAC) are converted at 192 kbps quality. Lossless formats (WAV, FLAC) preserve original quality.
@@ -166,7 +185,8 @@ if (window.audioConverterInitialized) {
                 isProcessing: false,
                 downloadTriggered: false,
                 abortController: null,
-                submitCount: 0
+                submitCount: 0,
+                isAsyncJob: false  // Flag to track if current job is async
             };
         }
         const state = window._audioConverterState;
@@ -202,7 +222,7 @@ if (window.audioConverterInitialized) {
             const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.textContent = 'Processing...';
+                submitBtn.textContent = 'Uploading...';
             } else {
                 console.error('❌ Submit button not found!');
             }
@@ -283,7 +303,7 @@ if (window.audioConverterInitialized) {
                     contentType = 'application/zip';
                     blob = new Blob([blob], { type: contentType });
                 } else if (contentTypeHeader?.includes('application/json')) {
-                    // JSON format - single file conversion
+                    // JSON format - could be async job or legacy base64 response
                     const data = await response.json();
                     
                     // Check if response contains an error
@@ -291,14 +311,46 @@ if (window.audioConverterInitialized) {
                         throw new Error(data.error);
                     }
                     
-                    const binary = atob(data.file);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++) {
-                        bytes[i] = binary.charCodeAt(i);
+                    // Check if this is an async job response (has job_id)
+                    if (data.job_id) {
+                        // Async job - start polling
+                        console.log('🔄 Async job created:', data.job_id);
+                        
+                        // Mark as async job to prevent finally block from resetting button
+                        state.isAsyncJob = true;
+                        
+                        // Update button to show processing state
+                        const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.textContent = 'Processing...';
+                        }
+                        
+                        // Show job status area
+                        document.getElementById('jobStatusArea').style.display = 'block';
+                        document.getElementById('resultsArea').style.display = 'none';
+                        document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
+                        document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
+                        document.getElementById('jobError').style.display = 'none';
+                        
+                        // Start polling
+                        startJobPolling(data.job_id);
+                        return; // Exit early - polling will handle completion
                     }
-                    blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
-                    filename = data.filename;
-                    contentType = data.content_type || 'audio/mpeg';
+                    
+                    // Legacy format - base64 encoded file
+                    if (data.file) {
+                        const binary = atob(data.file);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) {
+                            bytes[i] = binary.charCodeAt(i);
+                        }
+                        blob = new Blob([bytes], { type: data.content_type || 'audio/mpeg' });
+                        filename = data.filename;
+                        contentType = data.content_type || 'audio/mpeg';
+                    } else {
+                        throw new Error('Invalid response format from server');
+                    }
                 } else {
                     // Legacy format - direct audio file
                     blob = await response.blob();
@@ -360,19 +412,29 @@ if (window.audioConverterInitialized) {
                     window.location.reload();
                 }
             } finally {
-                // === ALWAYS RESET ===
+                // === ALWAYS RESET (unless async job) ===
                 console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
-                state.isProcessing = false;
-                state.downloadTriggered = false; // Reset download flag
-                state.abortController = null; // Clear controller
                 
-                // Find button again (in case form was re-rendered)
-                const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Convert & Download';
+                // Don't reset button state for async jobs - let download handler do it
+                if (!state.isAsyncJob) {
+                    state.isProcessing = false;
+                    state.downloadTriggered = false; // Reset download flag
+                    state.abortController = null; // Clear controller
+                    
+                    // Find button again (in case form was re-rendered)
+                    const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Convert Audio';
+                    }
+                    form.style.pointerEvents = 'auto';
+                } else {
+                    // For async jobs, only clear abort controller and reset download flag
+                    state.downloadTriggered = false;
+                    state.abortController = null;
+                    form.style.pointerEvents = 'auto';
+                    // Keep button as "Processing..." and isProcessing = true
                 }
-                form.style.pointerEvents = 'auto';
             }
         };
 
@@ -475,6 +537,160 @@ if (window.audioConverterInitialized) {
             console.error('❌ File input or upload area not found!');
         }
     });
+    
+    // Async job polling functions
+    let pollInterval = null;
+    
+    function startJobPolling(jobId) {
+        clearInterval(pollInterval); // Clear any existing interval
+        
+        console.log('🔄 Starting job polling for jobId:', jobId);
+        pollInterval = setInterval(() => {
+            fetch(`/media-converter/job/status/${jobId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    updateJobStatus(data);
+
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        console.log('🛑 Polling stopped, job status:', data.status);
+                        
+                        if (data.status === 'completed') {
+                            console.log('✅ Job completed, calling showConversionResult');
+                            showConversionResult(data, jobId);
+                            // Keep button as "Processing..." until download is clicked
+                            // Don't reset button state here - wait for download click
+                        } else {
+                            console.log('❌ Job failed');
+                            showJobError(data.error_message || 'Conversion failed. Please try again.');
+                            // Reset form state
+                            const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = 'Convert Audio';
+                            }
+                            state.isProcessing = false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                    // Continue polling on error (might be temporary network issue)
+                });
+        }, 2000); // Poll every 2 seconds
+    }
+    
+    function updateJobStatus(data) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobIdDisplay = document.getElementById('jobIdDisplay');
+        const jobError = document.getElementById('jobError');
+        
+        if (!jobStatusMessage || !jobIdDisplay || !jobError) return; // Safety check
+        
+        jobIdDisplay.textContent = `Job ID: ${data.job_id}`;
+        jobError.style.display = 'none';
+        
+        let statusText = '';
+        let spinner = '<div class="spinner"></div>';
+        
+        switch (data.status) {
+            case 'pending':
+                statusText = `${spinner} Job created. Waiting to process...`;
+                break;
+            case 'processing':
+                statusText = `${spinner} Converting audio file...`;
+                break;
+            case 'completed':
+                statusText = '✅ Conversion completed!';
+                break;
+            case 'failed':
+                statusText = '❌ Conversion failed.';
+                jobError.textContent = data.error_message || 'An unknown error occurred.';
+                jobError.style.display = 'block';
+                break;
+            default:
+                statusText = `${spinner} Unknown status: ${data.status}`;
+        }
+        jobStatusMessage.innerHTML = statusText;
+    }
+    
+    function showConversionResult(data, jobId) {
+        console.log('🎯 showConversionResult called with jobId:', jobId);
+        const resultsArea = document.getElementById('resultsArea');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if (!resultsArea || !downloadBtn) {
+            console.error('❌ Results area or download button not found!', { resultsArea, downloadBtn });
+            return; // Safety check
+        }
+        
+        console.log('✅ Found results area and download button');
+        
+        // Update download link
+        downloadBtn.href = `/media-converter/job/download/${jobId}/`;
+        console.log('✅ Download link set to:', downloadBtn.href);
+        
+        // Instead of cloning, just remove old listeners and add new one
+        // Use onclick directly for more reliable behavior
+        downloadBtn.onclick = function resetButtonAfterDownload(e) {
+            console.log('🔵🔵🔵 Download button clicked, resetting form button');
+            
+            // Reset the form button immediately (don't wait for download)
+            // Try multiple selectors to find the submit button
+            let submitBtn = document.querySelector('.converter-tool button.btn-primary');
+            if (!submitBtn) {
+                submitBtn = document.querySelector('.converter-tool button[type="submit"]');
+            }
+            if (!submitBtn) {
+                submitBtn = document.querySelector('.converter-tool button[type="button"]');
+            }
+            if (!submitBtn) {
+                // Last resort: find any button in the form
+                const form = document.querySelector('.converter-tool');
+                if (form) {
+                    submitBtn = form.querySelector('button');
+                }
+            }
+            
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Convert Audio';
+                console.log('✅✅✅ Form button reset to "Convert Audio"');
+            } else {
+                console.error('❌❌❌ Could not find submit button to reset');
+            }
+            
+            // Reset state flags using global state
+            const state = window._audioConverterState;
+            if (state) {
+                state.isProcessing = false;
+                state.isAsyncJob = false;
+                console.log('✅✅✅ State flags reset');
+            } else {
+                console.warn('⚠️ Global state not found');
+            }
+            
+            // Allow default download behavior (don't preventDefault)
+            // Return true to allow navigation
+            return true;
+        };
+        
+        console.log('✅ Download button onclick handler attached');
+        
+        // Show results area
+        resultsArea.style.display = 'block';
+        document.getElementById('jobStatusArea').style.display = 'none';
+        console.log('✅ Results area displayed');
+    }
+    
+    function showJobError(message) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobError = document.getElementById('jobError');
+        if (!jobStatusMessage || !jobError) return; // Safety check
+        jobStatusMessage.innerHTML = '❌ Error occurred.';
+        jobError.textContent = message;
+        jobError.style.display = 'block';
+    }
 }
 </script>
 {% endblock extra_js %}

@@ -16,5 +16,7 @@ urlpatterns = [
     path('mute-video/', views.mute_video, name='mute_video'),
     path('video-merge/', views.video_merge, name='video_merge'),
     path('video-preview/', views.video_preview, name='video_preview'),
+    path('job/status/<uuid:job_id>/', views.job_status, name='job_status'),
+    path('job/download/<uuid:job_id>/', views.download_result, name='download_result'),
 ]
 

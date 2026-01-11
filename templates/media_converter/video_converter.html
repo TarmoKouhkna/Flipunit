@@ -46,19 +46,41 @@
             </select>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Convert & Download</button>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Convert Video</button>
     </form>
     
-    <!-- Progress indicator -->
-    <div id="processing-indicator" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
-        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem;"></div>
-        <span id="processing-message">Processing video... This may take several minutes for large files. Please be patient and do not close this page.</span>
+    <!-- Job Status Area (for async processing) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div id="jobStatusMessage" style="text-align: center; font-size: 1.1rem; margin-bottom: 1rem;">
+            <div class="spinner"></div> Processing...
+        </div>
+        <div id="jobIdDisplay" style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+        <div id="jobError" style="display: none; color: var(--error-color); text-align: center; margin-top: 1rem;"></div>
+    </div>
+    
+    <!-- Results Area (for completed jobs) -->
+    <div id="resultsArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div style="text-align: center;">
+            <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ Conversion Completed!</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">Your video file has been converted successfully. Click below to download.</p>
+            <a id="downloadBtn" href="#" class="btn btn-primary" style="min-width: 220px; font-size: 1rem;">⬇️ Download Converted File</a>
+        </div>
     </div>
     
     <style>
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
         }
     </style>
     
@@ -67,8 +89,9 @@
         <ol class="list-indent" style="margin-top: 0.5rem;">
             <li>Upload a video file (MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP)</li>
             <li>Select the desired output format</li>
-            <li>Click "Convert & Download"</li>
-            <li>Download the converted video file</li>
+            <li>Click "Convert Video" - conversion will start in the background</li>
+            <li>Wait for processing to complete (status updates automatically)</li>
+            <li>Click "Download Converted File" when ready</li>
         </ol>
         <p style="margin-top: 1rem; color: var(--text-secondary);">
             <strong>Note:</strong> Video conversion is CPU-intensive and may take some time. For best performance:
@@ -85,295 +108,387 @@
 
 <a href="{% url 'media_converter:index' %}" class="btn btn-secondary">← Back to Media Converters</a>
 
+{% endblock content %}
+
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('.converter-tool');
-    const fileInput = document.getElementById('video_file');
-    const uploadArea = document.querySelector('.file-upload-area');
-    const submitBtn = document.getElementById('submit-btn') || form.querySelector('button[type="submit"]');
-    const processingIndicator = document.getElementById('processing-indicator');
-    
-    // Update UI when file is selected
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            const fileName = e.target.files[0].name;
-            uploadArea.querySelector('p').textContent = 'Selected: ' + fileName;
-        }
-    });
-    
-    fileInput.addEventListener('click', function(e) {
-        e.stopPropagation();
-    });
-    
-    // Prevent multiple submissions and dialog appearances
-    let isProcessing = false;
-    let isShowingDialog = false;
-    
-    // Use window-level flags to prevent duplicates across all instances
-    if (!window.videoConverterProcessing) {
-        window.videoConverterProcessing = false;
+    if (!form) {
+        console.error('❌ Form not found!');
+        return;
     }
-    if (!window.videoConverterDownloadTriggered) {
-        window.videoConverterDownloadTriggered = false;
+    console.log('✅ Form found:', form);
+
+    // GLOBAL STATE - shared across all instances
+    if (!window._videoConverterState) {
+        window._videoConverterState = {
+            isProcessing: false,
+            downloadTriggered: false,
+            abortController: null,
+            submitCount: 0,
+            isAsyncJob: false  // Flag to track if current job is async
+        };
     }
-    if (!window.videoConverterDownloadLink) {
-        window.videoConverterDownloadLink = null;
-    }
-    
-    // Handle form submission with fetch to keep page responsive
-    form.addEventListener('submit', function(e) {
+    const state = window._videoConverterState;
+
+    const submitHandler = async (e) => {
+        state.submitCount++;
+        console.log('📝 Submit handler called, count:', state.submitCount);
+        
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        
-        // Prevent multiple submissions
-        if (isProcessing || isShowingDialog || window.videoConverterProcessing) {
-            console.log('Already processing, ignoring duplicate submission');
+
+        // === INSTANT DOUBLE-CLICK PROTECTION ===
+        if (state.isProcessing) {
+            console.error('🚫🚫🚫 Submit BLOCKED: already processing (count:', state.submitCount, ')');
             return false;
         }
-        
-        if (!fileInput.files.length) {
-            alert('Please select a video file.');
+
+        const fileInput = form.querySelector('#video_file');
+        if (!fileInput?.files?.length) {
+            alert('Please select a video file');
             return false;
         }
+
+        // === LOCK IMMEDIATELY ===
+        state.isProcessing = true;
+        state.downloadTriggered = false;
+        console.log('🔒 Lock set, submit count:', state.submitCount);
         
-        // Warn user about large files
-        const fileSizeMB = fileInput.files[0].size / (1024 * 1024);
-        let userConfirmed = false;
-        
-        if (fileSizeMB > 200) {
-            isShowingDialog = true;
-            const estimatedTime = fileSizeMB > 400 ? '10-15 minutes' : '5-10 minutes';
-            userConfirmed = confirm(`Warning: This file is ${fileSizeMB.toFixed(1)} MB (${(fileSizeMB / 1024).toFixed(2)} GB).\n\nVideo conversion will use significant CPU resources and may take ${estimatedTime}.\n\nFor best performance, files under 200 MB are recommended.\n\nContinue with conversion?`);
-            isShowingDialog = false;
-            
-            if (!userConfirmed) {
-                // Explicitly prevent any further processing
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                return false;
-            }
-        } else if (fileSizeMB > 100) {
-            isShowingDialog = true;
-            userConfirmed = confirm(`This file is ${fileSizeMB.toFixed(1)} MB. Conversion may take a few minutes. Continue?`);
-            isShowingDialog = false;
-            
-            if (!userConfirmed) {
-                // Explicitly prevent any further processing
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                return false;
-            }
+        // Find button by class or any button in the form
+        const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Uploading...';
         }
-        
-        // Mark as processing (both local and window-level)
-        isProcessing = true;
-        window.videoConverterProcessing = true;
-        window.videoConverterDownloadTriggered = false;
-        
-        // Disable button during processing
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Processing...';
-        
-        // Show progress indicator with file size info
-        if (processingIndicator) {
-            processingIndicator.style.display = 'block';
-            const processingMessage = document.getElementById('processing-message');
-            if (processingMessage) {
-                let timeEstimate = 'a few minutes';
-                if (fileSizeMB > 400) {
-                    timeEstimate = '10-15 minutes';
-                } else if (fileSizeMB > 200) {
-                    timeEstimate = '5-10 minutes';
-                } else if (fileSizeMB > 100) {
-                    timeEstimate = '3-5 minutes';
-                }
-                processingMessage.textContent = `Processing video (${fileSizeMB.toFixed(1)} MB)... This may take ${timeEstimate}. Please be patient and do not close this page.`;
-            }
+        form.style.pointerEvents = 'none';
+
+        // Abort any previous fetch to kill duplicates
+        if (state.abortController) {
+            state.abortController.abort();
         }
-        
+        state.abortController = new AbortController();
+
         const formData = new FormData(form);
         
-        fetch(form.action || window.location.href, {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin',
-        })
-        .then(response => {
-            const contentType = response.headers.get('content-type') || '';
+        try {
+            console.log('📤 About to call fetch...');
+            const fetchUrl = form.action || window.location.href;
+            console.log('📤 Fetch URL:', fetchUrl);
             
-            // Check if we got a video file
-            if (contentType.includes('video/')) {
-                return response.blob().then(blob => {
-                    if (blob.size === 0) {
-                        throw new Error('Downloaded file is empty. Conversion may have failed.');
-                    }
-                    const filename = response.headers.get('x-filename') || 'converted.video';
-                    return { blob, filename };
-                });
-            }
-            
-            // If we got HTML, it's an error page - extract the error message
-            if (contentType.includes('text/html')) {
-                return response.text().then(html => {
-                    // Try to extract error message from the HTML
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    let errorMessage = 'Video conversion failed.';
-                    
-                    // Try multiple selectors to find the error message
-                    const errorDiv = doc.querySelector('.alert-error') || 
-                                    doc.querySelector('.alert.alert-error') ||
-                                    doc.querySelector('[class*="alert-error"]') ||
-                                    doc.querySelector('.error') ||
-                                    doc.querySelector('.alert');
-                    
-                    if (errorDiv) {
-                        errorMessage = errorDiv.textContent.trim();
-                        // Remove any extra whitespace
-                        errorMessage = errorMessage.replace(/\s+/g, ' ').trim();
-                    }
-                    
-                    // If still no error found, log the HTML for debugging
-                    if (errorMessage === 'Video conversion failed.') {
-                        console.error('Could not extract error message from HTML response');
-                        console.log('HTML response:', html.substring(0, 500));
-                    }
-                    
-                    throw new Error(errorMessage);
-                });
-            }
-            
-            // Unexpected content type
-            return response.text().then(text => {
-                throw new Error('Unexpected response type: ' + contentType + '. Response: ' + text.substring(0, 200));
-            });
-        })
-        .then(({ blob, filename }) => {
-            // Atomic check-and-set: only proceed if download hasn't been triggered
-            if (window.videoConverterDownloadTriggered) {
-                console.log('Download already triggered, skipping duplicate');
-                isProcessing = false;
-                window.videoConverterProcessing = false;
-                return;
-            }
-            if (!window.videoConverterProcessing) {
-                console.log('Processing stopped, skipping download');
-                return;
-            }
-            
-            // ATOMIC: Set download triggered flag IMMEDIATELY to prevent any race conditions
-            window.videoConverterDownloadTriggered = true;
-            
-            // Mark as processing complete
-            isProcessing = false;
-            window.videoConverterProcessing = false;
-            
-            // Clean up any existing download links
-            if (window.videoConverterDownloadLink) {
-                try {
-                    if (window.videoConverterDownloadLink.href && window.videoConverterDownloadLink.href.startsWith('blob:')) {
-                        window.URL.revokeObjectURL(window.videoConverterDownloadLink.href);
-                    }
-                    if (document.body.contains(window.videoConverterDownloadLink)) {
-                        document.body.removeChild(window.videoConverterDownloadLink);
-                    }
-                } catch(e) {
-                    // Ignore cleanup errors
-                }
-                window.videoConverterDownloadLink = null;
-            }
-            
-            // Remove any other download links (safety)
-            const existingLinks = document.querySelectorAll('a[data-video-download]');
-            existingLinks.forEach(link => {
-                try {
-                    if (link.href && link.href.startsWith('blob:')) {
-                        window.URL.revokeObjectURL(link.href);
-                    }
-                    if (document.body.contains(link)) {
-                        document.body.removeChild(link);
-                    }
-                } catch(e) {
-                    // Ignore cleanup errors
-                }
+            const response = await fetch(fetchUrl, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                signal: state.abortController.signal
             });
             
-            // Create download link only once and store it globally
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.style.display = 'none';
-            a.setAttribute('data-video-download', 'true');
+            console.log('📥 Fetch response received:', response.status);
+
+            const contentTypeHeader = response.headers.get('content-type');
             
-            // Store globally to prevent duplicates
-            window.videoConverterDownloadLink = a;
-            document.body.appendChild(a);
-            
-            // Trigger download exactly once - use immediate synchronous execution
-            try {
-                a.click();
-            } catch(e) {
-                console.error('Error triggering download:', e);
-            }
-            
-            // Clean up after a delay
-            setTimeout(function() {
+            if (!response.ok) {
+                let errorMessage = 'Conversion failed';
                 try {
-                    if (window.videoConverterDownloadLink && window.videoConverterDownloadLink.href === url) {
-                        window.URL.revokeObjectURL(url);
-                        if (document.body.contains(window.videoConverterDownloadLink)) {
-                            document.body.removeChild(window.videoConverterDownloadLink);
+                    if (contentTypeHeader?.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorData.message || errorMessage;
+                    } else {
+                        const text = await response.text();
+                        const errorMatch = text.match(/<div[^>]*class="[^"]*alert[^"]*error[^"]*"[^>]*>([^<]+)<\/div>/i);
+                        if (errorMatch) {
+                            errorMessage = errorMatch[1].trim();
                         }
-                        window.videoConverterDownloadLink = null;
                     }
-                } catch(e) {
-                    // Ignore cleanup errors
+                } catch (e) {
+                    console.error('Error parsing error response:', e);
                 }
-            }, 1000);
-            
-            // Hide progress indicator
-            if (processingIndicator) {
-                processingIndicator.style.display = 'none';
+                throw new Error(errorMessage || `Server returned status ${response.status}`);
             }
             
-            // Re-enable button
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Convert & Download';
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            
-            // Reset processing flags
-            isProcessing = false;
-            window.videoConverterProcessing = false;
-            window.videoConverterDownloadTriggered = false;
-            
-            // Hide progress indicator
-            if (processingIndicator) {
-                processingIndicator.style.display = 'none';
+            // Check if this is an async job response (has job_id)
+            if (contentTypeHeader?.includes('application/json')) {
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                if (data.job_id) {
+                    // Async job - start polling
+                    console.log('🔄 Async job created:', data.job_id);
+                    
+                    // Mark as async job to prevent finally block from resetting button
+                    state.isAsyncJob = true;
+                    
+                    // Update button to show processing state
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Processing...';
+                    }
+                    
+                    // Show job status area
+                    document.getElementById('jobStatusArea').style.display = 'block';
+                    document.getElementById('resultsArea').style.display = 'none';
+                    document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
+                    document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
+                    document.getElementById('jobError').style.display = 'none';
+                    
+                    // Start polling
+                    startJobPolling(data.job_id);
+                    return; // Exit early - polling will handle completion
+                }
             }
             
-            // Re-enable button
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Convert & Download';
+            // Legacy synchronous response - should not happen with async view
+            throw new Error('Unexpected response format from server');
             
-            // Show error message
-            alert('Error: ' + error.message);
+        } catch (err) {
+            // Ignore abort errors (expected for duplicates)
+            if (err.name === 'AbortError') {
+                console.log('Fetch aborted (duplicate prevented)');
+                return;
+            }
+            console.error('Conversion error:', err);
+            const errorMessage = err.message || 'Conversion failed. Please try again.';
+            alert(errorMessage);
+        } finally {
+            // === ALWAYS RESET (unless async job) ===
+            console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
             
-            // Reload to show error message
-            setTimeout(function() {
-                window.location.reload();
-            }, 1000);
-        });
-    });
+            // Don't reset button state for async jobs - let download handler do it
+            if (!state.isAsyncJob) {
+                state.isProcessing = false;
+                state.downloadTriggered = false;
+                state.abortController = null;
+                
+                const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Convert Video';
+                }
+                form.style.pointerEvents = 'auto';
+            } else {
+                // For async jobs, only clear abort controller and reset download flag
+                state.downloadTriggered = false;
+                state.abortController = null;
+                form.style.pointerEvents = 'auto';
+                // Keep button as "Processing..." and isProcessing = true
+            }
+        }
+    };
+
+    // Attach submit handler
+    const submitBtn = form.querySelector('button.btn-primary');
+    if (submitBtn) {
+        submitBtn.type = 'button';
+        submitBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            e.stopPropagation();
+            
+            if (state.isProcessing) {
+                console.error('🚫 Button click blocked: already processing');
+                return false;
+            }
+            
+            console.log('🖱️🖱️🖱️ BUTTON CLICKED - CALLING SUBMIT HANDLER DIRECTLY');
+            const submitEvent = { 
+                type: 'submit',
+                target: form,
+                preventDefault: () => {},
+                stopPropagation: () => {},
+                stopImmediatePropagation: () => {}
+            };
+            submitHandler(submitEvent);
+        }, { capture: true, once: false });
+    }
+
+    // Prevent native form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        return false;
+    }, { capture: true });
     
+    form.onsubmit = function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        return false;
+    };
+
+    // File input handling
+    const fileInput = form.querySelector('#video_file');
+    const uploadArea = form.querySelector('.file-upload-area');
+    
+    if (fileInput && uploadArea) {
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const fileName = e.target.files[0].name;
+                const p = uploadArea.querySelector('p');
+                if (p) {
+                    p.textContent = 'Selected: ' + fileName;
+                }
+            }
+        });
+    }
+    
+    // Async job polling functions
+    let pollInterval = null;
+    
+    function startJobPolling(jobId) {
+        clearInterval(pollInterval);
+        
+        console.log('🔄 Starting job polling for jobId:', jobId);
+        pollInterval = setInterval(() => {
+            fetch(`/media-converter/job/status/${jobId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    updateJobStatus(data);
+
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        console.log('🛑 Polling stopped, job status:', data.status);
+                        
+                        if (data.status === 'completed') {
+                            console.log('✅ Job completed, calling showConversionResult');
+                            showConversionResult(data, jobId);
+                            // Keep button as "Processing..." until download is clicked
+                        } else {
+                            console.log('❌ Job failed');
+                            showJobError(data.error_message || 'Conversion failed. Please try again.');
+                            const submitBtn = form.querySelector('button.btn-primary, button[type="button"], button[type="submit"]');
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = 'Convert Video';
+                            }
+                            state.isProcessing = false;
+                            state.isAsyncJob = false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                    // Continue polling on error (might be temporary network issue)
+                });
+        }, 2000); // Poll every 2 seconds
+    }
+    
+    function updateJobStatus(data) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobIdDisplay = document.getElementById('jobIdDisplay');
+        const jobError = document.getElementById('jobError');
+        
+        if (!jobStatusMessage || !jobIdDisplay || !jobError) return;
+        
+        jobIdDisplay.textContent = `Job ID: ${data.job_id}`;
+        jobError.style.display = 'none';
+        
+        let statusText = '';
+        let spinner = '<div class="spinner"></div>';
+        
+        switch (data.status) {
+            case 'pending':
+                statusText = `${spinner} Job created. Waiting to process...`;
+                break;
+            case 'processing':
+                statusText = `${spinner} Converting video file...`;
+                break;
+            case 'completed':
+                statusText = '✅ Conversion completed!';
+                break;
+            case 'failed':
+                statusText = '❌ Conversion failed.';
+                jobError.textContent = data.error_message || 'An unknown error occurred.';
+                jobError.style.display = 'block';
+                break;
+            default:
+                statusText = `${spinner} Unknown status: ${data.status}`;
+        }
+        jobStatusMessage.innerHTML = statusText;
+    }
+    
+    function showConversionResult(data, jobId) {
+        console.log('🎯 showConversionResult called with jobId:', jobId);
+        const resultsArea = document.getElementById('resultsArea');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if (!resultsArea || !downloadBtn) {
+            console.error('❌ Results area or download button not found!', { resultsArea, downloadBtn });
+            return;
+        }
+        
+        console.log('✅ Found results area and download button');
+        
+        // Update download link
+        downloadBtn.href = `/media-converter/job/download/${jobId}/`;
+        console.log('✅ Download link set to:', downloadBtn.href);
+        
+        // Use onclick directly for more reliable behavior
+        downloadBtn.onclick = function resetButtonAfterDownload(e) {
+            console.log('🔵🔵🔵 Download button clicked, resetting form button');
+            
+            // Reset the form button immediately
+            let submitBtn = document.querySelector('.converter-tool button.btn-primary');
+            if (!submitBtn) {
+                submitBtn = document.querySelector('.converter-tool button[type="submit"]');
+            }
+            if (!submitBtn) {
+                submitBtn = document.querySelector('.converter-tool button[type="button"]');
+            }
+            if (!submitBtn) {
+                const form = document.querySelector('.converter-tool');
+                if (form) {
+                    submitBtn = form.querySelector('button');
+                }
+            }
+            
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Convert Video';
+                console.log('✅✅✅ Form button reset to "Convert Video"');
+            } else {
+                console.error('❌❌❌ Could not find submit button to reset');
+            }
+            
+            // Reset state flags using global state
+            if (state) {
+                state.isProcessing = false;
+                state.isAsyncJob = false;
+                console.log('✅✅✅ State flags reset');
+            } else {
+                console.warn('⚠️ Global state not found');
+            }
+            
+            // Allow default download behavior
+            return true;
+        };
+        
+        console.log('✅ Download button onclick handler attached');
+        
+        // Show results area
+        resultsArea.style.display = 'block';
+        document.getElementById('jobStatusArea').style.display = 'none';
+        console.log('✅ Results area displayed');
+    }
+    
+    function showJobError(message) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobError = document.getElementById('jobError');
+        if (!jobStatusMessage || !jobError) return;
+        jobStatusMessage.innerHTML = '❌ Error occurred.';
+        jobError.textContent = message;
+        jobError.style.display = 'block';
+    }
 });
 </script>
-{% endblock %}
-{% endblock %}
+{% endblock extra_js %}
 

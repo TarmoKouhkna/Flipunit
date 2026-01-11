@@ -1,8 +1,10 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.urls import reverse
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.conf import settings
+from django.db import connection
+from django.core.cache import cache
 import os
 from .models import Feedback
 
@@ -448,4 +450,49 @@ def bing_site_auth_view(request):
             response['Cache-Control'] = 'public, max-age=3600'
             return response
     return HttpResponse(status=404)
+
+
+def health_check(request):
+    """Health check endpoint for monitoring"""
+    health_status = {
+        'status': 'healthy',
+        'checks': {}
+    }
+    
+    # Check database connection
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            health_status['checks']['database'] = 'ok'
+    except Exception as e:
+        health_status['checks']['database'] = f'error: {str(e)}'
+        health_status['status'] = 'unhealthy'
+    
+    # Check Redis connection
+    try:
+        cache.set('health_check', 'ok', 10)
+        result = cache.get('health_check')
+        if result == 'ok':
+            health_status['checks']['redis'] = 'ok'
+        else:
+            health_status['checks']['redis'] = 'error: cache test failed'
+            health_status['status'] = 'unhealthy'
+    except Exception as e:
+        health_status['checks']['redis'] = f'error: {str(e)}'
+        health_status['status'] = 'unhealthy'
+    
+    # Check Celery workers (basic check via Redis)
+    try:
+        from celery import current_app
+        inspect = current_app.control.inspect()
+        active_workers = inspect.active()
+        if active_workers:
+            health_status['checks']['celery'] = f'ok: {len(active_workers)} workers active'
+        else:
+            health_status['checks']['celery'] = 'warning: no active workers'
+    except Exception as e:
+        health_status['checks']['celery'] = f'warning: {str(e)}'
+    
+    status_code = 200 if health_status['status'] == 'healthy' else 503
+    return JsonResponse(health_status, status=status_code)
 

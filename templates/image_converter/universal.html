@@ -75,10 +75,45 @@
         </div>
         
         <button type="submit" class="btn btn-primary btn-block" id="convertBtn" style="margin-top: 1.5rem;">
-            <span id="btnText">Convert & Download</span>
+            <span id="btnText">Convert Image</span>
             <span id="btnLoader" style="display: none;">⏳ Converting...</span>
         </button>
     </form>
+    
+    <!-- Job Status Area (for async processing) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div id="jobStatusMessage" style="text-align: center; font-size: 1.1rem; margin-bottom: 1rem;">
+            <div class="spinner"></div> Processing...
+        </div>
+        <div id="jobIdDisplay" style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+        <div id="jobError" style="display: none; color: var(--error-color); text-align: center; margin-top: 1rem;"></div>
+    </div>
+    
+    <!-- Results Area (for completed jobs) -->
+    <div id="resultsArea" style="display: none; margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 6px;">
+        <div style="text-align: center;">
+            <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ Conversion Completed!</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">Your image has been converted. Click below to download.</p>
+            <a id="downloadBtn" href="#" class="btn btn-primary" style="min-width: 220px; font-size: 1rem;">⬇️ Download Converted Image</a>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+    </style>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3 style="margin-bottom: 0.75rem;">Format Information</h3>
@@ -349,19 +384,48 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Check if this is a ZIP file (batch conversion)
             if (contentTypeHeader?.includes('application/zip')) {
-                // ZIP format - batch conversion
+                // ZIP format - batch conversion (synchronous)
                 blob = await response.blob();
                 filename = 'converted_images.zip';
                 contentType = 'application/zip';
                 blob = new Blob([blob], { type: contentType });
             } else if (contentTypeHeader?.includes('application/json')) {
-                // JSON format - single file conversion
+                // JSON format - check for async job or legacy base64
                 const data = await response.json();
+                console.log('📦 Response data:', data); // Debug: log the actual response
                 
                 if (data.error) {
                     throw new Error(data.error);
                 }
                 
+                // Check if this is an async job response (has job_id)
+                if (data.job_id) {
+                    console.log('✅ Found job_id in response:', data.job_id);
+                    // Async job - start polling
+                    console.log('🔄 Async job created:', data.job_id);
+                    
+                    // Mark as async job to prevent finally block from resetting button
+                    state.isAsyncJob = true;
+                    
+                    // Update button to show processing state
+                    convertBtn.disabled = true;
+                    btnText.textContent = 'Processing...';
+                    btnText.style.display = 'inline';
+                    btnLoader.style.display = 'none';
+                    
+                    // Show job status area
+                    document.getElementById('jobStatusArea').style.display = 'block';
+                    document.getElementById('resultsArea').style.display = 'none';
+                    document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
+                    document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
+                    document.getElementById('jobError').style.display = 'none';
+                    
+                    // Start polling
+                    startJobPolling(data.job_id);
+                    return; // Exit early - polling will handle completion
+                }
+                
+                // Legacy base64 format - handle as before
                 const binary = atob(data.file);
                 const bytes = new Uint8Array(binary.length);
                 for (let i = 0; i < binary.length; i++) {
@@ -422,17 +486,162 @@ document.addEventListener('DOMContentLoaded', function() {
             const errorMessage = err.message || 'Conversion failed. Please try again.';
             alert(errorMessage);
         } finally {
-            // Always reset
-            console.log('🔓 Releasing lock');
-            state.isProcessing = false;
-            state.abortController = null;
+            // Always reset button state (unless async job)
+            console.log('🔓 Releasing lock (submit count:', state.submitCount, ')');
             
-            convertBtn.disabled = false;
-            btnText.style.display = 'inline';
-            btnLoader.style.display = 'none';
-            converterForm.style.pointerEvents = 'auto';
+            if (!state.isAsyncJob) {
+                state.isProcessing = false;
+                state.downloadTriggered = false;
+                state.abortController = null;
+                
+                convertBtn.disabled = false;
+                btnText.style.display = 'inline';
+                btnText.textContent = 'Convert Image';
+                btnLoader.style.display = 'none';
+                converterForm.style.pointerEvents = 'auto';
+            } else {
+                // For async jobs, only clear abort controller and reset download flag
+                state.downloadTriggered = false;
+                state.abortController = null;
+                converterForm.style.pointerEvents = 'auto';
+                // Keep button as "Processing..." and isProcessing = true
+            }
         }
     };
+    
+    // Async job polling functions
+    let pollInterval = null;
+    
+    function startJobPolling(jobId) {
+        clearInterval(pollInterval);
+        
+        console.log('🔄 Starting job polling for jobId:', jobId);
+        pollInterval = setInterval(() => {
+            fetch(`/image-converter/job/status/${jobId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    updateJobStatus(data);
+
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        console.log('🛑 Polling stopped, job status:', data.status);
+                        
+                        if (data.status === 'completed') {
+                            console.log('✅ Job completed, calling showConversionResult');
+                            showConversionResult(data, jobId);
+                            // Keep button as "Processing..." until download is clicked
+                        } else {
+                            console.log('❌ Job failed');
+                            showJobError(data.error_message || 'Conversion failed. Please try again.');
+                            convertBtn.disabled = false;
+                            btnText.textContent = 'Convert Image';
+                            btnText.style.display = 'inline';
+                            btnLoader.style.display = 'none';
+                            state.isProcessing = false;
+                            state.isAsyncJob = false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                });
+        }, 2000); // Poll every 2 seconds
+    }
+    
+    function updateJobStatus(data) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobIdDisplay = document.getElementById('jobIdDisplay');
+        const jobError = document.getElementById('jobError');
+        
+        if (!jobStatusMessage || !jobIdDisplay || !jobError) return;
+        
+        jobIdDisplay.textContent = `Job ID: ${data.job_id}`;
+        jobError.style.display = 'none';
+        
+        let statusText = '';
+        let spinner = '<div class="spinner"></div>';
+        
+        switch (data.status) {
+            case 'pending':
+                statusText = `${spinner} Job created. Waiting to process...`;
+                break;
+            case 'processing':
+                statusText = `${spinner} Converting image...`;
+                break;
+            case 'completed':
+                statusText = '✅ Conversion completed!';
+                break;
+            case 'failed':
+                statusText = '❌ Conversion failed.';
+                jobError.textContent = data.error_message || 'An unknown error occurred.';
+                jobError.style.display = 'block';
+                break;
+            default:
+                statusText = `${spinner} Unknown status: ${data.status}`;
+        }
+        jobStatusMessage.innerHTML = statusText;
+    }
+    
+    function showConversionResult(data, jobId) {
+        console.log('🎯 showConversionResult called with jobId:', jobId);
+        const resultsArea = document.getElementById('resultsArea');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if (!resultsArea || !downloadBtn) {
+            console.error('❌ Results area or download button not found!');
+            return;
+        }
+        
+        console.log('✅ Found results area and download button');
+        
+        // Update download link
+        downloadBtn.href = `/image-converter/job/download/${jobId}/`;
+        console.log('✅ Download link set to:', downloadBtn.href);
+        
+        // Use onclick directly for more reliable behavior
+        downloadBtn.onclick = function resetButtonAfterDownload(e) {
+            console.log('🔵🔵🔵 Download button clicked, resetting form button');
+            
+            // Reset the form button immediately
+            if (convertBtn) {
+                convertBtn.disabled = false;
+                btnText.textContent = 'Convert Image';
+                btnText.style.display = 'inline';
+                btnLoader.style.display = 'none';
+                console.log('✅✅✅ Form button reset to "Convert Image"');
+            } else {
+                console.error('❌❌❌ Could not find submit button to reset');
+            }
+            
+            // Reset state flags using global state
+            if (state) {
+                state.isProcessing = false;
+                state.isAsyncJob = false;
+                console.log('✅✅✅ State flags reset');
+            } else {
+                console.warn('⚠️ Global state not found');
+            }
+            
+            // Allow default download behavior
+            return true;
+        };
+        
+        console.log('✅ Download button onclick handler attached');
+        
+        // Show results area
+        resultsArea.style.display = 'block';
+        document.getElementById('jobStatusArea').style.display = 'none';
+        console.log('✅ Results area displayed');
+    }
+    
+    function showJobError(message) {
+        const jobStatusMessage = document.getElementById('jobStatusMessage');
+        const jobError = document.getElementById('jobError');
+        if (!jobStatusMessage || !jobError) return;
+        jobStatusMessage.innerHTML = '❌ Error occurred.';
+        jobError.textContent = message;
+        jobError.style.display = 'block';
+    }
     
     // Prevent default form submission and use our handler
     converterForm.addEventListener('submit', submitHandler);

@@ -1,6 +1,9 @@
-from django.shortcuts import render
-from django.http import HttpResponse
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, JsonResponse, FileResponse
+from django.conf import settings
 import os
+import uuid
+import logging
 from PIL import Image, ImageDraw, ImageFont
 import io
 import zipfile
@@ -370,56 +373,112 @@ def universal_converter(request):
         except (ValueError, TypeError):
             quality = 95
     
+    # Check if this is an AJAX request
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    logger = logging.getLogger(__name__)
+    
     try:
-        # Single file conversion
+        # Single file conversion - use hybrid approach: sync for small files, async for large files
         if not is_batch:
             uploaded_file = uploaded_files[0]
-            # Convert single image
-            converted_data, ext = _convert_single_image(uploaded_file, output_format, quality)
             
-            # Determine content type
-            content_type_map = {
-                'PNG': 'image/png',
-                'JPEG': 'image/jpeg',
-                'WEBP': 'image/webp',
-                'BMP': 'image/bmp',
-                'TIFF': 'image/tiff',
-                'GIF': 'image/gif',
-                'ICO': 'image/x-icon',
-                'AVIF': 'image/avif',
-            }
-            content_type = content_type_map.get(output_format, 'image/png')
+            # Threshold: Use async for files > 5MB (larger files benefit from async, small files are faster sync)
+            ASYNC_THRESHOLD = 5 * 1024 * 1024  # 5MB
+            use_async = uploaded_file.size > ASYNC_THRESHOLD
             
-            # Generate filename
-            base_name = os.path.splitext(uploaded_file.name)[0]
-            base_name = ''.join(c for c in base_name if c.isalnum() or c in (' ', '-', '_', '.')).strip()
-            base_name = base_name.replace(' ', '_')
-            safe_filename = f'{base_name}.{ext}' if base_name else f'converted.{ext}'
-            
-            # Check if this is an AJAX request - return JSON like audio converter
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-                # Encode file as base64 to send as JSON
-                file_base64 = base64.b64encode(converted_data).decode('utf-8')
+            if not use_async:
+                # Small file - process synchronously for speed
+                converted_data, ext = _convert_single_image(uploaded_file, output_format, quality)
                 
-                response_data = {
-                    'file': file_base64,
-                    'filename': safe_filename,
-                    'content_type': content_type
+                # Determine content type
+                content_type_map = {
+                    'PNG': 'image/png',
+                    'JPEG': 'image/jpeg',
+                    'WEBP': 'image/webp',
+                    'BMP': 'image/bmp',
+                    'TIFF': 'image/tiff',
+                    'GIF': 'image/gif',
+                    'ICO': 'image/x-icon',
+                    'AVIF': 'image/avif',
                 }
+                content_type = content_type_map.get(output_format, 'image/png')
                 
-                response = HttpResponse(
-                    json.dumps(response_data),
-                    content_type='application/json'
-                )
-                response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-                response['Pragma'] = 'no-cache'
-                response['Expires'] = '0'
-                return response
+                # Generate filename
+                base_name = os.path.splitext(uploaded_file.name)[0]
+                base_name = ''.join(c for c in base_name if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+                base_name = base_name.replace(' ', '_')
+                safe_filename = f'{base_name}.{ext}' if base_name else f'converted.{ext}'
+                
+                # Return response (sync path - fast for small files)
+                if is_ajax:
+                    # Encode file as base64 to send as JSON (legacy format for sync path)
+                    file_base64 = base64.b64encode(converted_data).decode('utf-8')
+                    response_data = {
+                        'file': file_base64,
+                        'filename': safe_filename,
+                        'content_type': content_type
+                    }
+                    response = HttpResponse(
+                        json.dumps(response_data),
+                        content_type='application/json'
+                    )
+                    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+                    response['Pragma'] = 'no-cache'
+                    response['Expires'] = '0'
+                    return response
+                else:
+                    # Legacy format - direct file download
+                    response = HttpResponse(converted_data, content_type=content_type)
+                    response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
+                    return response
             
-            # Legacy format - direct file download
-            response = HttpResponse(converted_data, content_type=content_type)
-            response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
-            return response
+            # Large file - use async pattern
+            # Save file to shared media directory (accessible by both web and worker containers)
+            media_dir = os.path.join(settings.MEDIA_ROOT, 'image_conversions')
+            os.makedirs(media_dir, exist_ok=True)
+            
+            # Create unique filename
+            file_ext = os.path.splitext(uploaded_file.name)[1]
+            unique_id = uuid.uuid4().hex[:8]
+            temp_filename = f'temp_{unique_id}{file_ext}'
+            input_path = os.path.join(media_dir, temp_filename)
+            
+            # Save uploaded file
+            with open(input_path, 'wb') as f:
+                for chunk in uploaded_file.chunks():
+                    f.write(chunk)
+            
+            # Get user IP for quota tracking
+            user_ip = request.META.get('REMOTE_ADDR')
+            if not user_ip:
+                user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+            
+            # Import here to avoid circular imports
+            from .models import ImageJob
+            from .tasks import image_converter_task
+            
+            # Create ImageJob
+            job = ImageJob.objects.create(
+                operation='image_converter',
+                file_key=input_path,
+                file_size=uploaded_file.size,
+                output_format=output_format.lower(),
+                user_ip=user_ip,
+                status='pending'
+            )
+            
+            # Enqueue conversion task
+            logger.info(f'Enqueuing async image conversion task for job {job.job_id} (file size: {uploaded_file.size} bytes)')
+            image_converter_task.delay(str(job.job_id), input_path, output_format, uploaded_file.name, quality)
+            
+            logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+            if is_ajax:
+                return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+            else:
+                return render(request, 'image_converter/universal.html', {
+                    'job_id': str(job.job_id),
+                    'status': 'pending',
+                })
         
         # Batch conversion - create ZIP file
         zip_buffer = io.BytesIO()
@@ -1395,3 +1454,72 @@ def watermark_image(request):
         return render(request, 'image_converter/watermark.html', {
             'error': f'Error processing image: {str(e)}'
         })
+
+
+def job_status(request, job_id):
+    """Get job status as JSON"""
+    from .models import ImageJob
+    job = get_object_or_404(ImageJob, job_id=job_id)
+    
+    response_data = {
+        'job_id': str(job.job_id),
+        'status': job.status,
+        'operation': job.operation,
+        'created_at': job.created_at.isoformat(),
+        'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+        'progress': job.progress,
+    }
+    
+    if job.status == 'completed' and job.output_file_key:
+        response_data['output_filename'] = os.path.basename(job.output_file_key)
+    
+    if job.status == 'failed':
+        response_data['error_message'] = job.error_message
+    
+    return JsonResponse(response_data)
+
+
+def download_result(request, job_id):
+    """Download job result file"""
+    from .models import ImageJob
+    import re
+    job = get_object_or_404(ImageJob, job_id=job_id)
+    
+    if job.status != 'completed':
+        return HttpResponse('Job not completed yet', status=400)
+    
+    if not job.output_file_key or not os.path.exists(job.output_file_key):
+        return HttpResponse('Output file not found', status=404)
+    
+    # Generate safe filename from original file name and output format
+    original_name = os.path.basename(job.file_key)
+    base_name = os.path.splitext(original_name)[0]
+    # Remove temp_ prefix if present
+    if base_name.startswith('temp_'):
+        base_name = base_name[5:]
+    base_name = re.sub(r'[^\w\s.-]', '', base_name).strip()
+    base_name = re.sub(r'[-\s]+', '-', base_name)
+    
+    output_ext = job.output_format or os.path.splitext(job.output_file_key)[1].lstrip('.')
+    safe_filename = f'{base_name}.{output_ext}'
+    
+    # Determine content type
+    content_type_map = {
+        'png': 'image/png',
+        'jpeg': 'image/jpeg',
+        'jpg': 'image/jpeg',
+        'webp': 'image/webp',
+        'bmp': 'image/bmp',
+        'tiff': 'image/tiff',
+        'gif': 'image/gif',
+        'ico': 'image/x-icon',
+        'avif': 'image/avif',
+    }
+    content_type = content_type_map.get(output_ext.lower(), 'application/octet-stream')
+    
+    return FileResponse(
+        open(job.output_file_key, 'rb'),
+        content_type=content_type,
+        as_attachment=True,
+        filename=safe_filename
+    )

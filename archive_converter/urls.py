@@ -12,5 +12,7 @@ urlpatterns = [
     path('zip-to-targz/', views.zip_to_targz, name='zip_to_targz'),
     path('extract-iso/', views.extract_iso, name='extract_iso'),
     path('create-zip/', views.create_zip_from_files, name='create_zip'),
+    path('job/status/<uuid:job_id>/', views.job_status, name='job_status'),
+    path('job/download/<uuid:job_id>/', views.download_result, name='download_result'),
 ]
 

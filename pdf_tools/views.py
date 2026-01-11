@@ -1,12 +1,15 @@
-from django.shortcuts import render
-from django.http import HttpResponse
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, JsonResponse, FileResponse
 from django.contrib import messages
+from django.conf import settings
 import io
 import zipfile
 import os
 import tempfile
 import subprocess
 import shutil
+import uuid
+import logging
 from pypdf import PdfWriter, PdfReader
 from PIL import Image
 
@@ -914,14 +917,22 @@ def pdf_split(request):
 def pdf_to_images(request):
     """Convert PDF pages to images"""
     if not PDF2IMAGE_AVAILABLE:
-        messages.error(request, 'PDF to images conversion requires pdf2image and poppler. Install with: brew install poppler (macOS) or apt-get install poppler-utils (Linux)')
+        error_msg = 'PDF to images conversion requires pdf2image and poppler. Install with: brew install poppler (macOS) or apt-get install poppler-utils (Linux)'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'pdf_tools/pdf_to_images.html')
     
     if request.method != 'POST':
         return render(request, 'pdf_tools/pdf_to_images.html')
     
     if 'pdf_file' not in request.FILES:
-        messages.error(request, 'Please upload a PDF file.')
+        error_msg = 'Please upload a PDF file.'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'pdf_tools/pdf_to_images.html')
     
     pdf_file = request.FILES['pdf_file']
@@ -929,43 +940,78 @@ def pdf_to_images(request):
     # Validate file size (max 50MB for PDFs)
     max_size = 50 * 1024 * 1024  # 50MB
     if pdf_file.size > max_size:
-        messages.error(request, f'File size exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
+        error_msg = f'File size exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'pdf_tools/pdf_to_images.html')
     
     if not pdf_file.name.lower().endswith('.pdf'):
-        messages.error(request, 'Please upload a valid PDF file.')
+        error_msg = 'Please upload a valid PDF file.'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'pdf_tools/pdf_to_images.html')
     
+    # Check if this is an AJAX request
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    logger = logging.getLogger(__name__)
+    
     try:
-        pdf_data = pdf_file.read()
-        images = convert_from_bytes(pdf_data, dpi=200)
+        # Save file to shared media directory (accessible by both web and worker containers)
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'pdf_conversions')
+        os.makedirs(media_dir, exist_ok=True)
         
-        if not images:
-            messages.error(request, 'No images could be extracted from the PDF.')
-            return render(request, 'pdf_tools/pdf_to_images.html')
+        # Create unique filename
+        unique_id = uuid.uuid4().hex[:8]
+        temp_filename = f'temp_{unique_id}.pdf'
+        input_path = os.path.join(media_dir, temp_filename)
         
-        # Create ZIP file with all images
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for i, image in enumerate(images):
-                img_buffer = io.BytesIO()
-                image.save(img_buffer, format='PNG')
-                img_buffer.seek(0)
-                zip_file.writestr(f'page_{i + 1}.png', img_buffer.read())
+        # Save uploaded file
+        with open(input_path, 'wb') as f:
+            for chunk in pdf_file.chunks():
+                f.write(chunk)
         
-        zip_buffer.seek(0)
+        # Get user IP for quota tracking
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        # Return ZIP file
-        response = HttpResponse(zip_buffer.read(), content_type='application/zip')
-        response['Content-Disposition'] = 'attachment; filename="pdf_images.zip"'
-        return response
+        # Import here to avoid circular imports
+        from .models import PDFJob
+        from .tasks import pdf_to_images_task
+        
+        # Create PDFJob
+        job = PDFJob.objects.create(
+            operation='pdf_to_images',
+            file_key=input_path,
+            file_size=pdf_file.size,
+            user_ip=user_ip,
+            status='pending'
+        )
+        
+        # Enqueue conversion task
+        logger.info(f'Enqueuing async PDF to images task for job {job.job_id}')
+        pdf_to_images_task.delay(str(job.job_id), input_path)
+        
+        logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+        else:
+            return render(request, 'pdf_tools/pdf_to_images.html', {
+                'job_id': str(job.job_id),
+                'status': 'pending',
+            })
         
     except Exception as e:
-        error_msg = str(e)
-        if 'poppler' in error_msg.lower() or 'pdftoppm' in error_msg.lower():
-            messages.error(request, 'Poppler is required for PDF to images conversion. Install with: brew install poppler (macOS)')
-        else:
-            messages.error(request, f'Error converting PDF to images: {error_msg}')
+        logger.error(f'Error initiating PDF to images conversion: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating PDF to images conversion: {str(e)}'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
+        messages.error(request, error_msg)
         return render(request, 'pdf_tools/pdf_to_images.html')
 
 def pdf_to_html(request):
@@ -3136,4 +3182,42 @@ def pdf_to_epub(request):
         return render(request, 'pdf_tools/pdf_to_epub.html', {
             'ebooklib_available': EBOOKLIB_AVAILABLE,
         })
+
+
+def job_status(request, job_id):
+    """Get job status as JSON"""
+    from .models import PDFJob
+    job = get_object_or_404(PDFJob, job_id=job_id)
+    
+    response_data = {
+        'job_id': str(job.job_id),
+        'status': job.status,
+        'operation': job.operation,
+        'created_at': job.created_at.isoformat(),
+        'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+        'progress': job.progress,
+    }
+    
+    if job.status == 'failed':
+        response_data['error_message'] = job.error_message
+    
+    return JsonResponse(response_data)
+
+
+def download_result(request, job_id):
+    """Download job result file"""
+    from .models import PDFJob
+    job = get_object_or_404(PDFJob, job_id=job_id)
+    
+    if job.status != 'completed':
+        return HttpResponse('Job not completed yet', status=400)
+    
+    if not job.output_file_key or not os.path.exists(job.output_file_key):
+        return HttpResponse('Output file not found', status=404)
+    
+    return FileResponse(
+        open(job.output_file_key, 'rb'),
+        as_attachment=True,
+        filename=os.path.basename(job.output_file_key)
+    )
 

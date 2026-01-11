@@ -1,6 +1,7 @@
-from django.shortcuts import render
-from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, JsonResponse, FileResponse
 from django.contrib import messages
+from django.utils import timezone
 import base64
 import json
 import re
@@ -10,6 +11,10 @@ import os
 import tempfile
 import shutil
 import subprocess
+import uuid
+from django.conf import settings
+from .models import TranscriptionJob
+from .tasks import transcribe_audio_task, estimate_transcription_cost
 
 # Check for optional dependencies
 try:
@@ -605,7 +610,10 @@ def audio_transcription(request):
     
     # Check if OpenAI is available
     if not OPENAI_AVAILABLE:
-        messages.error(request, 'OpenAI library is not installed. Please install with: pip install openai')
+        error_msg = 'OpenAI library is not installed. Please install with: pip install openai'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
             'docx_available': DOCX_AVAILABLE,
@@ -615,7 +623,10 @@ def audio_transcription(request):
     from django.conf import settings
     api_key = settings.OPENAI_API_KEY
     if not api_key:
-        messages.error(request, 'OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file.')
+        error_msg = 'OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
             'docx_available': DOCX_AVAILABLE,
@@ -623,7 +634,10 @@ def audio_transcription(request):
     
     # Check for uploaded file
     if 'audio_file' not in request.FILES:
-        messages.error(request, 'Please upload an audio file.')
+        error_msg = 'Please upload an audio file.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
             'docx_available': DOCX_AVAILABLE,
@@ -634,7 +648,10 @@ def audio_transcription(request):
     # Validate file size (max 700MB, consistent with other tools)
     max_size = 700 * 1024 * 1024  # 700MB
     if uploaded_file.size > max_size:
-        messages.error(request, f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.')
+        error_msg = f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
             'docx_available': DOCX_AVAILABLE,
@@ -645,7 +662,10 @@ def audio_transcription(request):
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
     
     if file_ext not in allowed_extensions:
-        messages.error(request, 'Invalid file type. Please upload MP3, WAV, M4A, or OGG files.')
+        error_msg = 'Invalid file type. Please upload MP3, WAV, M4A, or OGG files.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'text_converter/audio_transcription.html', {
             'openai_available': OPENAI_AVAILABLE,
             'docx_available': DOCX_AVAILABLE,
@@ -658,75 +678,144 @@ def audio_transcription(request):
         # but still proceed (client-side validation should catch it)
         ffprobe_path = None
     
-    temp_dir = None
+    # Save file to shared media directory (accessible by both web and worker containers)
+    # Use MEDIA_ROOT which is mounted as a volume in docker-compose
+    media_dir = os.path.join(settings.MEDIA_ROOT, 'transcriptions')
+    os.makedirs(media_dir, exist_ok=True)
+    
+    # Create unique filename
+    unique_id = uuid.uuid4().hex[:8]
+    temp_filename = f'temp_{unique_id}{file_ext}'
+    input_path = os.path.join(media_dir, temp_filename)
+    
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
-        input_path = os.path.join(temp_dir, f'input{file_ext}')
-        
         # Save uploaded file
         with open(input_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         
         # Validate audio duration using ffprobe (server-side check)
+        duration = None
         if ffprobe_path:
             duration = _get_audio_duration(input_path, ffprobe_path)
             if duration is not None:
                 max_duration = 30 * 60  # 30 minutes in seconds
                 if duration > max_duration:
-                    messages.error(request, f'Audio duration ({duration / 60:.1f} minutes) exceeds the 30-minute limit. Please use the audio splitter tool to shorten your file.')
+                    error_msg = f'Audio duration ({duration / 60:.1f} minutes) exceeds the 30-minute limit. Please use the audio splitter tool to shorten your file.'
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+                        return JsonResponse({'error': error_msg}, status=400)
+                    messages.error(request, error_msg)
                     return render(request, 'text_converter/audio_transcription.html', {
                         'openai_available': OPENAI_AVAILABLE,
                         'docx_available': DOCX_AVAILABLE,
                         'duration_exceeded': True,
                     })
         
-        # Transcribe audio using OpenAI Whisper API
-        transcription_text, detected_language = _transcribe_audio(input_path, api_key)
+        # Get user IP for quota tracking
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        if transcription_text is None:
-            messages.error(request, 'Failed to transcribe audio. Please check your API key and try again.')
+        # Create TranscriptionJob
+        file_size_mb = uploaded_file.size / (1024 * 1024)
+        cost_estimate = estimate_transcription_cost(file_size_mb, duration / 60 if duration else None)
+        
+        job = TranscriptionJob.objects.create(
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            duration_seconds=duration,
+            user_ip=user_ip,
+            cost_estimate=cost_estimate,
+            status='pending'
+        )
+        
+        # Enqueue transcription task
+        transcribe_audio_task.delay(str(job.job_id), input_path, api_key)
+        
+        # Return job_id for polling (async)
+        # Check if this is an AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+            return JsonResponse({
+                'job_id': str(job.job_id),
+                'status': 'pending',
+                'message': 'Transcription job created. Processing in background...'
+            })
+        else:
+            # Fallback for non-AJAX requests
+            return render(request, 'text_converter/audio_transcription.html', {
+                'openai_available': OPENAI_AVAILABLE,
+                'docx_available': DOCX_AVAILABLE,
+                'job_id': str(job.job_id),
+                'status': 'pending',
+            })
+        
+    except Exception as e:
+        logger.error(f'Error initiating transcription: {str(e)}', exc_info=True)
+        # Check if this is an AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+            return JsonResponse({
+                'error': f'Error processing file: {str(e)}'
+            }, status=500)
+        else:
+            messages.error(request, f'Error processing file: {str(e)}')
             return render(request, 'text_converter/audio_transcription.html', {
                 'openai_available': OPENAI_AVAILABLE,
                 'docx_available': DOCX_AVAILABLE,
             })
-        
-        # Return results
-        return render(request, 'text_converter/audio_transcription.html', {
-            'openai_available': OPENAI_AVAILABLE,
-            'transcription': transcription_text,
-            'detected_language': detected_language,
-            'docx_available': DOCX_AVAILABLE,
-        })
-        
-    except Exception as e:
-        messages.error(request, f'Error processing file: {str(e)}')
-        return render(request, 'text_converter/audio_transcription.html', {
-            'openai_available': OPENAI_AVAILABLE,
-            'docx_available': DOCX_AVAILABLE,
-        })
-    finally:
-        # Clean up temporary files
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+    # Note: Don't clean up temp_dir here - task will handle it
 
 
-def download_transcription_docx(request):
+def job_status(request, job_id):
+    """Get job status as JSON"""
+    job = get_object_or_404(TranscriptionJob, job_id=job_id)
+    
+    response_data = {
+        'job_id': str(job.job_id),
+        'status': job.status,
+        'created_at': job.created_at.isoformat(),
+        'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+    }
+    
+    if job.status == 'completed':
+        response_data['transcription_text'] = job.transcription_text
+        response_data['detected_language'] = job.detected_language
+    elif job.status == 'failed':
+        response_data['error_message'] = job.error_message
+    
+    return JsonResponse(response_data)
+
+
+def download_transcript(request, job_id):
+    """Download transcription as text file"""
+    job = get_object_or_404(TranscriptionJob, job_id=job_id)
+    
+    if job.status != 'completed':
+        return HttpResponse('Job not completed yet', status=400)
+    
+    if not job.transcription_text:
+        return HttpResponse('No transcription text available', status=404)
+    
+    from datetime import datetime
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    filename = f'transcription-{timestamp}.txt'
+    
+    response = HttpResponse(job.transcription_text, content_type='text/plain; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+def download_docx(request, job_id):
     """Download transcription as .docx file"""
-    if request.method != 'POST':
-        return HttpResponse('Method not allowed', status=405)
+    job = get_object_or_404(TranscriptionJob, job_id=job_id)
+    
+    if job.status != 'completed':
+        return HttpResponse('Job not completed yet', status=400)
     
     if not DOCX_AVAILABLE:
         return HttpResponse('python-docx library is not installed', status=503)
     
-    transcription_text = request.POST.get('transcription', '').strip()
-    
-    if not transcription_text:
-        return HttpResponse('No transcription text provided', status=400)
+    if not job.transcription_text:
+        return HttpResponse('No transcription text available', status=404)
     
     try:
         import io
@@ -739,13 +828,10 @@ def download_transcription_docx(request):
         doc.add_heading('Audio Transcription', 0)
         
         # Add transcription text
-        # Split by paragraphs (double newlines) for better formatting
-        # If no double newlines, split by single newlines
-        if '\n\n' in transcription_text:
-            paragraphs = transcription_text.split('\n\n')
+        if '\n\n' in job.transcription_text:
+            paragraphs = job.transcription_text.split('\n\n')
         else:
-            # Split by single newlines if no double newlines found
-            paragraphs = transcription_text.split('\n')
+            paragraphs = job.transcription_text.split('\n')
         
         for para in paragraphs:
             if para.strip():
@@ -761,6 +847,60 @@ def download_transcription_docx(request):
         filename = f'transcription-{timestamp}.docx'
         
         # Create HTTP response
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error creating DOCX: {str(e)}')
+        return HttpResponse(f'Error creating document: {str(e)}', status=500)
+
+
+def download_transcription_docx(request):
+    """Legacy endpoint - redirects to async pattern"""
+    # For backward compatibility, but should use download_docx with job_id
+    if request.method != 'POST':
+        return HttpResponse('Method not allowed', status=405)
+    
+    transcription_text = request.POST.get('transcription', '').strip()
+    
+    if not transcription_text:
+        return HttpResponse('No transcription text provided', status=400)
+    
+    # Create a temporary job for this legacy endpoint
+    # In production, you might want to deprecate this
+    try:
+        import io
+        from datetime import datetime
+        
+        if not DOCX_AVAILABLE:
+            return HttpResponse('python-docx library is not installed', status=503)
+        
+        doc = Document()
+        doc.add_heading('Audio Transcription', 0)
+        
+        if '\n\n' in transcription_text:
+            paragraphs = transcription_text.split('\n\n')
+        else:
+            paragraphs = transcription_text.split('\n')
+        
+        for para in paragraphs:
+            if para.strip():
+                doc.add_paragraph(para.strip())
+        
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        filename = f'transcription-{timestamp}.docx'
+        
         response = HttpResponse(
             buffer.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'

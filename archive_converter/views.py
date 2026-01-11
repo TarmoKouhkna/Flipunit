@@ -1,6 +1,7 @@
-from django.shortcuts import render
-from django.http import HttpResponse
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, JsonResponse, FileResponse
 from django.contrib import messages
+from django.conf import settings
 import io
 import zipfile
 import tarfile
@@ -8,6 +9,7 @@ import os
 import tempfile
 import shutil
 import logging
+import uuid
 
 # Check for optional dependencies
 try:
@@ -61,7 +63,11 @@ def rar_to_zip(request):
         })
     
     if 'archive_file' not in request.FILES:
-        messages.error(request, 'Please upload a RAR file.')
+        error_msg = 'Please upload a RAR file.'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'archive_converter/rar_to_zip.html', {
             'rarfile_available': RARFILE_AVAILABLE,
         })
@@ -71,7 +77,11 @@ def rar_to_zip(request):
     # Validate file type
     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
     if file_ext not in ['.rar', '.cbr']:
-        messages.error(request, 'Please upload a RAR or CBR file.')
+        error_msg = 'Please upload a RAR or CBR file.'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'archive_converter/rar_to_zip.html', {
             'rarfile_available': RARFILE_AVAILABLE,
         })
@@ -79,154 +89,87 @@ def rar_to_zip(request):
     # Validate file size (max 500MB)
     max_size = 500 * 1024 * 1024
     if uploaded_file.size > max_size:
-        messages.error(request, f'File size exceeds 500MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.')
+        error_msg = f'File size exceeds 500MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'archive_converter/rar_to_zip.html', {
             'rarfile_available': RARFILE_AVAILABLE,
         })
     
     if not RARFILE_AVAILABLE:
-        messages.error(request, 'RAR support requires rarfile library. Install with: pip install rarfile')
+        error_msg = 'RAR support requires rarfile library. Install with: pip install rarfile'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return render(request, 'archive_converter/rar_to_zip.html', {
             'rarfile_available': RARFILE_AVAILABLE,
         })
     
-    temp_dir = None
+    # Check if this is an AJAX request
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    logger = logging.getLogger(__name__)
+    
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
+        # Save file to shared media directory (accessible by both web and worker containers)
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'archive_conversions')
+        os.makedirs(media_dir, exist_ok=True)
         
-        # Save uploaded RAR - read entire file to ensure it's complete
-        rar_path = os.path.join(temp_dir, 'input.rar')
-        uploaded_file.seek(0)  # Reset file pointer
-        file_content = uploaded_file.read()  # Read entire file into memory
+        # Create unique filename
+        unique_id = uuid.uuid4().hex[:8]
+        temp_filename = f'temp_{unique_id}{file_ext}'
+        input_path = os.path.join(media_dir, temp_filename)
         
-        # Write to disk
-        with open(rar_path, 'wb') as f:
-            f.write(file_content)
-            f.flush()
-            os.fsync(f.fileno())  # Ensure data is written to disk
+        # Save uploaded file
+        with open(input_path, 'wb') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
         
-        # Verify file was written correctly
-        if not os.path.exists(rar_path) or os.path.getsize(rar_path) == 0:
-            messages.error(request, 'Failed to save uploaded file. Please try again.')
-            return render(request, 'archive_converter/rar_to_zip.html', {
-                'rarfile_available': RARFILE_AVAILABLE,
-            })
+        # Get user IP for quota tracking
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        # Verify file size matches
-        if os.path.getsize(rar_path) != uploaded_file.size:
-            messages.error(request, 'File upload incomplete. Please try uploading again.')
-            return render(request, 'archive_converter/rar_to_zip.html', {
-                'rarfile_available': RARFILE_AVAILABLE,
-            })
+        # Import here to avoid circular imports
+        from .models import ArchiveJob
+        from .tasks import archive_converter_task
         
-        # Extract RAR
-        extract_dir = os.path.join(temp_dir, 'extracted')
-        os.makedirs(extract_dir, exist_ok=True)
+        # Create ArchiveJob
+        job = ArchiveJob.objects.create(
+            operation='archive_converter',
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            output_format='zip',
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        try:
-            # Verify file is readable and has content
-            file_size = os.path.getsize(rar_path)
-            if file_size < 100:  # RAR files should be at least 100 bytes
-                messages.error(request, f'File is too small ({file_size} bytes) to be a valid RAR archive.')
-                return render(request, 'archive_converter/rar_to_zip.html', {
-                    'rarfile_available': RARFILE_AVAILABLE,
-                })
-            
-            # Open RAR file and extract
-            # Ensure unrar path is set
-            if RARFILE_AVAILABLE and hasattr(rarfile, 'UNRAR_TOOL'):
-                # Verify unrar is accessible
-                unrar_tool = rarfile.UNRAR_TOOL
-                if unrar_tool != 'unrar' and not os.path.exists(unrar_tool):
-                    # Try to find unrar again
-                    for path in [os.path.expanduser('~/bin/unrar'), '/usr/local/bin/unrar', '/usr/bin/unrar']:
-                        if os.path.exists(path):
-                            rarfile.UNRAR_TOOL = path
-                            break
-            
-            with rarfile.RarFile(rar_path, 'r') as rar_ref:
-                # Test if RAR file is valid
-                file_list = rar_ref.namelist()
-                if not file_list:
-                    messages.error(request, 'The RAR file appears to be empty or corrupted.')
-                    return render(request, 'archive_converter/rar_to_zip.html', {
-                        'rarfile_available': RARFILE_AVAILABLE,
-                    })
-                rar_ref.extractall(extract_dir)
-        except rarfile.RarCannotExec:
-            messages.error(request, 'RAR extraction requires unrar binary. Please install unrar (brew install unrar on macOS, apt-get install unrar on Linux).')
-            return render(request, 'archive_converter/rar_to_zip.html', {
-                'rarfile_available': RARFILE_AVAILABLE,
-            })
-        except (rarfile.RarOpenError, rarfile.RarCRCError, rarfile.RarFatalError, rarfile.RarNoFilesError) as e:
-            messages.error(request, f'RAR file error: {str(e)}. The file may be corrupted, incomplete, or not a valid RAR archive.')
-            return render(request, 'archive_converter/rar_to_zip.html', {
-                'rarfile_available': RARFILE_AVAILABLE,
-            })
-        except Exception as rar_error:
-            # Catch any other rarfile-specific errors
-            error_str = str(rar_error)
-            if 'Failed the read enough data' in error_str or 'req=' in error_str:
-                messages.error(request, 'The RAR file appears to be incomplete or corrupted. Please ensure the file was uploaded completely.')
-            else:
-                messages.error(request, f'RAR processing error: {error_str}')
-            return render(request, 'archive_converter/rar_to_zip.html', {
-                'rarfile_available': RARFILE_AVAILABLE,
-            })
+        # Enqueue conversion task
+        logger.info(f'Enqueuing async RAR to ZIP conversion task for job {job.job_id}')
+        archive_converter_task.delay(str(job.job_id), input_path, 'zip', uploaded_file.name)
         
-        # Create ZIP with path traversal protection
-        output_zip = io.BytesIO()
-        extract_dir_abs = os.path.abspath(extract_dir)
-        with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zip_out:
-            for root, dirs, files in os.walk(extract_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    # Security: Ensure file is within extract_dir (prevent path traversal)
-                    file_path_abs = os.path.abspath(file_path)
-                    if not file_path_abs.startswith(extract_dir_abs):
-                        continue  # Skip files outside extract directory
-                    arcname = os.path.relpath(file_path, extract_dir)
-                    # Additional security: Normalize path and check for path traversal
-                    arcname_normalized = os.path.normpath(arcname)
-                    if arcname_normalized.startswith('..') or os.path.isabs(arcname_normalized):
-                        continue  # Skip malicious paths
-                    zip_out.write(file_path, arcname_normalized)
-        
-        output_zip.seek(0)
-        
-        # Generate output filename
-        base_name = os.path.splitext(uploaded_file.name)[0]
-        safe_filename = f'{base_name}.zip'
-        
-        response = HttpResponse(output_zip.read(), content_type='application/zip')
-        response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
-        return response
-        
-    except (IOError, OSError) as e:
-        error_msg = str(e)
-        if 'Failed the read enough data' in error_msg or 'req=' in error_msg:
-            messages.error(request, 'The RAR file appears to be incomplete or corrupted. Please ensure the file was uploaded completely and is a valid RAR archive.')
+        logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
         else:
-            messages.error(request, f'File I/O error: {str(e)}')
-        return render(request, 'archive_converter/rar_to_zip.html', {
-            'rarfile_available': RARFILE_AVAILABLE,
-        })
+            return render(request, 'archive_converter/rar_to_zip.html', {
+                'rarfile_available': RARFILE_AVAILABLE,
+                'job_id': str(job.job_id),
+                'status': 'pending',
+            })
+        
     except Exception as e:
-        error_msg = str(e)
-        if 'Failed the read enough data' in error_msg:
-            messages.error(request, 'The RAR file appears to be incomplete or corrupted. Please try uploading the file again or verify it is a valid RAR archive.')
-        else:
-            messages.error(request, f'Error processing file: {str(e)}')
+        logger.error(f'Error initiating RAR to ZIP conversion: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating RAR to ZIP conversion: {str(e)}'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
+        messages.error(request, error_msg)
         return render(request, 'archive_converter/rar_to_zip.html', {
             'rarfile_available': RARFILE_AVAILABLE,
         })
-    finally:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
 
 
 def zip_to_7z(request):
@@ -833,4 +776,68 @@ def create_zip_from_files(request):
                 shutil.rmtree(temp_dir)
             except (OSError, PermissionError):
                 pass
+
+
+def job_status(request, job_id):
+    """Get job status as JSON"""
+    from .models import ArchiveJob
+    job = get_object_or_404(ArchiveJob, job_id=job_id)
+    
+    response_data = {
+        'job_id': str(job.job_id),
+        'status': job.status,
+        'operation': job.operation,
+        'created_at': job.created_at.isoformat(),
+        'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+        'progress': job.progress,
+    }
+    
+    if job.status == 'completed' and job.output_file_key:
+        response_data['output_filename'] = os.path.basename(job.output_file_key)
+    
+    if job.status == 'failed':
+        response_data['error_message'] = job.error_message
+    
+    return JsonResponse(response_data)
+
+
+def download_result(request, job_id):
+    """Download job result file"""
+    from .models import ArchiveJob
+    import re
+    job = get_object_or_404(ArchiveJob, job_id=job_id)
+    
+    if job.status != 'completed':
+        return HttpResponse('Job not completed yet', status=400)
+    
+    if not job.output_file_key or not os.path.exists(job.output_file_key):
+        return HttpResponse('Output file not found', status=404)
+    
+    # Generate safe filename from original file name and output format
+    original_name = os.path.basename(job.file_key)
+    base_name = os.path.splitext(original_name)[0]
+    # Remove temp_ prefix if present
+    if base_name.startswith('temp_'):
+        base_name = base_name[5:]
+    base_name = re.sub(r'[^\w\s.-]', '', base_name).strip()
+    base_name = re.sub(r'[-\s]+', '-', base_name)
+    
+    output_ext = job.output_format or os.path.splitext(job.output_file_key)[1].lstrip('.')
+    safe_filename = f'{base_name}.{output_ext}'
+    
+    # Determine content type
+    content_type_map = {
+        'zip': 'application/zip',
+        'tar.gz': 'application/gzip',
+        '7z': 'application/x-7z-compressed',
+        'rar': 'application/x-rar-compressed',
+    }
+    content_type = content_type_map.get(output_ext.lower(), 'application/octet-stream')
+    
+    return FileResponse(
+        open(job.output_file_key, 'rb'),
+        content_type=content_type,
+        as_attachment=True,
+        filename=safe_filename
+    )
 

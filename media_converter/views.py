@@ -1,6 +1,7 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse, FileResponse
+from django.conf import settings
 import os
 import tempfile
 import re
@@ -10,6 +11,9 @@ import json
 import base64
 import zipfile
 import io
+import uuid
+from .models import MediaJob
+from .tasks import audio_converter_task, video_converter_task
 
 def index(request):
     """Media converters index page"""
@@ -358,39 +362,70 @@ def audio_converter(request):
     if error:
         return render(request, 'media_converter/audio_converter.html', {'error': error})
     
+    # Check if this is an AJAX request
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     try:
-        # Single file conversion
+        # Single file conversion - use async pattern
         if not is_batch:
-            file_content, output_ext, safe_filename = _convert_single_audio(uploaded_file, output_format, ffmpeg_path, logger)
+            # Validate file size
+            max_size = 700 * 1024 * 1024  # 700MB
+            if uploaded_file.size > max_size:
+                error_msg = f'File size exceeds 700MB limit. Your file is {uploaded_file.size / (1024 * 1024):.1f}MB.'
+                if is_ajax:
+                    return JsonResponse({'error': error_msg}, status=400)
+                return render(request, 'media_converter/audio_converter.html', {'error': error_msg})
             
-            # Determine content type
-            content_type_map = {
-                'mp3': 'audio/mpeg',
-                'wav': 'audio/wav',
-                'ogg': 'audio/ogg',
-                'flac': 'audio/flac',
-                'aac': 'audio/aac',
-                'm4a': 'audio/mp4',
-                'aiff': 'audio/x-aiff',
-            }
+            # Validate file type
+            allowed_extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.aiff', '.aif']
+            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+            if file_ext not in allowed_extensions:
+                error_msg = 'Invalid file type. Please upload MP3, WAV, OGG, FLAC, AAC, M4A, or AIFF files.'
+                if is_ajax:
+                    return JsonResponse({'error': error_msg}, status=400)
+                return render(request, 'media_converter/audio_converter.html', {'error': error_msg})
             
-            # Encode file as base64 to send as JSON
-            file_base64 = base64.b64encode(file_content).decode('utf-8')
+            # Save file to shared media directory (accessible by both web and worker containers)
+            media_dir = os.path.join(settings.MEDIA_ROOT, 'audio_conversions')
+            os.makedirs(media_dir, exist_ok=True)
             
-            response_data = {
-                'file': file_base64,
-                'filename': safe_filename,
-                'content_type': content_type_map[output_format]
-            }
+            # Create unique filename
+            unique_id = uuid.uuid4().hex[:8]
+            temp_filename = f'temp_{unique_id}{file_ext}'
+            input_path = os.path.join(media_dir, temp_filename)
             
-            response = HttpResponse(
-                json.dumps(response_data),
-                content_type='application/json'
+            # Save uploaded file
+            with open(input_path, 'wb') as f:
+                for chunk in uploaded_file.chunks():
+                    f.write(chunk)
+            
+            # Get user IP for quota tracking
+            user_ip = request.META.get('REMOTE_ADDR')
+            if not user_ip:
+                user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+            
+            # Create MediaJob
+            job = MediaJob.objects.create(
+                operation='audio_converter',
+                file_key=input_path,
+                file_size=uploaded_file.size,
+                output_format=output_format,
+                user_ip=user_ip,
+                status='pending'
             )
-            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response['Pragma'] = 'no-cache'
-            response['Expires'] = '0'
-            return response
+            
+            # Enqueue conversion task
+            logger.info(f'Enqueuing async audio conversion task for job {job.job_id}')
+            audio_converter_task.delay(str(job.job_id), input_path, output_format, uploaded_file.name)
+            
+            logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+            if is_ajax:
+                return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+            else:
+                return render(request, 'media_converter/audio_converter.html', {
+                    'job_id': str(job.job_id),
+                    'status': 'pending',
+                })
         
         # Batch conversion - create ZIP file
         zip_buffer = io.BytesIO()
@@ -663,183 +698,64 @@ def video_converter(request):
     # Check FFmpeg
     ffmpeg_path, ffprobe_path, error = _check_ffmpeg()
     if error:
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error}, status=400)
         return render(request, 'media_converter/video_converter.html', {'error': error})
     
-    temp_dir = None
+    # Check if this is an AJAX request
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
-        input_path = os.path.join(temp_dir, f'input{file_ext}')
-        output_path = os.path.join(temp_dir, f'output.{output_format}')
+        # Save file to shared media directory (accessible by both web and worker containers)
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'video_conversions')
+        os.makedirs(media_dir, exist_ok=True)
+        
+        # Create unique filename
+        unique_id = uuid.uuid4().hex[:8]
+        temp_filename = f'temp_{unique_id}{file_ext}'
+        input_path = os.path.join(media_dir, temp_filename)
         
         # Save uploaded file
         with open(input_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         
-        # Get file size to warn about large files
-        file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+        # Get user IP for quota tracking
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        # Limit CPU usage and optimize for faster processing
-        # Use ultrafast preset for speed, limit threads to prevent system overload
-        # Build command based on output format
-        if output_format == 'webm':
-            cmd = [
-                ffmpeg_path,
-                '-i', input_path,
-                '-c:v', 'libvpx-vp9',  # Video codec
-                '-c:a', 'libopus',  # Audio codec
-                '-speed', '4',  # Fast encoding (0-8, higher = faster)
-                '-threads', '2',  # Limit to 2 threads to prevent system overload
-                '-y',
-                output_path
-            ]
-        elif output_format == 'avi':
-            cmd = [
-                ffmpeg_path,
-                '-i', input_path,
-                '-c:v', 'libx264',  # Video codec
-                '-c:a', 'libmp3lame',  # Audio codec
-                '-preset', 'ultrafast',  # Fastest encoding (less CPU intensive)
-                '-crf', '28',  # Slightly lower quality but much faster
-                '-threads', '2',  # Limit to 2 threads to prevent system overload
-                '-y',
-                output_path
-            ]
-        elif output_format == '3gp':
-            cmd = [
-                ffmpeg_path,
-                '-i', input_path,
-                '-c:v', 'libx264',  # Video codec
-                '-c:a', 'aac',  # Audio codec
-                '-preset', 'ultrafast',  # Fastest encoding (less CPU intensive)
-                '-crf', '28',  # Slightly lower quality but much faster
-                '-threads', '2',  # Limit to 2 threads to prevent system overload
-                '-s', '320x240',  # Common 3GP resolution
-                '-b:v', '128k',  # Video bitrate for 3GP
-                '-b:a', '64k',  # Audio bitrate for 3GP
-                '-y',
-                output_path
-            ]
-        else:  # mp4, mov, mkv
-            cmd = [
-                ffmpeg_path,
-                '-i', input_path,
-                '-c:v', 'libx264',  # Video codec
-                '-c:a', 'aac',  # Audio codec
-                '-preset', 'ultrafast',  # Fastest encoding (less CPU intensive)
-                '-crf', '28',  # Slightly lower quality but much faster
-                '-threads', '2',  # Limit to 2 threads to prevent system overload
-                '-movflags', '+faststart',  # Optimize for web playback
-                '-y',
-                output_path
-            ]
+        # Create MediaJob
+        job = MediaJob.objects.create(
+            operation='video_converter',
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            output_format=output_format,
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        # Warn user if file is extremely large (over 500MB)
-        if file_size_mb > 500:
+        # Enqueue conversion task
+        logger.info(f'Enqueuing async video conversion task for job {job.job_id}')
+        video_converter_task.delay(str(job.job_id), input_path, output_format)
+        
+        logger.info(f'Returning job_id response for job {job.job_id}, is_ajax={is_ajax}')
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+        else:
             return render(request, 'media_converter/video_converter.html', {
-                'error': f'File is too large ({file_size_mb:.1f} MB). For best performance, please use files under 500 MB. Large files may take a very long time to convert and could cause system slowdowns.'
+                'job_id': str(job.job_id),
+                'status': 'pending',
             })
         
-        # Adjust timeout based on file size (larger files need more time)
-        timeout_seconds = 600  # 10 minutes default
-        if file_size_mb > 300:
-            timeout_seconds = 1200  # 20 minutes for very large files
-        elif file_size_mb > 200:
-            timeout_seconds = 900  # 15 minutes for large files
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
-        
-        # Check if conversion failed
-        if result.returncode != 0:
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error during video conversion'
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/video_converter.html', {
-                'error': f'Video conversion failed: {full_error}'
-            })
-        
-        if not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error - output file was not created'
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/video_converter.html', {
-                'error': f'Conversion failed - output file not created: {full_error}'
-            })
-        
-        # Read output file
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-        
-        # Verify file is not empty
-        if len(file_content) == 0:
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/video_converter.html', {
-                'error': 'Conversion failed - output file is empty. The video file may be corrupted or in an unsupported format.'
-            })
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Determine content type
-        content_type_map = {
-            'mp4': 'video/mp4',
-            'avi': 'video/x-msvideo',
-            'mov': 'video/quicktime',
-            'mkv': 'video/x-matroska',
-            'webm': 'video/webm',
-            '3gp': 'video/3gpp',
-        }
-        
-        # Create response
-        # Note: We don't set Content-Disposition here to prevent browser auto-download
-        # JavaScript will handle the download programmatically to keep page responsive
-        safe_filename = os.path.splitext(uploaded_file.name)[0] + f'.{output_format}'
-        safe_filename = re.sub(r'[^\w\s-]', '', safe_filename).strip()
-        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
-        
-        response = HttpResponse(file_content, content_type=content_type_map[output_format])
-        response['Content-Length'] = len(file_content)
-        response['X-Filename'] = safe_filename
-        return response
-        
-    except subprocess.TimeoutExpired:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError) as cleanup_error:
-                # Log cleanup errors but don't fail the request
-                print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
-                pass
-        return render(request, 'media_converter/video_converter.html', {
-            'error': 'Video conversion timed out. The video might be too long or complex for server processing. Try a smaller file.'
-        })
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError) as cleanup_error:
-                # Log cleanup errors but don't fail the request
-                print(f"Warning: Failed to cleanup temp directory: {cleanup_error}")
-                pass
-        return render(request, 'media_converter/video_converter.html', {
-            'error': f'Error processing file: {str(e)}'
-        })
+        logger.error(f'Error initiating video conversion: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating video conversion: {str(e)}'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
+        return render(request, 'media_converter/video_converter.html', {'error': error_msg})
 
 def video_compressor(request):
     """Compress video files to reduce file size"""
@@ -2343,3 +2259,70 @@ def reduce_noise(request):
         return render(request, 'media_converter/reduce_noise.html', {
             'error': f'Error processing file: {str(e)}'
         })
+
+
+def job_status(request, job_id):
+    """Get job status as JSON"""
+    job = get_object_or_404(MediaJob, job_id=job_id)
+    
+    response_data = {
+        'job_id': str(job.job_id),
+        'status': job.status,
+        'operation': job.operation,
+        'created_at': job.created_at.isoformat(),
+        'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+        'progress': job.progress,
+    }
+    
+    if job.status == 'failed':
+        response_data['error_message'] = job.error_message
+    elif job.status == 'completed' and job.output_file_key:
+        # Include output file info for completed jobs
+        response_data['output_file_key'] = job.output_file_key
+        response_data['output_format'] = job.output_format
+    
+    return JsonResponse(response_data)
+
+
+def download_result(request, job_id):
+    """Download job result file"""
+    job = get_object_or_404(MediaJob, job_id=job_id)
+    
+    if job.status != 'completed':
+        return HttpResponse('Job not completed yet', status=400)
+    
+    if not job.output_file_key or not os.path.exists(job.output_file_key):
+        return HttpResponse('Output file not found', status=404)
+    
+    # Generate safe filename from original file name and output format
+    original_name = os.path.basename(job.file_key)
+    base_name = os.path.splitext(original_name)[0]
+    # Remove temp_ prefix if present
+    if base_name.startswith('temp_'):
+        base_name = base_name[5:]
+    base_name = re.sub(r'[^\w\s.-]', '', base_name).strip()
+    base_name = re.sub(r'[-\s]+', '-', base_name)
+    
+    output_ext = job.output_format or os.path.splitext(job.output_file_key)[1].lstrip('.')
+    safe_filename = f'{base_name}.{output_ext}'
+    
+    # Determine content type
+    content_type_map = {
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+        'ogg': 'audio/ogg',
+        'flac': 'audio/flac',
+        'aac': 'audio/aac',
+        'm4a': 'audio/mp4',
+        'aiff': 'audio/x-aiff',
+    }
+    content_type = content_type_map.get(output_ext.lower(), 'application/octet-stream')
+    
+    response = FileResponse(
+        open(job.output_file_key, 'rb'),
+        content_type=content_type,
+        as_attachment=True,
+        filename=safe_filename
+    )
+    
+    return response

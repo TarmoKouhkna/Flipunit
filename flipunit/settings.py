@@ -136,6 +136,7 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
+        'CONN_MAX_AGE': 300,  # Connection pooling: reuse connections for 5 minutes
     }
 }
 
@@ -203,6 +204,80 @@ GOOGLE_GEMINI_API_KEY = os.environ.get('GOOGLE_GEMINI_API_KEY')
 # Must be set in .env file: OPENAI_API_KEY=your_key_here
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
+# Redis Configuration
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://redis:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_SOFT_TIME_LIMIT = 900  # 15 minutes default soft timeout
+CELERY_TASK_TIME_LIMIT = 960  # 16 minutes default hard timeout
+
+# Celery Task Routes - Queue routing for different operation types
+CELERY_TASK_ROUTES = {
+    'text_converter.tasks.transcribe_audio_task': {'queue': 'transcription'},
+    'text_converter.tasks.generate_docx_task': {'queue': 'lightweight'},
+    'media_converter.tasks.*': {'queue': 'media_processing'},
+    'pdf_tools.tasks.*': {'queue': 'pdf_processing'},
+    'image_converter.tasks.*': {'queue': 'image_processing'},
+    'archive_converter.tasks.*': {'queue': 'archive_processing'},
+    'currency_converter.tasks.*': {'queue': 'api_calls'},
+    'ai_chat.tasks.*': {'queue': 'api_calls'},
+}
+
+# Celery Task Queues Configuration
+CELERY_TASK_QUEUES = {
+    'transcription': {
+        'exchange': 'transcription',
+        'routing_key': 'transcription',
+    },
+    'media_processing': {
+        'exchange': 'media_processing',
+        'routing_key': 'media_processing',
+    },
+    'pdf_processing': {
+        'exchange': 'pdf_processing',
+        'routing_key': 'pdf_processing',
+    },
+    'image_processing': {
+        'exchange': 'image_processing',
+        'routing_key': 'image_processing',
+    },
+    'archive_processing': {
+        'exchange': 'archive_processing',
+        'routing_key': 'archive_processing',
+    },
+    'lightweight': {
+        'exchange': 'lightweight',
+        'routing_key': 'lightweight',
+    },
+    'api_calls': {
+        'exchange': 'api_calls',
+        'routing_key': 'api_calls',
+    },
+}
+
+# Cache Configuration (Redis)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': os.environ.get('REDIS_URL', 'redis://redis:6379/2'),  # Use DB 2 for cache
+        'KEY_PREFIX': 'flipunit_cache',
+        'TIMEOUT': 300,  # Default timeout 5 minutes
+    }
+}
+
+# Session Configuration (Redis)
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+SESSION_COOKIE_AGE = 86400  # 24 hours
+
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 734003200  # 700MB
@@ -249,27 +324,73 @@ LOGGING = {
             'format': '[{levelname}] {asctime} {module} {message}',
             'style': '{',
         },
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': '%(asctime)s %(name)s %(levelname)s %(message)s %(pathname)s %(lineno)d',
+        },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'flipunit.log'),
+            'maxBytes': 1024 * 1024 * 10,  # 10MB
+            'backupCount': 5,
+            'formatter': 'json' if not DEBUG else 'verbose',
+        },
     },
     'root': {
-        'handlers': ['console'],
+        'handlers': ['console', 'file'] if not DEBUG else ['console'],
         'level': 'INFO',
     },
     'loggers': {
         'media_converter': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'] if not DEBUG else ['console'],
             'level': 'INFO',
             'propagate': False,
         },
         'ai_chat': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'] if not DEBUG else ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'text_converter': {
+            'handlers': ['console', 'file'] if not DEBUG else ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['console', 'file'] if not DEBUG else ['console'],
             'level': 'INFO',
             'propagate': False,
         },
     },
 }
+
+# Create logs directory if it doesn't exist
+logs_dir = os.path.join(BASE_DIR, 'logs')
+os.makedirs(logs_dir, exist_ok=True)
+
+# Sentry integration (optional)
+SENTRY_DSN = os.environ.get('SENTRY_DSN')
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[
+                DjangoIntegration(),
+                CeleryIntegration(),
+            ],
+            traces_sample_rate=0.1,  # 10% of transactions
+            send_default_pii=False,  # Don't send PII
+            environment='production' if not DEBUG else 'development',
+        )
+    except ImportError:
+        pass  # Sentry SDK not installed
