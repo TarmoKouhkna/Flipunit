@@ -844,45 +844,58 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function showConversionResult(data, jobId) {
         console.log('🎯 showConversionResult called with jobId:', jobId);
-        const resultsArea = document.getElementById('resultsArea');
-        const downloadJobBtn = document.getElementById('downloadJobBtn');
+        const previewSection = document.getElementById('previewSection');
+        const previewVideo = document.getElementById('previewVideo');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const backToEditBtn = document.getElementById('backToEditBtn');
         
-        if (!resultsArea || !downloadJobBtn) {
-            console.error('❌ Results area or download button not found!', { resultsArea, downloadJobBtn });
+        if (!previewSection || !previewVideo || !downloadBtn || !backToEditBtn) {
+            console.error('❌ Preview elements not found!', { previewSection, previewVideo, downloadBtn, backToEditBtn });
             return;
         }
         
-        console.log('✅ Found results area and download button');
+        console.log('✅ Found preview section and elements');
         
-        // Update download link
-        downloadJobBtn.href = `/media-converter/job/download/${jobId}/`;
-        console.log('✅ Download link set to:', downloadJobBtn.href);
+        // Set video source to job download URL (can be used for preview)
+        const videoUrl = `/media-converter/job/download/${jobId}/`;
+        previewVideo.src = videoUrl;
+        console.log('✅ Preview video source set to:', videoUrl);
         
-        // Use onclick to reset button after download
-        downloadJobBtn.onclick = function resetButtonAfterDownload(e) {
-            console.log('🔵 Download button clicked, resetting merge button');
+        // Update download button to trigger download (with ?download=true to force download)
+        downloadBtn.onclick = function handleDownload(e) {
+            e.preventDefault();
+            console.log('🔵 Download button clicked, triggering download');
             
-            // Reset the merge button
+            // Create download link with download parameter to force download
+            const downloadUrl = videoUrl + '?download=true';
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = 'merged_video.mp4';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            // Reset the merge button after download
             mergePreviewBtn.disabled = false;
             mergePreviewBtn.textContent = 'Merge & Preview';
             mergePreviewBtn.style.opacity = '1';
             mergePreviewBtn.style.cursor = 'pointer';
             isProcessing = false;
             
-            console.log('✅ Merge button reset');
-            
-            // Allow default download behavior
-            return true;
+            console.log('✅ Download triggered, merge button reset');
         };
         
-        console.log('✅ Download button onclick handler attached');
-        
-        // Show results area
-        resultsArea.style.display = 'block';
+        // Show preview section
+        previewSection.style.display = 'block';
+        downloadBtn.style.display = 'block';
+        backToEditBtn.style.display = 'block';
+        actionButtons.style.display = 'none';
         document.getElementById('jobStatusArea').style.display = 'none';
+        document.getElementById('resultsArea').style.display = 'none';
         
-        // Scroll to results
-        resultsArea.scrollIntoView({ behavior: 'smooth' });
+        // Scroll to preview
+        previewSection.scrollIntoView({ behavior: 'smooth' });
     }
     
     function showJobError(errorMessage) {

@@ -2061,7 +2061,7 @@ def job_status(request, job_id):
 
 
 def download_result(request, job_id):
-    """Download job result file"""
+    """Download job result file or stream for preview"""
     job = get_object_or_404(MediaJob, job_id=job_id)
     
     if job.status != 'completed':
@@ -2091,14 +2091,37 @@ def download_result(request, job_id):
         'aac': 'audio/aac',
         'm4a': 'audio/mp4',
         'aiff': 'audio/x-aiff',
+        'mp4': 'video/mp4',
+        'avi': 'video/x-msvideo',
+        'mov': 'video/quicktime',
+        'mkv': 'video/x-matroska',
+        'webm': 'video/webm',
     }
     content_type = content_type_map.get(output_ext.lower(), 'application/octet-stream')
     
-    response = FileResponse(
-        open(job.output_file_key, 'rb'),
-        content_type=content_type,
-        as_attachment=True,
-        filename=safe_filename
-    )
+    # Check if this is a preview request (for video merge, allow streaming)
+    # If it's a video and the request doesn't explicitly want download, stream it
+    is_video = output_ext.lower() in ['mp4', 'avi', 'mov', 'mkv', 'webm']
+    force_download = request.GET.get('download', 'false').lower() == 'true'
+    
+    if is_video and not force_download:
+        # Stream video for preview (supports range requests for seeking)
+        response = FileResponse(
+            open(job.output_file_key, 'rb'),
+            content_type=content_type,
+            as_attachment=False,  # Don't force download, allow streaming
+            filename=safe_filename
+        )
+        response['Accept-Ranges'] = 'bytes'
+        response['Cache-Control'] = 'no-cache'
+        response['X-Filename'] = safe_filename
+    else:
+        # Force download for audio files or explicit download requests
+        response = FileResponse(
+            open(job.output_file_key, 'rb'),
+            content_type=content_type,
+            as_attachment=True,
+            filename=safe_filename
+        )
     
     return response
