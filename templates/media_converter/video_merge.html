@@ -916,13 +916,29 @@ document.addEventListener('DOMContentLoaded', function() {
         let videoLoadRetries = 0;
         const MAX_VIDEO_LOAD_RETRIES = 10; // Increased retries
         const VIDEO_LOAD_RETRY_DELAY = 3000; // 3 seconds between retries
+        let videoLoadRetryTimeout = null;
+        let videoLoadInProgress = false;
+        let videoLoadSuccess = false;
         
         function loadVideoWithRetry() {
+            // Prevent multiple simultaneous retry attempts
+            if (videoLoadInProgress || videoLoadSuccess) {
+                console.log('⏸️ Video load already in progress or completed, skipping retry');
+                return;
+            }
+            
+            videoLoadInProgress = true;
             console.log(`🔄 Attempting to load video (attempt ${videoLoadRetries + 1}/${MAX_VIDEO_LOAD_RETRIES})`);
             
             // Update loading message
             if (loadingMsg) {
                 loadingMsg.innerHTML = `<div class="spinner"></div> <p style="margin-top: 1rem;">Loading merged video${videoLoadRetries > 0 ? ` (retrying ${videoLoadRetries}/${MAX_VIDEO_LOAD_RETRIES})...` : '...'}</p>`;
+            }
+            
+            // Clear any existing timeout
+            if (videoLoadRetryTimeout) {
+                clearTimeout(videoLoadRetryTimeout);
+                videoLoadRetryTimeout = null;
             }
             
             // Clear previous source and set new one
@@ -931,29 +947,53 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Small delay to ensure video element is ready
             setTimeout(() => {
+                // Check again if we should continue (might have been cancelled)
+                if (videoLoadSuccess) {
+                    videoLoadInProgress = false;
+                    return;
+                }
+                
                 previewVideo.src = videoUrl;
                 previewVideo.load(); // Force reload
                 
                 // Handle successful load
                 const onLoadedData = () => {
+                    if (videoLoadSuccess) return; // Already handled
+                    videoLoadSuccess = true;
+                    videoLoadInProgress = false;
                     console.log('✅ Video loaded successfully');
                     if (loadingMsg) loadingMsg.remove();
                     previewVideo.style.display = 'block';
                     videoLoadRetries = 0; // Reset retry count
+                    if (videoLoadRetryTimeout) {
+                        clearTimeout(videoLoadRetryTimeout);
+                        videoLoadRetryTimeout = null;
+                    }
                 };
                 
                 const onCanPlay = () => {
+                    if (videoLoadSuccess) return; // Already handled
+                    videoLoadSuccess = true;
+                    videoLoadInProgress = false;
                     console.log('✅ Video can play');
                     if (loadingMsg) loadingMsg.remove();
                     previewVideo.style.display = 'block';
                     videoLoadRetries = 0;
+                    if (videoLoadRetryTimeout) {
+                        clearTimeout(videoLoadRetryTimeout);
+                        videoLoadRetryTimeout = null;
+                    }
                 };
                 
                 // Handle errors
                 const onError = () => {
+                    if (videoLoadSuccess) return; // Already succeeded, ignore this error
+                    
                     videoLoadRetries++;
                     const errorCode = previewVideo.error ? previewVideo.error.code : 'unknown';
                     console.warn(`⚠️ Video load error (attempt ${videoLoadRetries}/${MAX_VIDEO_LOAD_RETRIES}):`, errorCode, previewVideo.error);
+                    
+                    videoLoadInProgress = false; // Allow next retry
                     
                     if (loadingMsg) {
                         if (videoLoadRetries >= MAX_VIDEO_LOAD_RETRIES) {
@@ -969,14 +1009,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             previewVideo.style.display = 'none';
                         } else {
                             // Retry after delay
-                            setTimeout(loadVideoWithRetry, VIDEO_LOAD_RETRY_DELAY);
+                            videoLoadRetryTimeout = setTimeout(() => {
+                                loadVideoWithRetry();
+                            }, VIDEO_LOAD_RETRY_DELAY);
                         }
                     }
                 };
                 
-                // Remove old listeners if they exist (using AbortController for cleaner cleanup)
-                // Since we're using { once: true }, they should auto-remove, but we'll be extra safe
-                // Just add new listeners with { once: true } - they'll only fire once anyway
+                // Add event listeners (they auto-remove with { once: true })
                 previewVideo.addEventListener('loadeddata', onLoadedData, { once: true });
                 previewVideo.addEventListener('canplay', onCanPlay, { once: true });
                 previewVideo.addEventListener('error', onError, { once: true });
