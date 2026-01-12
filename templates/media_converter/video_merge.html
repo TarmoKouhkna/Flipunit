@@ -943,7 +943,68 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Set video source to job download URL (can be used for preview)
         const videoUrl = `/media-converter/job/download/${jobId}/`;
-        previewVideo.src = videoUrl;
+        
+        // Add retry logic for video loading (handles 503 errors)
+        let videoLoadRetries = 0;
+        const MAX_VIDEO_LOAD_RETRIES = 5;
+        const VIDEO_LOAD_RETRY_DELAY = 2000; // 2 seconds
+        
+        function loadVideoWithRetry() {
+            console.log(`🔄 Attempting to load video (attempt ${videoLoadRetries + 1}/${MAX_VIDEO_LOAD_RETRIES})`);
+            
+            // Show loading state
+            previewVideo.style.display = 'none';
+            const loadingMsg = document.createElement('div');
+            loadingMsg.id = 'videoLoadingMsg';
+            loadingMsg.style.cssText = 'text-align: center; padding: 2rem; color: var(--text-secondary);';
+            loadingMsg.innerHTML = `<div class="spinner"></div> <p style="margin-top: 1rem;">Loading merged video${videoLoadRetries > 0 ? ' (retrying...)' : ''}...</p>`;
+            previewSection.insertBefore(loadingMsg, previewVideo);
+            
+            // Set video source
+            previewVideo.src = videoUrl;
+            previewVideo.load(); // Force reload
+            
+            // Handle successful load
+            const onLoadedData = () => {
+                console.log('✅ Video loaded successfully');
+                const loadingMsg = document.getElementById('videoLoadingMsg');
+                if (loadingMsg) loadingMsg.remove();
+                previewVideo.style.display = 'block';
+                videoLoadRetries = 0; // Reset retry count
+            };
+            
+            // Handle errors
+            const onError = () => {
+                videoLoadRetries++;
+                console.warn(`⚠️ Video load error (attempt ${videoLoadRetries}/${MAX_VIDEO_LOAD_RETRIES}):`, previewVideo.error);
+                
+                const loadingMsg = document.getElementById('videoLoadingMsg');
+                if (loadingMsg) {
+                    if (videoLoadRetries >= MAX_VIDEO_LOAD_RETRIES) {
+                        loadingMsg.innerHTML = `
+                            <p style="color: var(--error-color); margin-bottom: 1rem;">⚠️ Unable to load video preview</p>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                                The video was merged successfully, but preview is temporarily unavailable due to server load.
+                            </p>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                                You can still download the merged video using the button below.
+                            </p>
+                        `;
+                        previewVideo.style.display = 'none';
+                    } else {
+                        loadingMsg.innerHTML = `<div class="spinner"></div> <p style="margin-top: 1rem;">Loading video... (retrying in ${VIDEO_LOAD_RETRY_DELAY/1000}s, attempt ${videoLoadRetries + 1}/${MAX_VIDEO_LOAD_RETRIES})</p>`;
+                        // Retry after delay
+                        setTimeout(loadVideoWithRetry, VIDEO_LOAD_RETRY_DELAY);
+                    }
+                }
+            };
+            
+            previewVideo.addEventListener('loadeddata', onLoadedData, { once: true });
+            previewVideo.addEventListener('canplay', onLoadedData, { once: true });
+            previewVideo.addEventListener('error', onError, { once: true });
+        }
+        
+        loadVideoWithRetry();
         console.log('✅ Preview video source set to:', videoUrl);
         
         // Update download button to trigger download (with ?download=true to force download)
