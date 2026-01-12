@@ -889,13 +889,28 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show loading state immediately
         previewVideo.style.display = 'none';
         let loadingMsg = document.getElementById('videoLoadingMsg');
+        
+        // Find the parent container of the video (the div with background)
+        const videoContainer = previewVideo.parentElement;
+        
         if (!loadingMsg) {
             loadingMsg = document.createElement('div');
             loadingMsg.id = 'videoLoadingMsg';
             loadingMsg.style.cssText = 'text-align: center; padding: 2rem; color: var(--text-secondary);';
-            previewSection.insertBefore(loadingMsg, previewVideo);
+            // Insert before the video element (which is inside videoContainer)
+            if (videoContainer && previewVideo.parentNode === videoContainer) {
+                videoContainer.insertBefore(loadingMsg, previewVideo);
+            } else {
+                // Fallback: append to videoContainer
+                if (videoContainer) {
+                    videoContainer.insertBefore(loadingMsg, videoContainer.firstChild);
+                } else {
+                    previewSection.appendChild(loadingMsg);
+                }
+            }
         }
         loadingMsg.innerHTML = `<div class="spinner"></div> <p style="margin-top: 1rem;">Loading merged video...</p>`;
+        loadingMsg.style.display = 'block';
         
         // Add retry logic for video loading (handles 503 errors)
         let videoLoadRetries = 0;
