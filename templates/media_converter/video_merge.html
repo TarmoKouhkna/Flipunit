@@ -701,10 +701,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.warn('⚠️ Response not OK and not JSON. Status:', response.status);
                 const html = await response.text();
                 console.log('📄 HTML response (first 500 chars):', html.substring(0, 500));
+                
+                // Handle specific error codes with user-friendly messages
+                if (response.status === 413) {
+                    throw new Error('File size too large. Total size of all videos must be less than 5GB. Please use smaller files or fewer videos.');
+                }
+                
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 const errorDiv = doc.querySelector('.alert-error');
-                const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Merge failed.';
+                const errorMessage = errorDiv ? errorDiv.textContent.trim() : `Merge failed (HTTP ${response.status}).`;
                 throw new Error(errorMessage);
             } else {
                 // Response OK but not JSON - unexpected
