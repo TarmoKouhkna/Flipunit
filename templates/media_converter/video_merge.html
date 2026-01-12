@@ -577,8 +577,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
+            // Set file_count based on actual files we're sending (not videoFiles.length)
+            // This ensures it matches the number of files we actually send, even if some were removed
+            formData.append('file_count', String(orderedVideoFiles.length));
+            
             // Debug: Log the order and trim values before sending
-            console.log('Sending files in order:');
+            console.log(`Sending ${orderedVideoFiles.length} files in order:`);
             orderedVideoFiles.forEach((vf, idx) => {
                 console.log(`  Index ${idx}: ${vf.file.name}, start=${vf.startTime}, end=${vf.endTime}`);
             });
