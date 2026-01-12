@@ -641,18 +641,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            if (!response.ok) {
-                throw new Error('Merge failed');
-            }
-            
             const contentType = response.headers.get('content-type') || '';
             
-            // Check if response is JSON (async job)
+            // Check if response is JSON (async job) - check this even if response is not OK
+            // because a job might have been created before the error occurred
             if (contentType.includes('application/json')) {
                 const data = await response.json();
                 
                 if (data.job_id) {
-                    // Async job created - start polling
+                    // Async job created - start polling (even if there was an error)
                     console.log('✅ Async job created:', data.job_id);
                     
                     // Remove progress indicator
@@ -680,8 +677,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     startJobPolling(data.job_id);
                     return; // Exit early - polling will handle completion
                 } else if (data.error) {
+                    // Only throw error if no job was created
                     throw new Error(data.error);
+                } else if (!response.ok) {
+                    // Response not OK and no job_id - throw generic error
+                    throw new Error('Merge failed');
                 }
+            } else if (!response.ok) {
+                // Not JSON and not OK - try to extract error from HTML
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const errorDiv = doc.querySelector('.alert-error');
+                const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Merge failed.';
+                throw new Error(errorMessage);
             }
             
             // Legacy synchronous response (should not happen with async view)
@@ -707,6 +716,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Scroll to preview
                 previewSection.scrollIntoView({ behavior: 'smooth' });
             } else {
+                // Not JSON, not video - unexpected response
                 const html = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
@@ -715,7 +725,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(errorMessage);
             }
         } catch (error) {
-            alert('Error: ' + error.message);
+            // Only show alert if we haven't started async processing
+            // (if jobStatusArea is visible, polling will handle the error)
+            const jobStatusArea = document.getElementById('jobStatusArea');
+            if (!jobStatusArea || jobStatusArea.style.display === 'none') {
+                alert('Error: ' + error.message);
+            } else {
+                // Async process is running, let polling handle the error
+                console.error('Error during merge request (async process may continue):', error);
+            }
         } finally {
             // Clear progress interval
             if (progressInterval !== null) {
@@ -772,15 +790,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Async job polling functions
     let pollInterval = null;
+    let pollingErrorCount = 0;
+    const MAX_POLLING_ERRORS = 5;
     
     function startJobPolling(jobId) {
         clearInterval(pollInterval);
+        pollingErrorCount = 0;
         
         console.log('🔄 Starting job polling for jobId:', jobId);
         pollInterval = setInterval(() => {
             fetch(`/media-converter/job/status/${jobId}/`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    pollingErrorCount = 0; // Reset error count on success
                     updateJobStatus(data);
 
                     if (data.status === 'completed' || data.status === 'failed') {
@@ -802,8 +829,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .catch(error => {
+                    pollingErrorCount++;
                     console.error('Polling error:', error);
-                    // Continue polling on error (might be temporary network issue)
+                    
+                    // Show error message after a few failures
+                    if (pollingErrorCount >= MAX_POLLING_ERRORS) {
+                        clearInterval(pollInterval);
+                        const errorMsg = `Failed to check job status after ${MAX_POLLING_ERRORS} attempts. The job may still be processing. Please refresh the page or check back later.`;
+                        showJobError(errorMsg);
+                        mergePreviewBtn.disabled = false;
+                        mergePreviewBtn.textContent = 'Merge & Preview';
+                        mergePreviewBtn.style.opacity = '1';
+                        mergePreviewBtn.style.cursor = 'pointer';
+                        isProcessing = false;
+                    } else {
+                        // Show temporary error message but continue polling
+                        const jobStatusMessage = document.getElementById('jobStatusMessage');
+                        if (jobStatusMessage) {
+                            jobStatusMessage.innerHTML = `<div class="spinner"></div> Checking status... (Connection issue, retrying...)`;
+                        }
+                    }
                 });
         }, 2000); // Poll every 2 seconds
     }
