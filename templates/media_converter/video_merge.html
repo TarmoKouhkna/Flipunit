@@ -497,58 +497,25 @@ document.addEventListener('DOMContentLoaded', function() {
             item.style.opacity = '0.6';
         });
         
+        // Show async UI immediately (don't wait for response)
+        previewSection.style.display = 'none';
+        actionButtons.style.display = 'none';
+        document.getElementById('jobStatusArea').style.display = 'block';
+        document.getElementById('resultsArea').style.display = 'none';
+        document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Preparing files and creating job...';
+        document.getElementById('jobIdDisplay').textContent = '';
+        document.getElementById('jobError').style.display = 'none';
+        
+        // Scroll to job status area so user can see it immediately
+        document.getElementById('jobStatusArea').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
         // Declare progress variables at function scope for access in finally block
-        let progressBar = null;
-        let progressText = null;
         let progressInterval = null;
-        
-        // Show progress indicator
-        const progressDiv = document.createElement('div');
-        progressDiv.id = 'mergeProgress';
-        progressDiv.className = 'merge-progress-modal';
-        progressDiv.innerHTML = `
-            <div class="merge-progress-title">
-                <strong>Processing ${videoFiles.length} video(s)...</strong>
-            </div>
-            <div class="merge-progress-bar-container">
-                <div id="progressBar" class="merge-progress-bar"></div>
-            </div>
-            <div id="progressText" class="merge-progress-text">
-                Preparing files...
-            </div>
-        `;
-        actionButtons.insertAdjacentElement('afterend', progressDiv);
-        
-        // Get progress elements
-        progressBar = document.getElementById('progressBar');
-        progressText = document.getElementById('progressText');
-        
-        // Simulate progress (we can't get real progress from FFmpeg easily, so we estimate)
-        let progressPercent = 0;
-        if (progressBar && progressText) {
-            progressInterval = setInterval(() => {
-                if (progressPercent < 90) {
-                    progressPercent += 2;
-                    progressBar.style.width = progressPercent + '%';
-                    if (progressPercent < 30) {
-                        progressText.textContent = 'Preparing files...';
-                    } else if (progressPercent < 60) {
-                        progressText.textContent = 'Processing videos...';
-                    } else {
-                        progressText.textContent = 'Merging and encoding...';
-                    }
-                }
-            }, 500);
-        }
         
         try {
             const formData = new FormData();
             formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
             formData.append('action', 'preview');
-            
-            // Add files in order (videoFiles array order matches display order after drag-and-drop)
-            // Use explicit index in field name to guarantee order preservation
-            formData.append('file_count', String(videoFiles.length));
             
             // IMPORTANT: Read trim values from current input fields and send files in DOM order
             // This ensures we get the latest values and correct order even if updateVideoList was called
@@ -610,8 +577,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
+            // Set file_count based on actual files we're sending (not videoFiles.length)
+            // This ensures it matches the number of files we actually send, even if some were removed
+            formData.append('file_count', String(orderedVideoFiles.length));
+            
             // Debug: Log the order and trim values before sending
-            console.log('Sending files in order:');
+            console.log(`Sending ${orderedVideoFiles.length} files in order:`);
             orderedVideoFiles.forEach((vf, idx) => {
                 console.log(`  Index ${idx}: ${vf.file.name}, start=${vf.startTime}, end=${vf.endTime}`);
             });
@@ -641,47 +612,53 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            if (!response.ok) {
-                throw new Error('Merge failed');
-            }
-            
             const contentType = response.headers.get('content-type') || '';
+            console.log('📥 Response status:', response.status, 'Content-Type:', contentType);
             
-            // Check if response is JSON (async job)
+            // Check if response is JSON (async job) - check this even if response is not OK
+            // because a job might have been created before the error occurred
             if (contentType.includes('application/json')) {
                 const data = await response.json();
+                console.log('📦 JSON response data:', data);
                 
                 if (data.job_id) {
-                    // Async job created - start polling
+                    // Async job created - update UI and start polling
                     console.log('✅ Async job created:', data.job_id);
                     
-                    // Remove progress indicator
-                    if (progressInterval !== null) {
-                        clearInterval(progressInterval);
-                        progressInterval = null;
-                    }
-                    const progressDiv = document.getElementById('mergeProgress');
-                    if (progressDiv) {
-                        progressDiv.remove();
-                    }
-                    
-                    // Hide preview section and action buttons
-                    previewSection.style.display = 'none';
-                    actionButtons.style.display = 'none';
-                    
-                    // Show job status area
-                    document.getElementById('jobStatusArea').style.display = 'block';
-                    document.getElementById('resultsArea').style.display = 'none';
+                    // Update job status area (already visible, just update content)
                     document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
                     document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
                     document.getElementById('jobError').style.display = 'none';
                     
-                    // Start polling
+                    // Start polling immediately
                     startJobPolling(data.job_id);
                     return; // Exit early - polling will handle completion
                 } else if (data.error) {
+                    // Only throw error if no job was created
                     throw new Error(data.error);
+                } else if (!response.ok) {
+                    // Response not OK and no job_id - throw generic error
+                    throw new Error('Merge failed');
                 }
+            } else if (!response.ok) {
+                // Not JSON and not OK - try to extract error from HTML
+                console.warn('⚠️ Response not OK and not JSON. Status:', response.status);
+                const html = await response.text();
+                console.log('📄 HTML response (first 500 chars):', html.substring(0, 500));
+                
+                // Handle specific error codes with user-friendly messages
+                if (response.status === 413) {
+                    throw new Error('File size too large. Total size of all videos must be less than 5GB. Please use smaller files or fewer videos.');
+                }
+                
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const errorDiv = doc.querySelector('.alert-error');
+                const errorMessage = errorDiv ? errorDiv.textContent.trim() : `Merge failed (HTTP ${response.status}).`;
+                throw new Error(errorMessage);
+            } else {
+                // Response OK but not JSON - unexpected
+                console.warn('⚠️ Response OK but not JSON. Content-Type:', contentType);
             }
             
             // Legacy synchronous response (should not happen with async view)
@@ -707,6 +684,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Scroll to preview
                 previewSection.scrollIntoView({ behavior: 'smooth' });
             } else {
+                // Not JSON, not video - unexpected response
                 const html = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
@@ -715,31 +693,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(errorMessage);
             }
         } catch (error) {
-            alert('Error: ' + error.message);
+            // Only show alert if we haven't started async processing
+            // (if jobStatusArea is visible, polling will handle the error)
+            const jobStatusArea = document.getElementById('jobStatusArea');
+            if (!jobStatusArea || jobStatusArea.style.display === 'none') {
+                alert('Error: ' + error.message);
+                // Reset UI on error
+                isProcessing = false;
+                mergePreviewBtn.disabled = false;
+                mergePreviewBtn.textContent = 'Merge & Preview';
+                mergePreviewBtn.style.opacity = '1';
+                mergePreviewBtn.style.cursor = 'pointer';
+                actionButtons.style.display = 'flex';
+                jobStatusArea.style.display = 'none';
+                
+                // Re-enable video items
+                videoList.querySelectorAll('.video-item').forEach(item => {
+                    item.style.pointerEvents = 'auto';
+                    item.style.opacity = '1';
+                });
+            } else {
+                // Async process is running, let polling handle the error
+                console.error('Error during merge request (async process may continue):', error);
+                // Show error in job status area
+                showJobError('Error initiating merge: ' + error.message);
+            }
         } finally {
-            // Clear progress interval
+            // Clear progress interval if it exists
             if (progressInterval !== null) {
                 clearInterval(progressInterval);
                 progressInterval = null;
             }
-            
-            // Remove progress indicator
-            const progressDiv = document.getElementById('mergeProgress');
-            if (progressDiv) {
-                progressDiv.remove();
-            }
-            
-            isProcessing = false;
-            mergePreviewBtn.disabled = false;
-            mergePreviewBtn.textContent = 'Merge & Preview';
-            mergePreviewBtn.style.opacity = '1';
-            mergePreviewBtn.style.cursor = 'pointer';
-            
-            // Re-enable video items
-            videoList.querySelectorAll('.video-item').forEach(item => {
-                item.style.pointerEvents = 'auto';
-                item.style.opacity = '1';
-            });
         }
     });
     
@@ -772,15 +756,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Async job polling functions
     let pollInterval = null;
+    let pollingErrorCount = 0;
+    const MAX_POLLING_ERRORS = 5;
     
     function startJobPolling(jobId) {
         clearInterval(pollInterval);
+        pollingErrorCount = 0;
         
         console.log('🔄 Starting job polling for jobId:', jobId);
         pollInterval = setInterval(() => {
             fetch(`/media-converter/job/status/${jobId}/`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    pollingErrorCount = 0; // Reset error count on success
                     updateJobStatus(data);
 
                     if (data.status === 'completed' || data.status === 'failed') {
@@ -802,8 +795,42 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .catch(error => {
+                    pollingErrorCount++;
                     console.error('Polling error:', error);
-                    // Continue polling on error (might be temporary network issue)
+                    
+                    // Handle 503 errors more gracefully (server busy but job may still be processing)
+                    const is503 = error.message && error.message.includes('503');
+                    if (is503) {
+                        // 503 means server is busy but job is likely still processing
+                        // Continue polling but show a message
+                        const jobStatusMessage = document.getElementById('jobStatusMessage');
+                        if (jobStatusMessage && pollingErrorCount <= MAX_POLLING_ERRORS * 2) {
+                            // Allow more retries for 503 errors since they're temporary
+                            jobStatusMessage.innerHTML = `<div class="spinner"></div> Processing... (Server busy, checking status...)`;
+                        }
+                        // Don't increment error count as aggressively for 503s
+                        if (pollingErrorCount < MAX_POLLING_ERRORS * 3) {
+                            return; // Continue polling
+                        }
+                    }
+                    
+                    // Show error message after too many failures
+                    if (pollingErrorCount >= MAX_POLLING_ERRORS) {
+                        clearInterval(pollInterval);
+                        const errorMsg = `Failed to check job status after ${pollingErrorCount} attempts. The job may still be processing. Please refresh the page or check back later.`;
+                        showJobError(errorMsg);
+                        mergePreviewBtn.disabled = false;
+                        mergePreviewBtn.textContent = 'Merge & Preview';
+                        mergePreviewBtn.style.opacity = '1';
+                        mergePreviewBtn.style.cursor = 'pointer';
+                        isProcessing = false;
+                    } else {
+                        // Show temporary error message but continue polling
+                        const jobStatusMessage = document.getElementById('jobStatusMessage');
+                        if (jobStatusMessage) {
+                            jobStatusMessage.innerHTML = `<div class="spinner"></div> Checking status... (Connection issue, retrying...)`;
+                        }
+                    }
                 });
         }, 2000); // Poll every 2 seconds
     }
@@ -858,7 +885,145 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Set video source to job download URL (can be used for preview)
         const videoUrl = `/media-converter/job/download/${jobId}/`;
-        previewVideo.src = videoUrl;
+        
+        // Show loading state immediately
+        previewVideo.style.display = 'none';
+        let loadingMsg = document.getElementById('videoLoadingMsg');
+        
+        // Find the parent container of the video (the div with background)
+        const videoContainer = previewVideo.parentElement;
+        
+        if (!loadingMsg) {
+            loadingMsg = document.createElement('div');
+            loadingMsg.id = 'videoLoadingMsg';
+            loadingMsg.style.cssText = 'text-align: center; padding: 2rem; color: var(--text-secondary);';
+            // Insert before the video element (which is inside videoContainer)
+            if (videoContainer && previewVideo.parentNode === videoContainer) {
+                videoContainer.insertBefore(loadingMsg, previewVideo);
+            } else {
+                // Fallback: append to videoContainer
+                if (videoContainer) {
+                    videoContainer.insertBefore(loadingMsg, videoContainer.firstChild);
+                } else {
+                    previewSection.appendChild(loadingMsg);
+                }
+            }
+        }
+        loadingMsg.innerHTML = `<div class="spinner"></div> <p style="margin-top: 1rem;">Loading merged video...</p>`;
+        loadingMsg.style.display = 'block';
+        
+        // Add retry logic for video loading (handles 503 errors)
+        let videoLoadRetries = 0;
+        const MAX_VIDEO_LOAD_RETRIES = 10; // Increased retries
+        const VIDEO_LOAD_RETRY_DELAY = 3000; // 3 seconds between retries
+        let videoLoadRetryTimeout = null;
+        let videoLoadInProgress = false;
+        let videoLoadSuccess = false;
+        
+        function loadVideoWithRetry() {
+            // Prevent multiple simultaneous retry attempts
+            if (videoLoadInProgress || videoLoadSuccess) {
+                console.log('⏸️ Video load already in progress or completed, skipping retry');
+                return;
+            }
+            
+            videoLoadInProgress = true;
+            console.log(`🔄 Attempting to load video (attempt ${videoLoadRetries + 1}/${MAX_VIDEO_LOAD_RETRIES})`);
+            
+            // Update loading message
+            if (loadingMsg) {
+                loadingMsg.innerHTML = `<div class="spinner"></div> <p style="margin-top: 1rem;">Loading merged video${videoLoadRetries > 0 ? ` (retrying ${videoLoadRetries}/${MAX_VIDEO_LOAD_RETRIES})...` : '...'}</p>`;
+            }
+            
+            // Clear any existing timeout
+            if (videoLoadRetryTimeout) {
+                clearTimeout(videoLoadRetryTimeout);
+                videoLoadRetryTimeout = null;
+            }
+            
+            // Clear previous source and set new one
+            previewVideo.src = '';
+            previewVideo.load(); // Clear any previous state
+            
+            // Small delay to ensure video element is ready
+            setTimeout(() => {
+                // Check again if we should continue (might have been cancelled)
+                if (videoLoadSuccess) {
+                    videoLoadInProgress = false;
+                    return;
+                }
+                
+                previewVideo.src = videoUrl;
+                previewVideo.load(); // Force reload
+                
+                // Handle successful load
+                const onLoadedData = () => {
+                    if (videoLoadSuccess) return; // Already handled
+                    videoLoadSuccess = true;
+                    videoLoadInProgress = false;
+                    console.log('✅ Video loaded successfully');
+                    if (loadingMsg) loadingMsg.remove();
+                    previewVideo.style.display = 'block';
+                    videoLoadRetries = 0; // Reset retry count
+                    if (videoLoadRetryTimeout) {
+                        clearTimeout(videoLoadRetryTimeout);
+                        videoLoadRetryTimeout = null;
+                    }
+                };
+                
+                const onCanPlay = () => {
+                    if (videoLoadSuccess) return; // Already handled
+                    videoLoadSuccess = true;
+                    videoLoadInProgress = false;
+                    console.log('✅ Video can play');
+                    if (loadingMsg) loadingMsg.remove();
+                    previewVideo.style.display = 'block';
+                    videoLoadRetries = 0;
+                    if (videoLoadRetryTimeout) {
+                        clearTimeout(videoLoadRetryTimeout);
+                        videoLoadRetryTimeout = null;
+                    }
+                };
+                
+                // Handle errors
+                const onError = () => {
+                    if (videoLoadSuccess) return; // Already succeeded, ignore this error
+                    
+                    videoLoadRetries++;
+                    const errorCode = previewVideo.error ? previewVideo.error.code : 'unknown';
+                    console.warn(`⚠️ Video load error (attempt ${videoLoadRetries}/${MAX_VIDEO_LOAD_RETRIES}):`, errorCode, previewVideo.error);
+                    
+                    videoLoadInProgress = false; // Allow next retry
+                    
+                    if (loadingMsg) {
+                        if (videoLoadRetries >= MAX_VIDEO_LOAD_RETRIES) {
+                            loadingMsg.innerHTML = `
+                                <p style="color: var(--error-color); margin-bottom: 1rem;">⚠️ Unable to load video preview</p>
+                                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                                    The video was merged successfully, but preview is temporarily unavailable due to server load.
+                                </p>
+                                <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                                    You can still download the merged video using the button below.
+                                </p>
+                            `;
+                            previewVideo.style.display = 'none';
+                        } else {
+                            // Retry after delay
+                            videoLoadRetryTimeout = setTimeout(() => {
+                                loadVideoWithRetry();
+                            }, VIDEO_LOAD_RETRY_DELAY);
+                        }
+                    }
+                };
+                
+                // Add event listeners (they auto-remove with { once: true })
+                previewVideo.addEventListener('loadeddata', onLoadedData, { once: true });
+                previewVideo.addEventListener('canplay', onCanPlay, { once: true });
+                previewVideo.addEventListener('error', onError, { once: true });
+            }, 100);
+        }
+        
+        loadVideoWithRetry();
         console.log('✅ Preview video source set to:', videoUrl);
         
         // Update download button to trigger download (with ?download=true to force download)
@@ -918,6 +1083,22 @@ document.addEventListener('DOMContentLoaded', function() {
         previewVideo.src = '';
         mergedVideoBlob = null;
         mergedVideoFilename = null;
+        
+        // Re-enable video items so Preview & Trim buttons work again
+        videoList.querySelectorAll('.video-item').forEach(item => {
+            item.style.pointerEvents = 'auto';
+            item.style.opacity = '1';
+        });
+        
+        // Reset processing state
+        isProcessing = false;
+        mergePreviewBtn.disabled = false;
+        mergePreviewBtn.textContent = 'Merge & Preview';
+        mergePreviewBtn.style.opacity = '1';
+        mergePreviewBtn.style.cursor = 'pointer';
+        
+        // Hide job status area if it's still visible
+        document.getElementById('jobStatusArea').style.display = 'none';
     });
     
     // Show individual video preview with trim controls (client-side, no server processing)
@@ -1495,10 +1676,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Cleanup blob URLs when removing videos
     function removeVideo(id) {
         const videoFile = videoFiles.find(vf => String(vf.id) === String(id));
-        if (videoFile && videoFile.previewUrl) {
-            URL.revokeObjectURL(videoFile.previewUrl);
+        if (videoFile) {
+            // Clean up blob URLs
+            if (videoFile.previewUrl) {
+                URL.revokeObjectURL(videoFile.previewUrl);
+            }
+            if (videoFile.serverPreviewUrl) {
+                URL.revokeObjectURL(videoFile.serverPreviewUrl);
+            }
         }
-        videoFiles = videoFiles.filter(vf => vf.id !== id);
+        // Remove from array - use strict comparison to ensure correct removal
+        videoFiles = videoFiles.filter(vf => String(vf.id) !== String(id));
+        console.log(`🗑️ Removed video ${id}, remaining: ${videoFiles.length}`);
         updateVideoList();
     }
 });
