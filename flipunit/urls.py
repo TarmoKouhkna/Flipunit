@@ -82,11 +82,39 @@ def sitemap(request):
         http_response = HttpResponse(xml_bytes, content_type='application/xml; charset=utf-8')
         http_response['Content-Length'] = str(len(xml_bytes))
         
+        # Remove security headers that might interfere with Google's crawler
+        # These headers are fine for HTML pages but can cause issues for XML sitemaps
+        # Django's SecurityMiddleware adds these headers, but we need to remove them for sitemaps
+        headers_to_remove = [
+            'X-Frame-Options',
+            'X-Content-Type-Options',
+            'Referrer-Policy',
+            'Cross-Origin-Opener-Policy',
+            'X-Robots-Tag',  # Ensure no noindex header
+        ]
+        for header in headers_to_remove:
+            if header in http_response:
+                del http_response[header]
+        
         return http_response
     except Exception as e:
         # Return a minimal valid sitemap on any error to prevent 500 errors
         error_xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>\n'
-        return HttpResponse(error_xml.encode('utf-8'), content_type='application/xml; charset=utf-8')
+        http_response = HttpResponse(error_xml.encode('utf-8'), content_type='application/xml; charset=utf-8')
+        
+        # Remove security headers from error response as well
+        headers_to_remove = [
+            'X-Frame-Options',
+            'X-Content-Type-Options',
+            'Referrer-Policy',
+            'Cross-Origin-Opener-Policy',
+            'X-Robots-Tag',
+        ]
+        for header in headers_to_remove:
+            if header in http_response:
+                del http_response[header]
+        
+        return http_response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
