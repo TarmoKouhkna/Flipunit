@@ -113,7 +113,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let audioFiles = [];
     let draggedElement = null;
     let isSubmitting = false;
-    let downloadTriggered = false;
     
     // Create audio file object
     function createAudioFile(file, index) {
@@ -356,8 +355,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
-        downloadTriggered = false;
-        
         // Create FormData
         const formData = new FormData();
         
@@ -397,6 +394,13 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Button reset to:', resetText);
         };
         
+        // Show async job status immediately
+        submitBtn.style.display = 'none';
+        document.getElementById('jobStatusArea').style.display = 'block';
+        document.getElementById('resultsArea').style.display = 'none';
+        document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Creating job...';
+        document.getElementById('jobError').style.display = 'none';
+        
         fetch(submitUrl, {
             method: 'POST',
             body: formData,
@@ -408,123 +412,54 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => {
             console.log('Response status:', response.status);
-            const contentType = response.headers.get('content-type') || '';
             
-            // Check if response is JSON (async job)
-            if (contentType.includes('application/json')) {
-                return response.json().then(data => {
-                    if (data.job_id) {
-                        // Async job created - start polling
-                        console.log('✅ Async job created:', data.job_id);
-                        
-                        // Hide submit button
-                        submitBtn.style.display = 'none';
-                        
-                        // Show job status area
-                        document.getElementById('jobStatusArea').style.display = 'block';
-                        document.getElementById('resultsArea').style.display = 'none';
-                        document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
-                        document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
-                        document.getElementById('jobError').style.display = 'none';
-                        
-                        // Start polling
-                        startJobPolling(data.job_id);
-                        return null; // Exit early - polling will handle completion
-                    } else if (data.error) {
-                        throw new Error(data.error);
-                    }
-                    throw new Error('Unexpected response format');
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(text || `Server error: ${response.status}`);
                 });
             }
             
-            // Legacy synchronous response (should not happen with async view)
-            if (response.ok && contentType.includes('audio/')) {
-                return response.blob().then(blob => {
-                    const filename = response.headers.get('x-filename') || 'merged_audio.mp3';
-                    return { blob, filename };
-                });
-            }
-            
-            if (contentType.includes('text/html')) {
-                return response.text().then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const errorDiv = doc.querySelector('.alert-error') || doc.querySelector('.error');
-                    const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Merging failed.';
-                    throw new Error(errorMessage);
-                });
-            }
-            
-            return response.text().then(text => {
-                console.error('Error response:', text);
-                throw new Error(text || 'Merge failed');
-            });
-        })
-        .then((result) => {
-            // Skip if async job (result is null)
-            if (result === null) {
-                return; // Polling will handle completion
-            }
-            
-            const { blob, filename } = result;
-            console.log('Received blob, size:', blob.size);
-            
-            if (downloadTriggered) {
-                console.warn('Download already triggered, skipping duplicate');
-                resetButton();
-                return;
-            }
-            
-            downloadTriggered = true;
-            console.log('Triggering download...');
-            
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.style.display = 'none';
-            a.id = 'audio-download-link-' + Date.now();
-            
-            const existingLinks = document.querySelectorAll('a[id^="audio-download-link-"]');
-            existingLinks.forEach(link => {
-                if (document.body.contains(link)) {
-                    document.body.removeChild(link);
+            return response.json().then(data => {
+                if (data.job_id) {
+                    // Async job created - start polling
+                    console.log('✅ Async job created:', data.job_id);
+                    
+                    // Reset button state
+                    const resetText = submitBtn.dataset.originalText || 'Merge & Download';
+                    submitBtn.textContent = resetText;
+                    submitBtn.disabled = false;
+                    isSubmitting = false;
+                    
+                    // Update job status display
+                    document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
+                    document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
+                    
+                    // Start polling
+                    startJobPolling(data.job_id);
+                } else if (data.error) {
+                    throw new Error(data.error);
+                } else {
+                    throw new Error('Unexpected response format: missing job_id');
                 }
             });
-            
-            document.body.appendChild(a);
-            
-            setTimeout(() => {
-                if (!document.body.contains(a)) {
-                    console.warn('Download link removed before click');
-                    resetButton();
-                    return;
-                }
-                a.click();
-                console.log('Download triggered');
-                
-                setTimeout(() => {
-                    if (document.body.contains(a)) {
-                        document.body.removeChild(a);
-                    }
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-            }, 10);
-            
-            resetButton();
         })
         .catch(error => {
             console.error('Error:', error);
+            
+            // Reset button state on error
+            const resetText = submitBtn.dataset.originalText || 'Merge & Download';
+            submitBtn.textContent = resetText;
+            submitBtn.disabled = false;
+            submitBtn.style.display = 'block';
+            isSubmitting = false;
+            
+            // Show error in job status area
+            document.getElementById('jobStatusArea').style.display = 'block';
+            document.getElementById('jobStatusMessage').innerHTML = '❌ Error creating job';
+            document.getElementById('jobError').textContent = error.message || 'Please try again.';
+            document.getElementById('jobError').style.display = 'block';
+            
             alert('Error merging audio files: ' + (error.message || 'Please try again.'));
-            resetButton();
-        })
-        .finally(() => {
-            setTimeout(() => {
-                if (submitBtn.textContent === 'Merging...' && submitBtn.disabled) {
-                    console.warn('Button still in merging state, forcing reset');
-                    resetButton();
-                }
-            }, 10000);
         });
         
         return false;
