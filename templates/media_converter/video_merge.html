@@ -856,10 +856,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     pollingErrorCount++;
                     console.error('Polling error:', error);
                     
-                    // Show error message after a few failures
+                    // Handle 503 errors more gracefully (server busy but job may still be processing)
+                    const is503 = error.message && error.message.includes('503');
+                    if (is503) {
+                        // 503 means server is busy but job is likely still processing
+                        // Continue polling but show a message
+                        const jobStatusMessage = document.getElementById('jobStatusMessage');
+                        if (jobStatusMessage && pollingErrorCount <= MAX_POLLING_ERRORS * 2) {
+                            // Allow more retries for 503 errors since they're temporary
+                            jobStatusMessage.innerHTML = `<div class="spinner"></div> Processing... (Server busy, checking status...)`;
+                        }
+                        // Don't increment error count as aggressively for 503s
+                        if (pollingErrorCount < MAX_POLLING_ERRORS * 3) {
+                            return; // Continue polling
+                        }
+                    }
+                    
+                    // Show error message after too many failures
                     if (pollingErrorCount >= MAX_POLLING_ERRORS) {
                         clearInterval(pollInterval);
-                        const errorMsg = `Failed to check job status after ${MAX_POLLING_ERRORS} attempts. The job may still be processing. Please refresh the page or check back later.`;
+                        const errorMsg = `Failed to check job status after ${pollingErrorCount} attempts. The job may still be processing. Please refresh the page or check back later.`;
                         showJobError(errorMsg);
                         mergePreviewBtn.disabled = false;
                         mergePreviewBtn.textContent = 'Merge & Preview';
