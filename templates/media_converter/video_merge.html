@@ -517,10 +517,6 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
             formData.append('action', 'preview');
             
-            // Add files in order (videoFiles array order matches display order after drag-and-drop)
-            // Use explicit index in field name to guarantee order preservation
-            formData.append('file_count', String(videoFiles.length));
-            
             // IMPORTANT: Read trim values from current input fields and send files in DOM order
             // This ensures we get the latest values and correct order even if updateVideoList was called
             const videoItems = Array.from(videoList.querySelectorAll('.video-item'));
