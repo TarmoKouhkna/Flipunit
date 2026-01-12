@@ -1043,6 +1043,22 @@ document.addEventListener('DOMContentLoaded', function() {
         previewVideo.src = '';
         mergedVideoBlob = null;
         mergedVideoFilename = null;
+        
+        // Re-enable video items so Preview & Trim buttons work again
+        videoList.querySelectorAll('.video-item').forEach(item => {
+            item.style.pointerEvents = 'auto';
+            item.style.opacity = '1';
+        });
+        
+        // Reset processing state
+        isProcessing = false;
+        mergePreviewBtn.disabled = false;
+        mergePreviewBtn.textContent = 'Merge & Preview';
+        mergePreviewBtn.style.opacity = '1';
+        mergePreviewBtn.style.cursor = 'pointer';
+        
+        // Hide job status area if it's still visible
+        document.getElementById('jobStatusArea').style.display = 'none';
     });
     
     // Show individual video preview with trim controls (client-side, no server processing)
