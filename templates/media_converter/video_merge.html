@@ -1676,10 +1676,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Cleanup blob URLs when removing videos
     function removeVideo(id) {
         const videoFile = videoFiles.find(vf => String(vf.id) === String(id));
-        if (videoFile && videoFile.previewUrl) {
-            URL.revokeObjectURL(videoFile.previewUrl);
+        if (videoFile) {
+            // Clean up blob URLs
+            if (videoFile.previewUrl) {
+                URL.revokeObjectURL(videoFile.previewUrl);
+            }
+            if (videoFile.serverPreviewUrl) {
+                URL.revokeObjectURL(videoFile.serverPreviewUrl);
+            }
         }
-        videoFiles = videoFiles.filter(vf => vf.id !== id);
+        // Remove from array - use strict comparison to ensure correct removal
+        videoFiles = videoFiles.filter(vf => String(vf.id) !== String(id));
+        console.log(`🗑️ Removed video ${id}, remaining: ${videoFiles.length}`);
         updateVideoList();
     }
 });
