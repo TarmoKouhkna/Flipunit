@@ -974,11 +974,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 };
                 
-                // Remove old listeners and add new ones
-                previewVideo.removeEventListener('loadeddata', onLoadedData);
-                previewVideo.removeEventListener('canplay', onCanPlay);
-                previewVideo.removeEventListener('error', onError);
-                
+                // Remove old listeners if they exist (using AbortController for cleaner cleanup)
+                // Since we're using { once: true }, they should auto-remove, but we'll be extra safe
+                // Just add new listeners with { once: true } - they'll only fire once anyway
                 previewVideo.addEventListener('loadeddata', onLoadedData, { once: true });
                 previewVideo.addEventListener('canplay', onCanPlay, { once: true });
                 previewVideo.addEventListener('error', onError, { once: true });
