@@ -642,11 +642,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const contentType = response.headers.get('content-type') || '';
+            console.log('📥 Response status:', response.status, 'Content-Type:', contentType);
             
             // Check if response is JSON (async job) - check this even if response is not OK
             // because a job might have been created before the error occurred
             if (contentType.includes('application/json')) {
                 const data = await response.json();
+                console.log('📦 JSON response data:', data);
                 
                 if (data.job_id) {
                     // Async job created - start polling (even if there was an error)
@@ -667,11 +669,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     actionButtons.style.display = 'none';
                     
                     // Show job status area
-                    document.getElementById('jobStatusArea').style.display = 'block';
+                    const jobStatusArea = document.getElementById('jobStatusArea');
+                    if (jobStatusArea) {
+                        jobStatusArea.style.display = 'block';
+                        console.log('✅ Showing jobStatusArea');
+                    } else {
+                        console.error('❌ jobStatusArea element not found!');
+                    }
                     document.getElementById('resultsArea').style.display = 'none';
                     document.getElementById('jobStatusMessage').innerHTML = '<div class="spinner"></div> Job created. Processing in background...';
                     document.getElementById('jobIdDisplay').textContent = `Job ID: ${data.job_id}`;
                     document.getElementById('jobError').style.display = 'none';
+                    
+                    // Scroll to job status area so user can see it
+                    if (jobStatusArea) {
+                        jobStatusArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
                     
                     // Start polling
                     startJobPolling(data.job_id);
@@ -685,12 +698,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } else if (!response.ok) {
                 // Not JSON and not OK - try to extract error from HTML
+                console.warn('⚠️ Response not OK and not JSON. Status:', response.status);
                 const html = await response.text();
+                console.log('📄 HTML response (first 500 chars):', html.substring(0, 500));
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 const errorDiv = doc.querySelector('.alert-error');
                 const errorMessage = errorDiv ? errorDiv.textContent.trim() : 'Merge failed.';
                 throw new Error(errorMessage);
+            } else {
+                // Response OK but not JSON - unexpected
+                console.warn('⚠️ Response OK but not JSON. Content-Type:', contentType);
             }
             
             // Legacy synchronous response (should not happen with async view)
