@@ -106,6 +106,10 @@ def index(request):
     context = {
         'converters': [
             {'name': 'Universal Converter', 'url': 'universal', 'url_name': 'universal', 'description': 'Convert images to any format - choose your input and output formats'},
+            {'name': 'JPEG to PNG', 'url': 'jpeg-to-png', 'url_name': 'convert', 'description': 'Convert JPEG images to PNG format'},
+            {'name': 'PNG to JPG', 'url': 'png-to-jpg', 'url_name': 'convert', 'description': 'Convert PNG images to JPG format'},
+            {'name': 'WebP Converter', 'url': 'webp', 'url_name': 'convert', 'description': 'Convert images to or from WebP format'},
+            {'name': 'SVG to PNG', 'url': 'svg-to-png', 'url_name': 'convert', 'description': 'Convert SVG vector images to PNG raster format'},
         ],
         'utilities': [
             {'name': 'Image Resizer', 'url': 'resize', 'url_name': 'resize', 'description': 'Resize images to custom dimensions while maintaining aspect ratio'},

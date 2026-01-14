@@ -33,6 +33,22 @@
             <h3>Universal Converter</h3>
             <p>Convert PDF to PNG, JPG, JPEG, HTML, Text, SVG, or RTF. Convert PNG, JPG, JPEG, HTML, Text, SVG, or RTF to PDF.</p>
         </a>
+        <a href="{% url 'pdf_tools:pdf_to_images' %}" class="category-card">
+            <h3>PDF to Images</h3>
+            <p>Convert PDF pages to images (PNG, JPEG)</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_to_html' %}" class="category-card">
+            <h3>PDF to HTML</h3>
+            <p>Convert PDF documents to HTML format</p>
+        </a>
+        <a href="{% url 'pdf_tools:html_to_pdf' %}" class="category-card">
+            <h3>HTML to PDF</h3>
+            <p>Convert HTML files to PDF documents</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_to_text' %}" class="category-card">
+            <h3>PDF to Text</h3>
+            <p>Extract text content from PDF files</p>
+        </a>
     </div>
 </div>
 
