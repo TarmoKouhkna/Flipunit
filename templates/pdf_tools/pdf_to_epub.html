@@ -679,14 +679,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Check if response is successful
             if (!response.ok) {
                 return response.text().then(text => {
-                    // If it's an error page, reload to show messages
-                    if (text.includes('alert alert-')) {
-                        document.open();
-                        document.write(text);
-                        document.close();
+                    // Extract error message from HTML response safely
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, 'text/html');
+                    const alertElement = doc.querySelector('.alert');
+                    if (alertElement) {
+                        const errorMessage = alertElement.textContent.trim();
+                        alert('Error: ' + errorMessage);
                     } else {
-                        throw new Error('Conversion failed');
+                        alert('Conversion failed. Please try again.');
                     }
+                    downloadBtn.textContent = originalDownloadText;
+                    downloadBtn.disabled = false;
+                    throw new Error('Conversion failed');
                 });
             }
             

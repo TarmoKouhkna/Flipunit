@@ -615,6 +615,7 @@ def universal_converter(request):
                 
                 response = HttpResponse(html_content, content_type='text/html; charset=utf-8')
                 response['Content-Disposition'] = 'attachment; filename="converted.html"'
+                response['X-Content-Type-Options'] = 'nosniff'  # Prevent MIME sniffing
                 return response
                 
             finally:
@@ -1233,6 +1234,7 @@ def pdf_to_html(request):
             
             response = HttpResponse(html_content, content_type='text/html; charset=utf-8')
             response['Content-Disposition'] = 'attachment; filename="converted.html"'
+            response['X-Content-Type-Options'] = 'nosniff'  # Prevent MIME sniffing
             return response
             
         finally:
@@ -2382,6 +2384,7 @@ def pdf_to_flipbook(request):
         
         # Return HTML - either for preview (inline) or download (attachment)
         response = HttpResponse(html_content, content_type='text/html; charset=utf-8')
+        response['X-Content-Type-Options'] = 'nosniff'  # Prevent MIME sniffing
         if not is_preview:
             response['Content-Disposition'] = 'attachment; filename="flipbook.html"'
         return response

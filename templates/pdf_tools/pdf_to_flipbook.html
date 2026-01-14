@@ -558,13 +558,19 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => {
             if (!response.ok) {
                 return response.text().then(text => {
-                    if (text.includes('alert alert-')) {
-                        document.open();
-                        document.write(text);
-                        document.close();
+                    // Extract error message from HTML response safely
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, 'text/html');
+                    const alertElement = doc.querySelector('.alert');
+                    if (alertElement) {
+                        const errorMessage = alertElement.textContent.trim();
+                        alert('Error: ' + errorMessage);
                     } else {
-                        throw new Error('Preview generation failed');
+                        alert('Preview generation failed. Please try again.');
                     }
+                    previewBtn.textContent = 'Preview Flipbook';
+                    previewBtn.disabled = false;
+                    throw new Error('Preview generation failed');
                 });
             }
             return response.text();
