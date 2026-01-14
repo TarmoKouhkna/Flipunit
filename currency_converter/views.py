@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 import requests
 import json
@@ -187,4 +187,6 @@ def convert(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
+    # Redirect GET requests to the currency converter index page
+    # This prevents 4xx errors when crawlers/bots access this URL
+    return redirect('currency_converter:index')
