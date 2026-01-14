@@ -164,6 +164,7 @@
             <p>&copy; {% now "Y" %} {{ SITE_NAME }}. All rights reserved.</p>
             <p>Fast, simple, no-login required online converters.</p>
             <div class="hybrid-footer-links">
+                <a href="{% url 'search' %}" aria-label="Search">Search</a>
                 <a href="{% url 'privacy' %}" aria-label="Privacy Policy">Privacy</a>
                 <a href="{% url 'terms' %}" aria-label="Terms of Service">Terms</a>
             </div>
@@ -247,4 +248,3 @@
     {% block structured_data %}{% endblock %}
 </body>
 </html>
-
