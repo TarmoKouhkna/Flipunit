@@ -13,6 +13,13 @@ echo ""
 
 cd "$PROJECT_DIR"
 
+# Check for uncommitted changes and stash them if needed
+if ! git diff-index --quiet HEAD --; then
+    echo "⚠️  Uncommitted local changes detected. Stashing them..."
+    git stash push -m "Auto-stash before deployment $(date +%Y-%m-%d_%H:%M:%S)"
+    echo "✅ Local changes stashed"
+fi
+
 echo "📥 Pulling latest code from main..."
 git pull origin main
 
