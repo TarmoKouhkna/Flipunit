@@ -296,24 +296,27 @@ if not DEBUG:
     # 4. Set SESSION_COOKIE_SECURE = True
     # 5. Set CSRF_COOKIE_SECURE = True
     
-    # Currently disabled to avoid redirect loops - RE-ENABLE AFTER NGINX SSL CONFIGURATION
-    SECURE_SSL_REDIRECT = False  # Set to True after Nginx SSL is configured
-    SESSION_COOKIE_SECURE = False  # Set to True after Nginx SSL is configured
-    CSRF_COOKIE_SECURE = False  # Set to True after Nginx SSL is configured
+    # SSL redirect is handled by Nginx, so we don't need Django to redirect
+    # This prevents redirect loops since Nginx already redirects HTTP to HTTPS
+    SECURE_SSL_REDIRECT = False  # Nginx handles HTTP to HTTPS redirect
+    
+    # Enable secure cookies since we're using HTTPS
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
     
     # Basic security headers (always enabled)
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
     
-    # HSTS (HTTP Strict Transport Security) - Enable after SSL is working
-    # SECURE_HSTS_SECONDS = 31536000  # 1 year
-    # SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    # SECURE_HSTS_PRELOAD = True
+    # HSTS (HTTP Strict Transport Security) - Enabled for security
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
     
     # Trust proxy headers from Nginx (REQUIRED if using Nginx reverse proxy)
-    # Uncomment this line AFTER confirming Nginx sends X-Forwarded-Proto header
-    # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Nginx is configured to send X-Forwarded-Proto header
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Logging configuration
 LOGGING = {
