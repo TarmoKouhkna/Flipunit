@@ -105,7 +105,8 @@ class StaticViewSitemap(Sitemap):
             'color_picker:from_image',
             
             # Currency Converter
-            'currency_converter:convert',
+            # Note: currency_converter:convert is an API endpoint (POST only, redirects GET)
+            # It should not be in sitemap as it's not a page to index
             
             # Archive converters
             'archive_converter:rar_to_zip',
