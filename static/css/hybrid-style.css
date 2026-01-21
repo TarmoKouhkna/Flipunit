@@ -2113,6 +2113,25 @@ header:not(.hybrid-header) {
    FORM INPUTS - HYBRID STYLING
    ============================================ */
 
+.status-check-inputs {
+    display: flex;
+    align-items: stretch;
+}
+
+.status-check-inputs .btn {
+    align-self: stretch;
+}
+
+@media (max-width: 640px) {
+    .status-check-inputs {
+        flex-direction: column !important;
+    }
+
+    .status-check-inputs .btn {
+        width: 100% !important;
+    }
+}
+
 .form-control {
     width: 100% !important;
     padding: var(--space-md) var(--space-lg) !important;

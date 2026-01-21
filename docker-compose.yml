@@ -37,6 +37,7 @@ services:
       - ./media_converter:/app/media_converter  # Mount media_converter so changes are immediate without rebuild
       - ./image_converter:/app/image_converter  # Mount image_converter so changes are immediate without rebuild
       - ./archive_converter:/app/archive_converter  # Mount archive_converter so changes are immediate without rebuild
+      - ./currency_converter:/app/currency_converter  # Mount currency_converter so changes are immediate without rebuild
     depends_on:
       - postgres
       - redis
@@ -110,6 +111,7 @@ services:
       - ./media_converter:/app/media_converter
       - ./image_converter:/app/image_converter
       - ./archive_converter:/app/archive_converter
+      - ./currency_converter:/app/currency_converter
     depends_on:
       - postgres
       - redis
@@ -148,6 +150,7 @@ services:
       - ./media_converter:/app/media_converter
       - ./image_converter:/app/image_converter
       - ./archive_converter:/app/archive_converter
+      - ./currency_converter:/app/currency_converter
     depends_on:
       - postgres
       - redis
@@ -186,6 +189,7 @@ services:
       - ./media_converter:/app/media_converter
       - ./image_converter:/app/image_converter
       - ./archive_converter:/app/archive_converter
+      - ./currency_converter:/app/currency_converter
     depends_on:
       - postgres
       - redis
@@ -224,6 +228,7 @@ services:
       - ./media_converter:/app/media_converter
       - ./image_converter:/app/image_converter
       - ./archive_converter:/app/archive_converter
+      - ./currency_converter:/app/currency_converter
     depends_on:
       - postgres
       - redis
@@ -262,6 +267,7 @@ services:
       - ./media_converter:/app/media_converter
       - ./image_converter:/app/image_converter
       - ./archive_converter:/app/archive_converter
+      - ./currency_converter:/app/currency_converter
     depends_on:
       - postgres
       - redis
@@ -300,6 +306,7 @@ services:
       - ./media_converter:/app/media_converter
       - ./image_converter:/app/image_converter
       - ./archive_converter:/app/archive_converter
+      - ./currency_converter:/app/currency_converter
     depends_on:
       - postgres
       - redis

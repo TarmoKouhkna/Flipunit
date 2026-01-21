@@ -20,6 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.sitemaps.views import sitemap as sitemap_view
 from django.views.generic import TemplateView
+from django.views.decorators.cache import cache_page
 from . import views
 from .sitemaps import StaticViewSitemap
 # Note: Monkey-patch is applied in flipunit/__init__.py to ensure it runs early
@@ -27,6 +28,8 @@ from .sitemaps import StaticViewSitemap
 sitemaps = {
     'static': StaticViewSitemap,
 }
+
+SITEMAP_CACHE_SECONDS = 3600
 
 def sitemap(request):
     """Custom sitemap view that generates properly formatted XML with explicit formatting"""
@@ -137,7 +140,7 @@ urlpatterns = [
     path('isdown/', include('isdown.urls')),
     path('youtube-thumbnail/', include('youtube_thumbnail.urls')),
     path('ai-chat/', include('ai_chat.urls')),
-    path('sitemap.xml', sitemap, name='django.contrib.sitemaps.views.sitemap'),
+    path('sitemap.xml', cache_page(SITEMAP_CACHE_SECONDS)(sitemap), name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name='robots.txt', content_type='text/plain')),
     path('health/', views.health_check, name='health_check'),
 ]
