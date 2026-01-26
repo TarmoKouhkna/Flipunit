@@ -577,7 +577,7 @@ if (window.audioConverterInitialized) {
                     console.error('Polling error:', error);
                     // Continue polling on error (might be temporary network issue)
                 });
-        }, 2000); // Poll every 2 seconds
+        }, 4000); // Poll every 4 seconds to avoid rate limiting
     }
     
     function updateJobStatus(data) {
