@@ -82,11 +82,35 @@
         <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem;"></div>
         <span>Processing video... This may take a while for large files.</span>
     </div>
+
+    <!-- Job Status Area (async) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 1.5rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <div id="jobStatusMessage"><div class="spinner"></div> Preparing job...</div>
+        <div id="jobIdDisplay" style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;"></div>
+        <div id="jobError" style="display: none; margin-top: 0.5rem; color: var(--error-color);"></div>
+    </div>
+
+    <!-- Results Area (async) -->
+    <div id="resultsArea" style="display: none; margin-top: 1.5rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ GIF ready!</h3>
+        <a id="downloadJobBtn" href="#" class="btn btn-primary" style="min-width: 220px;">⬇️ Download GIF</a>
+    </div>
     
     <style>
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
         }
     </style>
     
@@ -115,6 +139,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('video_file');
     const uploadArea = document.querySelector('.file-upload-area');
     const submitBtn = document.getElementById('submit-btn') || form.querySelector('button[type="submit"]');
+    const processingIndicator = document.getElementById('processing-indicator');
+    const jobStatusArea = document.getElementById('jobStatusArea');
+    const jobStatusMessage = document.getElementById('jobStatusMessage');
+    const jobIdDisplay = document.getElementById('jobIdDisplay');
+    const jobError = document.getElementById('jobError');
+    const resultsArea = document.getElementById('resultsArea');
+    const downloadJobBtn = document.getElementById('downloadJobBtn');
     
     // Update UI when file is selected
     fileInput.addEventListener('change', function(e) {
@@ -139,6 +170,85 @@ document.addEventListener('DOMContentLoaded', function() {
         window.videoToGifDownloadLink = null;
     }
     
+    let pollInterval = null;
+
+    function startJobPolling(jobId) {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+        }
+        if (jobStatusArea) {
+            jobStatusArea.style.display = 'block';
+        }
+        if (resultsArea) {
+            resultsArea.style.display = 'none';
+        }
+        if (jobStatusMessage) {
+            jobStatusMessage.innerHTML = '<div class="spinner"></div> GIF conversion queued...';
+        }
+        if (jobIdDisplay) {
+            jobIdDisplay.textContent = `Job ID: ${jobId}`;
+        }
+        if (jobError) {
+            jobError.style.display = 'none';
+            jobError.textContent = '';
+        }
+
+        pollInterval = setInterval(() => {
+            fetch(`/media-converter/job/status/${jobId}/`, {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (jobStatusMessage) {
+                    if (data.status === 'processing') {
+                        jobStatusMessage.innerHTML = '<div class="spinner"></div> Converting video to GIF...';
+                    } else if (data.status === 'pending') {
+                        jobStatusMessage.innerHTML = '<div class="spinner"></div> Waiting to start...';
+                    } else if (data.status === 'completed') {
+                        jobStatusMessage.textContent = '✅ GIF ready!';
+                    } else if (data.status === 'failed') {
+                        jobStatusMessage.textContent = '❌ Conversion failed.';
+                    }
+                }
+
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    if (resultsArea) {
+                        resultsArea.style.display = 'block';
+                    }
+                    if (downloadJobBtn) {
+                        downloadJobBtn.href = `/media-converter/job/download/${jobId}/?download=true`;
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Convert to GIF & Download';
+                    form.style.pointerEvents = 'auto';
+                } else if (data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    if (jobError) {
+                        jobError.textContent = data.error_message || 'Conversion failed.';
+                        jobError.style.display = 'block';
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Convert to GIF & Download';
+                    form.style.pointerEvents = 'auto';
+                }
+            })
+            .catch(() => {
+                if (jobError) {
+                    jobError.textContent = 'Unable to fetch job status. Please try again.';
+                    jobError.style.display = 'block';
+                }
+            });
+        }, 2000);
+    }
+
     // Handle form submission with fetch to keep page responsive
     form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -162,8 +272,6 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Processing...';
         
-        // Show progress indicator
-        const processingIndicator = document.getElementById('processing-indicator');
         if (processingIndicator) {
             processingIndicator.style.display = 'block';
         }
@@ -174,9 +282,29 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData,
             credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
         })
         .then(response => {
             const contentType = response.headers.get('content-type') || '';
+
+            if (contentType.includes('application/json')) {
+                return response.json().then(data => {
+                    if (data.job_id) {
+                        if (processingIndicator) {
+                            processingIndicator.style.display = 'none';
+                        }
+                        startJobPolling(data.job_id);
+                        return null;
+                    }
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    return null;
+                });
+            }
             
             // Check if we got an error page (HTML response)
             if (contentType.includes('text/html')) {
@@ -215,7 +343,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         })
-        .then(({ blob, filename }) => {
+        .then((result) => {
+            if (!result) {
+                return;
+            }
+            const { blob, filename } = result;
             // Atomic check-and-set: only proceed if download hasn't been triggered
             if (window.videoToGifDownloadTriggered) {
                 console.log('Download already triggered, skipping duplicate');
@@ -297,12 +429,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, 1000);
             
-            // Hide progress indicator
             if (processingIndicator) {
                 processingIndicator.style.display = 'none';
             }
-            
-            // Re-enable button
             submitBtn.disabled = false;
             submitBtn.textContent = 'Convert to GIF & Download';
         })
@@ -313,12 +442,9 @@ document.addEventListener('DOMContentLoaded', function() {
             window.videoToGifProcessing = false;
             window.videoToGifDownloadTriggered = false;
             
-            // Hide progress indicator
             if (processingIndicator) {
                 processingIndicator.style.display = 'none';
             }
-            
-            // Re-enable button
             submitBtn.disabled = false;
             submitBtn.textContent = 'Convert to GIF & Download';
             

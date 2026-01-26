@@ -13,7 +13,18 @@ import zipfile
 import io
 import uuid
 from .models import MediaJob
-from .tasks import audio_converter_task, video_converter_task, video_merge_task, audio_merge_task, mp4_to_mp3_task
+from .tasks import (
+    audio_converter_task,
+    video_converter_task,
+    video_merge_task,
+    audio_merge_task,
+    mp4_to_mp3_task,
+    video_to_gif_task,
+    video_compressor_task,
+    mute_video_task,
+    reduce_noise_task,
+    audio_splitter_task,
+)
 
 def index(request):
     """Media converters index page"""
@@ -467,7 +478,7 @@ def audio_converter(request):
         })
 
 def video_to_gif(request):
-    """Convert video to animated GIF"""
+    """Convert video to animated GIF (async)"""
     if request.method != 'POST':
         return render(request, 'media_converter/video_to_gif.html')
     
@@ -492,6 +503,7 @@ def video_to_gif(request):
     fps = request.POST.get('fps', '10').strip() or '10'
     
     try:
+        start_time = float(start_time)
         duration = float(duration)
         width = int(width)
         fps = int(fps)
@@ -529,123 +541,53 @@ def video_to_gif(request):
     if error:
         return render(request, 'media_converter/video_to_gif.html', {'error': error})
     
-    temp_dir = None
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
-        input_path = os.path.join(temp_dir, f'input{file_ext}')
-        palette_path = os.path.join(temp_dir, 'palette.png')
-        output_path = os.path.join(temp_dir, 'output.gif')
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'video_conversions')
+        os.makedirs(media_dir, exist_ok=True)
         
-        # Save uploaded file
+        unique_id = uuid.uuid4().hex[:8]
+        job_dir = os.path.join(media_dir, f'gif_{unique_id}')
+        os.makedirs(job_dir, exist_ok=True)
+        
+        input_path = os.path.join(job_dir, f'input{file_ext}')
+        
         with open(input_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         
-        # Generate palette for better quality
-        # Use -frames:v 1 to generate a single palette frame
-        palette_cmd = [
-            ffmpeg_path,
-            '-ss', str(start_time),
-            '-i', input_path,
-            '-t', str(duration),
-            '-vf', f'fps={fps},scale={width}:-1:flags=lanczos,palettegen=stats_mode=single',
-            '-frames:v', '1',
-            '-y',
-            palette_path
-        ]
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        result = subprocess.run(palette_cmd, capture_output=True, text=True, timeout=300)
+        job = MediaJob.objects.create(
+            operation='video_to_gif',
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            output_format='gif',
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        if result.returncode != 0 or not os.path.exists(palette_path):
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error during palette generation'
-            # Show more of the error message
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/video_to_gif.html', {
-                'error': f'Palette generation failed: {full_error}'
-            })
+        video_to_gif_task.delay(str(job.job_id), input_path, start_time, duration, width, fps)
         
-        # Create GIF using palette
-        # Fix filter_complex syntax - need to properly reference the inputs
-        gif_cmd = [
-            ffmpeg_path,
-            '-ss', str(start_time),
-            '-i', input_path,
-            '-i', palette_path,
-            '-t', str(duration),
-            '-filter_complex', f'[0:v]fps={fps},scale={width}:-1:flags=lanczos[x];[x][1:v]paletteuse',
-            '-y',
-            output_path
-        ]
-        
-        result = subprocess.run(gif_cmd, capture_output=True, text=True, timeout=300)
-        
-        if result.returncode != 0 or not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error during GIF creation'
-            # Show more of the error message
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/video_to_gif.html', {
-                'error': f'GIF creation failed: {full_error}'
-            })
-        
-        # Read output file and verify it's actually a GIF
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-            
-        # Verify the file is actually a GIF by checking the magic bytes (GIF89a or GIF87a)
-        if len(file_content) < 6:
-            return render(request, 'media_converter/video_to_gif.html', {
-                'error': 'Generated file is too small to be a valid GIF.'
-            })
-        
-        magic_bytes = file_content[:6]
-        # Check for GIF89a or GIF87a - first 3 bytes should be "GIF"
-        if magic_bytes[:3] != b'GIF':
-            # Also check if it might be a different format that FFmpeg created
-            error_msg = result.stderr[:500] if result.stderr else 'Unknown error'
-            return render(request, 'media_converter/video_to_gif.html', {
-                'error': f'Generated file is not a valid GIF file. The file may be corrupted or FFmpeg failed silently. Error: {error_msg}'
-            })
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Create response
-        # Note: We don't set Content-Disposition here to prevent browser auto-download
-        # JavaScript will handle the download programmatically to keep page responsive
-        # Preserve .gif extension in filename
-        base_name = os.path.splitext(uploaded_file.name)[0]
-        safe_filename = re.sub(r'[^\w\s-]', '', base_name).strip()
-        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
-        if not safe_filename.endswith('.gif'):
-            safe_filename = safe_filename + '.gif'
-        
-        response = HttpResponse(file_content, content_type='image/gif')
-        response['Content-Length'] = len(file_content)
-        response['X-Filename'] = safe_filename
-        return response
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
+        return render(request, 'media_converter/video_to_gif.html', {
+            'job_id': str(job.job_id),
+            'status': 'pending',
+        })
         
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error initiating video-to-gif: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating video-to-gif: {str(e)}'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
         return render(request, 'media_converter/video_to_gif.html', {
-            'error': f'Error processing file: {str(e)}'
+            'error': error_msg
         })
 
 def video_converter(request):
@@ -750,7 +692,7 @@ def video_converter(request):
         return render(request, 'media_converter/video_converter.html', {'error': error_msg})
 
 def video_compressor(request):
-    """Compress video files to reduce file size"""
+    """Compress video files to reduce file size (async)"""
     if request.method != 'POST':
         return render(request, 'media_converter/video_compressor.html')
     
@@ -778,7 +720,7 @@ def video_compressor(request):
             'error': 'Invalid file type. Please upload MP4, AVI, MOV, MKV, WebM, FLV, WMV, or 3GP files.'
         })
     
-    if compression_level not in ['low', 'medium']:
+    if compression_level not in ['low', 'medium', 'high']:
         compression_level = 'medium'
     
     # Check FFmpeg
@@ -786,276 +728,56 @@ def video_compressor(request):
     if error:
         return render(request, 'media_converter/video_compressor.html', {'error': error})
     
-    temp_dir = None
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
-        input_path = os.path.join(temp_dir, f'input{file_ext}')
-        output_path = os.path.join(temp_dir, f'compressed{file_ext}')
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'video_conversions')
+        os.makedirs(media_dir, exist_ok=True)
         
-        # Save uploaded file
+        unique_id = uuid.uuid4().hex[:8]
+        job_dir = os.path.join(media_dir, f'compress_{unique_id}')
+        os.makedirs(job_dir, exist_ok=True)
+        
+        input_path = os.path.join(job_dir, f'input{file_ext}')
         with open(input_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         
-        # Get file size
-        file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        # Compression settings based on level
-        if compression_level == 'low':
-            # Light compression - minimal quality loss
-            crf = '23'
-            preset = 'medium'
-            video_bitrate = None
-        else:  # medium (default)
-            # Balanced compression
-            crf = '28'
-            preset = 'fast'
-            video_bitrate = None
+        job = MediaJob.objects.create(
+            operation='video_compressor',
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            output_format='mp4',
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        # Build FFmpeg command for compression
-        cmd = [
-            ffmpeg_path,
-            '-i', input_path,
-            '-c:v', 'libx264',  # Video codec
-            '-c:a', 'aac',  # Audio codec
-            '-preset', preset,
-            '-threads', '2',  # Limit threads
-        ]
+        video_compressor_task.delay(str(job.job_id), input_path, compression_level)
         
-        # Add CRF (bitrate mode removed with high compression option)
-        if crf:
-            cmd.extend(['-crf', crf])
-        
-        cmd.extend(['-movflags', '+faststart', '-y', output_path])
-        
-        # Adjust timeout based on file size
-        timeout_seconds = 600
-        if file_size_mb > 300:
-            timeout_seconds = 1200
-        elif file_size_mb > 200:
-            timeout_seconds = 900
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
-        
-        # Check if compression failed
-        if result.returncode != 0:
-            # Extract meaningful error message from ffmpeg output
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
-            
-            # Check if this is just a FFmpeg version dump
-            # If error starts with "ffmpeg version" or contains version + mostly config lines, it's a dump
-            error_lower = error_msg.lower()
-            error_stripped = error_msg.strip()
-            
-            # Simple, direct check
-            is_version_dump = False
-            if error_stripped.startswith('ffmpeg version'):
-                is_version_dump = True
-            elif 'ffmpeg version' in error_lower:
-                # Count how many lines are version/config vs meaningful
-                all_lines = error_msg.split('\n')
-                version_config_count = 0
-                for line in all_lines:
-                    line_lower = line.lower().strip()
-                    if not line_lower:
-                        continue
-                    if ('ffmpeg version' in line_lower or 'configuration:' in line_lower or 
-                        'built with' in line_lower or 'copyright' in line_lower or 
-                        line.strip().startswith('--')):
-                        version_config_count += 1
-                
-                # If more than 80% are version/config lines, it's a dump
-                non_empty_lines = len([l for l in all_lines if l.strip()])
-                if non_empty_lines > 0 and version_config_count / non_empty_lines > 0.8:
-                    is_version_dump = True
-            
-            if is_version_dump:
-                # This is a version dump, use friendly message
-                full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
-            else:
-                full_error = None  # Will be set in filtering block below
-            
-            # Only do detailed filtering if we didn't already set full_error
-            if full_error is None:
-                # Filter out version information and extract actual error
-                error_lines = error_msg.split('\n')
-                meaningful_errors = []
-                
-                # Skip patterns that indicate FFmpeg info/version output
-                skip_patterns = [
-                    'ffmpeg version', 'built with', 'configuration:', 'copyright',
-                    'the ffmpeg developers', 'toolchain', 'libdir=', 'incdir=', 'arch=',
-                    '--prefix=', '--extra-version=', '--enable-', '--disable-', 'gcc',
-                    'debian', 'hardened', 'x86_64-linux-gnu'
-                ]
-                
-                for line in error_lines:
-                    line_lower = line.lower().strip()
-                    
-                    # Skip empty lines at the start
-                    if not meaningful_errors and not line_lower:
-                        continue
-                    
-                    # Skip if line matches any skip pattern
-                    should_skip = False
-                    for pattern in skip_patterns:
-                        if pattern in line_lower:
-                            should_skip = True
-                            break
-                    
-                    # Also skip lines that start with -- (configuration flags)
-                    if line.strip().startswith('--'):
-                        should_skip = True
-                    
-                    if not should_skip and line_lower:
-                        meaningful_errors.append(line.strip())
-                
-                # Use meaningful errors or fallback
-                if meaningful_errors:
-                    # Take last few meaningful error lines (usually contain the actual error)
-                    error_text = '\n'.join(meaningful_errors[-5:])
-                    # Limit length and ensure it's not just whitespace
-                    full_error = error_text[:500].strip() if len(error_text) > 500 else error_text.strip()
-                    
-                    # If after filtering we only have whitespace or very short text, use fallback
-                    if not full_error or len(full_error) < 10:
-                        full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
-                else:
-                    full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video.'
-            
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            # Final check: if full_error still contains version info, replace it
-            # This is a catch-all to ensure no version dump ever gets through
-            if not full_error or 'ffmpeg version' in str(full_error).lower():
-                full_error = 'Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
-            
-            # Double-check the final error message one more time before returning
-            final_error_msg = f'Compression failed: {full_error}'
-            if 'ffmpeg version' in final_error_msg.lower():
-                final_error_msg = 'Compression failed: Video compression failed. The video file may be corrupted, in an unsupported format, or the compression settings may be incompatible with this video. Try using Medium or Low compression level instead.'
-            
-            return render(request, 'media_converter/video_compressor.html', {
-                'error': final_error_msg
-            })
-        
-        if not os.path.exists(output_path):
-            error_msg_raw = result.stderr if result.stderr else 'Output file was not created'
-            
-            # Apply same filtering as above
-            if isinstance(error_msg_raw, str) and 'ffmpeg version' in error_msg_raw.lower():
-                # Filter out version info
-                error_lines = error_msg_raw.split('\n')
-                meaningful_errors = []
-                skip_patterns = [
-                    'ffmpeg version', 'built with', 'configuration:', 'copyright',
-                    'the ffmpeg developers', 'toolchain', 'libdir=', 'incdir=', 'arch=',
-                    '--prefix=', '--extra-version=', '--enable-', '--disable-', 'gcc',
-                    'debian', 'hardened', 'x86_64-linux-gnu'
-                ]
-                
-                for line in error_lines:
-                    line_lower = line.lower().strip()
-                    if not line_lower:
-                        continue
-                    should_skip = any(pattern in line_lower for pattern in skip_patterns) or line.strip().startswith('--')
-                    if not should_skip:
-                        meaningful_errors.append(line.strip())
-                
-                if meaningful_errors:
-                    error_msg = '\n'.join(meaningful_errors[-3:])[:500]
-                else:
-                    error_msg = 'Output file was not created. The video file may be corrupted or in an unsupported format.'
-            else:
-                error_msg = error_msg_raw[:500] if len(error_msg_raw) > 500 else error_msg_raw
-            
-            # Final safety check: if error_msg contains version info, replace it
-            if error_msg and 'ffmpeg version' in error_msg.lower():
-                error_msg = 'Output file was not created. The video file may be corrupted or in an unsupported format.'
-            
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/video_compressor.html', {
-                'error': f'Compression failed: {error_msg}'
-            })
-        
-        # Read output file
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-        
-        if len(file_content) == 0:
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/video_compressor.html', {
-                'error': 'Compression failed - output file is empty.'
-            })
-        
-        # Calculate compression ratio
-        original_size = os.path.getsize(input_path)
-        compressed_size = len(file_content)
-        compression_ratio = (1 - compressed_size / original_size) * 100
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Determine content type
-        content_type_map = {
-            '.mp4': 'video/mp4',
-            '.avi': 'video/x-msvideo',
-            '.mov': 'video/quicktime',
-            '.mkv': 'video/x-matroska',
-            '.webm': 'video/webm',
-            '.flv': 'video/x-flv',
-            '.wmv': 'video/x-ms-wmv',
-            '.3gp': 'video/3gpp',
-        }
-        content_type = content_type_map.get(file_ext, 'video/mp4')
-        
-        # Create response
-        safe_filename = os.path.splitext(uploaded_file.name)[0] + '_compressed' + file_ext
-        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename).strip()
-        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
-        
-        response = HttpResponse(file_content, content_type=content_type)
-        response['Content-Length'] = len(file_content)
-        response['X-Filename'] = safe_filename
-        response['X-Compression-Ratio'] = f'{compression_ratio:.1f}%'
-        return response
-        
-    except subprocess.TimeoutExpired:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
         return render(request, 'media_converter/video_compressor.html', {
-            'error': 'Compression timed out. The video might be too long or complex. Try a smaller file.'
+            'job_id': str(job.job_id),
+            'status': 'pending',
         })
+        
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error initiating video compression: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating video compression: {str(e)}'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
         return render(request, 'media_converter/video_compressor.html', {
-            'error': f'Error processing file: {str(e)}'
+            'error': error_msg
         })
 
 def mute_video(request):
-    """Remove audio track from video"""
+    """Remove audio track from video (async)"""
     if request.method != 'POST':
         return render(request, 'media_converter/mute_video.html')
     
@@ -1087,129 +809,56 @@ def mute_video(request):
     if error:
         return render(request, 'media_converter/mute_video.html', {'error': error})
     
-    temp_dir = None
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
-        input_path = os.path.join(temp_dir, f'input{file_ext}')
-        output_path = os.path.join(temp_dir, f'muted{file_ext}')
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'video_conversions')
+        os.makedirs(media_dir, exist_ok=True)
         
-        # Save uploaded file
+        unique_id = uuid.uuid4().hex[:8]
+        job_dir = os.path.join(media_dir, f'mute_{unique_id}')
+        os.makedirs(job_dir, exist_ok=True)
+        
+        input_path = os.path.join(job_dir, f'input{file_ext}')
         with open(input_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         
-        # Get file size
-        file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        # Build FFmpeg command to remove audio
-        # Use stream copy for video (fast) and exclude audio
-        cmd = [
-            ffmpeg_path,
-            '-i', input_path,
-            '-c:v', 'copy',  # Copy video stream (no re-encoding, fast)
-            '-an',  # No audio
-            '-y',
-            output_path
-        ]
+        job = MediaJob.objects.create(
+            operation='mute_video',
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            output_format=file_ext.lstrip('.'),
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        # Adjust timeout based on file size
-        timeout_seconds = 300  # 5 minutes default (should be fast with stream copy)
-        if file_size_mb > 300:
-            timeout_seconds = 600
-        elif file_size_mb > 200:
-            timeout_seconds = 450
+        mute_video_task.delay(str(job.job_id), input_path, file_ext)
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
-        
-        # Check if processing failed
-        if result.returncode != 0:
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/mute_video.html', {
-                'error': f'Processing failed: {full_error}'
-            })
-        
-        if not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else 'Output file was not created'
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/mute_video.html', {
-                'error': f'Processing failed: {error_msg[:500]}'
-            })
-        
-        # Read output file
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-        
-        if len(file_content) == 0:
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/mute_video.html', {
-                'error': 'Processing failed - output file is empty.'
-            })
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Determine content type
-        content_type_map = {
-            '.mp4': 'video/mp4',
-            '.avi': 'video/x-msvideo',
-            '.mov': 'video/quicktime',
-            '.mkv': 'video/x-matroska',
-            '.webm': 'video/webm',
-            '.flv': 'video/x-flv',
-            '.wmv': 'video/x-ms-wmv',
-            '.3gp': 'video/3gpp',
-        }
-        content_type = content_type_map.get(file_ext, 'video/mp4')
-        
-        # Create response
-        safe_filename = os.path.splitext(uploaded_file.name)[0] + '_muted' + file_ext
-        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename).strip()
-        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
-        
-        response = HttpResponse(file_content, content_type=content_type)
-        response['Content-Length'] = len(file_content)
-        response['X-Filename'] = safe_filename
-        return response
-        
-    except subprocess.TimeoutExpired:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
         return render(request, 'media_converter/mute_video.html', {
-            'error': 'Processing timed out. The video might be too long. Try a smaller file.'
+            'job_id': str(job.job_id),
+            'status': 'pending',
         })
+        
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error initiating mute video: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating mute video: {str(e)}'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
         return render(request, 'media_converter/mute_video.html', {
-            'error': f'Error processing file: {str(e)}'
+            'error': error_msg
         })
 
 def audio_splitter(request):
-    """Split audio files into segments"""
+    """Split audio files into segments (async)"""
     if request.method != 'POST':
         return render(request, 'media_converter/audio_splitter.html')
     
@@ -1282,158 +931,52 @@ def audio_splitter(request):
     if error:
         return render(request, 'media_converter/audio_splitter.html', {'error': error})
     
-    temp_dir = None
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
-        input_path = os.path.join(temp_dir, f'input{file_ext}')
-        output_path = os.path.join(temp_dir, f'split{file_ext}')
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'audio_conversions')
+        os.makedirs(media_dir, exist_ok=True)
         
-        # Save uploaded file
+        unique_id = uuid.uuid4().hex[:8]
+        job_dir = os.path.join(media_dir, f'split_{unique_id}')
+        os.makedirs(job_dir, exist_ok=True)
+        
+        input_path = os.path.join(job_dir, f'input{file_ext}')
         with open(input_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         
-        # Build FFmpeg command to extract segment
-        # Try copy first (fast), fall back to re-encoding if needed
-        cmd = [
-            ffmpeg_path,
-            '-i', input_path,
-            '-ss', str(start_seconds),  # Start time
-            '-t', str(duration_seconds),  # Duration
-            '-c:a', 'copy',  # Copy audio stream (fast, no re-encoding)
-            '-y',
-            output_path
-        ]
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        job = MediaJob.objects.create(
+            operation='audio_splitter',
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            output_format=file_ext.lstrip('.'),
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        # If copy fails, re-encode
-        if result.returncode != 0 or not os.path.exists(output_path):
-            # Determine codec based on format
-            codec_map = {
-                '.mp3': 'libmp3lame',
-                '.wav': 'pcm_s16le',
-                '.ogg': 'libvorbis',
-                '.flac': 'flac',
-                '.aac': 'aac',
-                '.m4a': 'aac',
-                '.aiff': 'pcm_s16be',
-                '.aif': 'pcm_s16be',
-            }
-            
-            format_map = {
-                '.mp3': 'mp3',
-                '.wav': 'wav',
-                '.ogg': 'ogg',
-                '.flac': 'flac',
-                '.aac': 'mp4',
-                '.m4a': 'mp4',
-                '.aiff': 'aiff',
-                '.aif': 'aiff',
-            }
-            
-            codec = codec_map.get(file_ext, 'libmp3lame')
-            output_format = format_map.get(file_ext, 'mp3')
-            
-            cmd = [
-                ffmpeg_path,
-                '-i', input_path,
-                '-ss', str(start_seconds),
-                '-t', str(duration_seconds),
-                '-c:a', codec,
-                '-ar', '44100',
-                '-ac', '2',
-            ]
-            
-            if output_format == 'mp3':
-                cmd.extend(['-b:a', '192k', '-f', 'mp3'])
-            elif output_format == 'wav':
-                cmd.extend(['-sample_fmt', 's16', '-f', 'wav'])
-            elif output_format == 'flac':
-                cmd.extend(['-compression_level', '5', '-f', 'flac'])
-            elif output_format in ['mp4', 'aac', 'm4a']:
-                cmd.extend(['-b:a', '192k', '-f', 'mp4', '-movflags', '+faststart'])
-            elif output_format == 'aiff':
-                cmd.extend(['-sample_fmt', 's16', '-f', 'aiff'])
-            else:
-                cmd.extend(['-f', output_format])
-            
-            cmd.extend(['-y', output_path])
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        audio_splitter_task.delay(str(job.job_id), input_path, file_ext, start_seconds, duration_seconds)
         
-        if result.returncode != 0 or not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/audio_splitter.html', {
-                'error': f'Splitting failed: {full_error}'
-            })
-        
-        # Read output file
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-        
-        if len(file_content) == 0:
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/audio_splitter.html', {
-                'error': 'Splitting failed - output file is empty.'
-            })
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Determine content type
-        content_type_map = {
-            '.mp3': 'audio/mpeg',
-            '.wav': 'audio/wav',
-            '.ogg': 'audio/ogg',
-            '.flac': 'audio/flac',
-            '.aac': 'audio/aac',
-            '.m4a': 'audio/mp4',
-            '.aiff': 'audio/x-aiff',
-            '.aif': 'audio/x-aiff',
-        }
-        content_type = content_type_map.get(file_ext, 'audio/mpeg')
-        
-        # Create response
-        safe_filename = os.path.splitext(uploaded_file.name)[0] + f'_split_{int(start_seconds)}s-{int(end_seconds)}s{file_ext}'
-        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename).strip()
-        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
-        
-        response = HttpResponse(file_content, content_type=content_type)
-        response['Content-Length'] = len(file_content)
-        response['X-Filename'] = safe_filename
-        return response
-        
-    except subprocess.TimeoutExpired:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
         return render(request, 'media_converter/audio_splitter.html', {
-            'error': 'Processing timed out. Please try again.'
+            'job_id': str(job.job_id),
+            'status': 'pending',
         })
+        
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error initiating audio split: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating audio split: {str(e)}'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
         return render(request, 'media_converter/audio_splitter.html', {
-            'error': f'Error processing file: {str(e)}'
+            'error': error_msg
         })
 
 def audio_merge(request):
@@ -1841,7 +1384,7 @@ def video_preview(request):
         return HttpResponse(f'Error: {str(e)}', status=500)
 
 def reduce_noise(request):
-    """Reduce background noise from audio files"""
+    """Reduce background noise from audio files (async)"""
     if request.method != 'POST':
         return render(request, 'media_converter/reduce_noise.html')
     
@@ -1877,155 +1420,52 @@ def reduce_noise(request):
     if error:
         return render(request, 'media_converter/reduce_noise.html', {'error': error})
     
-    temp_dir = None
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json'
+    
     try:
-        # Create temporary directory
-        temp_dir = tempfile.mkdtemp()
-        input_path = os.path.join(temp_dir, f'input{file_ext}')
-        output_path = os.path.join(temp_dir, f'denoised{file_ext}')
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'audio_conversions')
+        os.makedirs(media_dir, exist_ok=True)
         
-        # Save uploaded file
+        unique_id = uuid.uuid4().hex[:8]
+        job_dir = os.path.join(media_dir, f'denoise_{unique_id}')
+        os.makedirs(job_dir, exist_ok=True)
+        
+        input_path = os.path.join(job_dir, f'input{file_ext}')
         with open(input_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
         
-        # Noise reduction settings
-        # Using FFmpeg's highpass and lowpass filters combined with afftdn (FFT denoise)
-        if noise_reduction_level == 'low':
-            # Light noise reduction
-            filter_complex = 'highpass=f=80,lowpass=f=15000,afftdn=nr=10:nf=-25'
-        elif noise_reduction_level == 'high':
-            # Aggressive noise reduction
-            filter_complex = 'highpass=f=100,lowpass=f=12000,afftdn=nr=20:nf=-30'
-        else:  # medium
-            # Balanced noise reduction
-            filter_complex = 'highpass=f=90,lowpass=f=14000,afftdn=nr=15:nf=-27'
+        user_ip = request.META.get('REMOTE_ADDR')
+        if not user_ip:
+            user_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
         
-        # Build FFmpeg command
-        # Determine output codec based on input format
-        codec_map = {
-            '.mp3': 'libmp3lame',
-            '.wav': 'pcm_s16le',
-            '.ogg': 'libvorbis',
-            '.flac': 'flac',
-            '.aac': 'aac',
-            '.m4a': 'aac',
-            '.aiff': 'pcm_s16be',
-            '.aif': 'pcm_s16be',
-        }
+        job = MediaJob.objects.create(
+            operation='reduce_noise',
+            file_key=input_path,
+            file_size=uploaded_file.size,
+            output_format=file_ext.lstrip('.'),
+            user_ip=user_ip,
+            status='pending'
+        )
         
-        format_map = {
-            '.mp3': 'mp3',
-            '.wav': 'wav',
-            '.ogg': 'ogg',
-            '.flac': 'flac',
-            '.aac': 'mp4',
-            '.m4a': 'mp4',
-            '.aiff': 'aiff',
-            '.aif': 'aiff',
-        }
+        reduce_noise_task.delay(str(job.job_id), input_path, file_ext, noise_reduction_level)
         
-        codec = codec_map.get(file_ext, 'libmp3lame')
-        output_format = format_map.get(file_ext, 'mp3')
-        
-        cmd = [
-            ffmpeg_path,
-            '-i', input_path,
-            '-af', filter_complex,
-            '-c:a', codec,
-            '-ar', '44100',
-            '-ac', '2',
-        ]
-        
-        if output_format == 'mp3':
-            cmd.extend(['-b:a', '192k', '-f', 'mp3'])
-        elif output_format == 'wav':
-            cmd.extend(['-sample_fmt', 's16', '-f', 'wav'])
-        elif output_format == 'flac':
-            cmd.extend(['-compression_level', '5', '-f', 'flac'])
-        elif output_format in ['mp4', 'aac', 'm4a']:
-            cmd.extend(['-b:a', '192k', '-f', 'mp4', '-movflags', '+faststart'])
-        elif output_format == 'aiff':
-            cmd.extend(['-sample_fmt', 's16', '-f', 'aiff'])
-        else:
-            cmd.extend(['-f', output_format])
-        
-        cmd.extend(['-y', output_path])
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        
-        if result.returncode != 0 or not os.path.exists(output_path):
-            error_msg = result.stderr if result.stderr else result.stdout if result.stdout else 'Unknown error'
-            full_error = error_msg[:1000] if len(error_msg) > 1000 else error_msg
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/reduce_noise.html', {
-                'error': f'Noise reduction failed: {full_error}'
-            })
-        
-        # Read output file
-        with open(output_path, 'rb') as f:
-            file_content = f.read()
-        
-        if len(file_content) == 0:
-            if temp_dir:
-                try:
-                    shutil.rmtree(temp_dir)
-                except (OSError, PermissionError):
-                    pass
-            return render(request, 'media_converter/reduce_noise.html', {
-                'error': 'Noise reduction failed - output file is empty.'
-            })
-        
-        # Clean up
-        try:
-            shutil.rmtree(temp_dir)
-        except (OSError, PermissionError):
-            pass
-        
-        # Determine content type
-        content_type_map = {
-            '.mp3': 'audio/mpeg',
-            '.wav': 'audio/wav',
-            '.ogg': 'audio/ogg',
-            '.flac': 'audio/flac',
-            '.aac': 'audio/aac',
-            '.m4a': 'audio/mp4',
-            '.aiff': 'audio/x-aiff',
-            '.aif': 'audio/x-aiff',
-        }
-        content_type = content_type_map.get(file_ext, 'audio/mpeg')
-        
-        # Create response
-        safe_filename = os.path.splitext(uploaded_file.name)[0] + '_denoised' + file_ext
-        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename).strip()
-        safe_filename = re.sub(r'[-\s]+', '-', safe_filename)
-        
-        response = HttpResponse(file_content, content_type=content_type)
-        response['Content-Length'] = len(file_content)
-        response['X-Filename'] = safe_filename
-        return response
-        
-    except subprocess.TimeoutExpired:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        if is_ajax:
+            return JsonResponse({'job_id': str(job.job_id), 'status': 'pending'})
         return render(request, 'media_converter/reduce_noise.html', {
-            'error': 'Processing timed out. Please try again.'
+            'job_id': str(job.job_id),
+            'status': 'pending',
         })
+        
     except Exception as e:
-        if temp_dir:
-            try:
-                shutil.rmtree(temp_dir)
-            except (OSError, PermissionError):
-                pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Error initiating noise reduction: {str(e)}', exc_info=True)
+        error_msg = f'Error initiating noise reduction: {str(e)}'
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=500)
         return render(request, 'media_converter/reduce_noise.html', {
-            'error': f'Error processing file: {str(e)}'
+            'error': error_msg
         })
 
 

@@ -601,9 +601,12 @@ def audio_merge_task(self, job_id, file_paths, output_ext):
     max_retries=0,
     queue='media_processing'
 )
-def video_to_gif_task(self, job_id, file_path):
+def video_to_gif_task(self, job_id, file_path, start_time, duration, width, fps):
     """Convert video to GIF"""
     job = MediaJob.objects.get(job_id=job_id)
+    temp_dir = os.path.dirname(file_path)
+    palette_path = os.path.join(temp_dir, f'palette_{job_id}.png')
+    output_path = os.path.join(temp_dir, f'output_{job_id}.gif')
     
     try:
         job.status = 'processing'
@@ -613,22 +616,41 @@ def video_to_gif_task(self, job_id, file_path):
         if error:
             raise Exception(error)
         
-        temp_dir = os.path.dirname(file_path)
-        output_path = os.path.join(temp_dir, 'output.gif')
-        
-        cmd = [
-            ffmpeg_path, '-i', file_path,
-            '-vf', 'fps=10,scale=320:-1:flags=lanczos',
-            '-y', output_path
+        # Generate palette for better quality
+        palette_cmd = [
+            ffmpeg_path,
+            '-ss', str(start_time),
+            '-i', file_path,
+            '-t', str(duration),
+            '-vf', f'fps={fps},scale={width}:-1:flags=lanczos,palettegen=stats_mode=single',
+            '-frames:v', '1',
+            '-y',
+            palette_path
         ]
+        result = subprocess.run(palette_cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0 or not os.path.exists(palette_path):
+            error_msg = result.stderr or result.stdout or 'Unknown error during palette generation'
+            raise Exception(error_msg[:1000])
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        
-        if result.returncode != 0:
-            raise Exception(f"FFmpeg error: {result.stderr}")
+        # Create GIF using palette
+        gif_cmd = [
+            ffmpeg_path,
+            '-ss', str(start_time),
+            '-i', file_path,
+            '-i', palette_path,
+            '-t', str(duration),
+            '-filter_complex', f'[0:v]fps={fps},scale={width}:-1:flags=lanczos[x];[x][1:v]paletteuse',
+            '-y',
+            output_path
+        ]
+        result = subprocess.run(gif_cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr or result.stdout or 'Unknown error during GIF creation'
+            raise Exception(error_msg[:1000])
         
         job.status = 'completed'
         job.output_file_key = output_path
+        job.output_format = 'gif'
         job.completed_at = timezone.now()
         job.save()
         
@@ -643,6 +665,19 @@ def video_to_gif_task(self, job_id, file_path):
         job.completed_at = timezone.now()
         job.save()
         raise
+    finally:
+        for path in [palette_path]:
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"Cleaned up input file: {file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up file {file_path}: {cleanup_error}")
 
 
 @shared_task(
@@ -766,6 +801,7 @@ def video_compressor_task(self, job_id, file_path, quality):
         
         job.status = 'completed'
         job.output_file_key = output_path
+        job.output_format = 'mp4'
         job.completed_at = timezone.now()
         job.save()
         
@@ -780,3 +816,300 @@ def video_compressor_task(self, job_id, file_path, quality):
         job.completed_at = timezone.now()
         job.save()
         raise
+    finally:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"Cleaned up input file: {file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up file {file_path}: {cleanup_error}")
+
+
+@shared_task(
+    bind=True,
+    soft_time_limit=600,  # 10 minutes
+    time_limit=660,  # 11 minutes
+    max_retries=0,
+    queue='media_processing'
+)
+def mute_video_task(self, job_id, file_path, output_ext):
+    """Remove audio track from a video"""
+    job = MediaJob.objects.get(job_id=job_id)
+    temp_dir = os.path.dirname(file_path)
+    output_path = os.path.join(temp_dir, f'muted_{job_id}{output_ext}')
+    
+    try:
+        job.status = 'processing'
+        job.save()
+        
+        ffmpeg_path, _, error = _check_ffmpeg()
+        if error:
+            raise Exception(error)
+        
+        cmd = [
+            ffmpeg_path,
+            '-i', file_path,
+            '-c:v', 'copy',
+            '-an',
+            '-y',
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr or result.stdout or 'Unknown error'
+            raise Exception(error_msg[:1000])
+        
+        if os.path.getsize(output_path) == 0:
+            raise Exception('Output file is empty.')
+        
+        job.status = 'completed'
+        job.output_file_key = output_path
+        job.output_format = output_ext.lstrip('.')
+        job.completed_at = timezone.now()
+        job.save()
+        
+        logger.info(f"Mute video completed for job {job_id}")
+        return output_path
+        
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Mute video failed for job {job_id}: {error_msg}")
+        job.status = 'failed'
+        job.error_message = error_msg
+        job.completed_at = timezone.now()
+        job.save()
+        raise
+    finally:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"Cleaned up input file: {file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up file {file_path}: {cleanup_error}")
+
+
+@shared_task(
+    bind=True,
+    soft_time_limit=600,  # 10 minutes
+    time_limit=660,  # 11 minutes
+    max_retries=0,
+    queue='media_processing'
+)
+def reduce_noise_task(self, job_id, file_path, output_ext, noise_reduction_level):
+    """Reduce background noise from audio"""
+    job = MediaJob.objects.get(job_id=job_id)
+    temp_dir = os.path.dirname(file_path)
+    output_path = os.path.join(temp_dir, f'denoised_{job_id}{output_ext}')
+    
+    try:
+        job.status = 'processing'
+        job.save()
+        
+        ffmpeg_path, _, error = _check_ffmpeg()
+        if error:
+            raise Exception(error)
+        
+        if noise_reduction_level == 'low':
+            filter_complex = 'highpass=f=80,lowpass=f=15000,afftdn=nr=10:nf=-25'
+        elif noise_reduction_level == 'high':
+            filter_complex = 'highpass=f=100,lowpass=f=12000,afftdn=nr=20:nf=-30'
+        else:
+            filter_complex = 'highpass=f=90,lowpass=f=14000,afftdn=nr=15:nf=-27'
+        
+        codec_map = {
+            '.mp3': 'libmp3lame',
+            '.wav': 'pcm_s16le',
+            '.ogg': 'libvorbis',
+            '.flac': 'flac',
+            '.aac': 'aac',
+            '.m4a': 'aac',
+            '.aiff': 'pcm_s16be',
+            '.aif': 'pcm_s16be',
+        }
+        format_map = {
+            '.mp3': 'mp3',
+            '.wav': 'wav',
+            '.ogg': 'ogg',
+            '.flac': 'flac',
+            '.aac': 'mp4',
+            '.m4a': 'mp4',
+            '.aiff': 'aiff',
+            '.aif': 'aiff',
+        }
+        
+        codec = codec_map.get(output_ext, 'libmp3lame')
+        output_format = format_map.get(output_ext, 'mp3')
+        
+        cmd = [
+            ffmpeg_path,
+            '-i', file_path,
+            '-af', filter_complex,
+            '-c:a', codec,
+            '-ar', '44100',
+            '-ac', '2',
+        ]
+        
+        if output_format == 'mp3':
+            cmd.extend(['-b:a', '192k', '-f', 'mp3'])
+        elif output_format == 'wav':
+            cmd.extend(['-sample_fmt', 's16', '-f', 'wav'])
+        elif output_format == 'flac':
+            cmd.extend(['-compression_level', '5', '-f', 'flac'])
+        elif output_format in ['mp4', 'aac', 'm4a']:
+            cmd.extend(['-b:a', '192k', '-f', 'mp4', '-movflags', '+faststart'])
+        elif output_format == 'aiff':
+            cmd.extend(['-sample_fmt', 's16', '-f', 'aiff'])
+        else:
+            cmd.extend(['-f', output_format])
+        
+        cmd.extend(['-y', output_path])
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr or result.stdout or 'Unknown error'
+            raise Exception(error_msg[:1000])
+        
+        if os.path.getsize(output_path) == 0:
+            raise Exception('Output file is empty.')
+        
+        job.status = 'completed'
+        job.output_file_key = output_path
+        job.output_format = output_ext.lstrip('.')
+        job.completed_at = timezone.now()
+        job.save()
+        
+        logger.info(f"Reduce noise completed for job {job_id}")
+        return output_path
+        
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Reduce noise failed for job {job_id}: {error_msg}")
+        job.status = 'failed'
+        job.error_message = error_msg
+        job.completed_at = timezone.now()
+        job.save()
+        raise
+    finally:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"Cleaned up input file: {file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up file {file_path}: {cleanup_error}")
+
+
+@shared_task(
+    bind=True,
+    soft_time_limit=300,  # 5 minutes
+    time_limit=360,  # 6 minutes
+    max_retries=0,
+    queue='media_processing'
+)
+def audio_splitter_task(self, job_id, file_path, output_ext, start_seconds, duration_seconds):
+    """Split audio into a segment"""
+    job = MediaJob.objects.get(job_id=job_id)
+    temp_dir = os.path.dirname(file_path)
+    output_path = os.path.join(temp_dir, f'split_{job_id}{output_ext}')
+    
+    try:
+        job.status = 'processing'
+        job.save()
+        
+        ffmpeg_path, _, error = _check_ffmpeg()
+        if error:
+            raise Exception(error)
+        
+        cmd = [
+            ffmpeg_path,
+            '-i', file_path,
+            '-ss', str(start_seconds),
+            '-t', str(duration_seconds),
+            '-c:a', 'copy',
+            '-y',
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0 or not os.path.exists(output_path):
+            codec_map = {
+                '.mp3': 'libmp3lame',
+                '.wav': 'pcm_s16le',
+                '.ogg': 'libvorbis',
+                '.flac': 'flac',
+                '.aac': 'aac',
+                '.m4a': 'aac',
+                '.aiff': 'pcm_s16be',
+                '.aif': 'pcm_s16be',
+            }
+            format_map = {
+                '.mp3': 'mp3',
+                '.wav': 'wav',
+                '.ogg': 'ogg',
+                '.flac': 'flac',
+                '.aac': 'mp4',
+                '.m4a': 'mp4',
+                '.aiff': 'aiff',
+                '.aif': 'aiff',
+            }
+            codec = codec_map.get(output_ext, 'libmp3lame')
+            output_format = format_map.get(output_ext, 'mp3')
+            
+            cmd = [
+                ffmpeg_path,
+                '-i', file_path,
+                '-ss', str(start_seconds),
+                '-t', str(duration_seconds),
+                '-c:a', codec,
+                '-ar', '44100',
+                '-ac', '2',
+            ]
+            
+            if output_format == 'mp3':
+                cmd.extend(['-b:a', '192k', '-f', 'mp3'])
+            elif output_format == 'wav':
+                cmd.extend(['-sample_fmt', 's16', '-f', 'wav'])
+            elif output_format == 'flac':
+                cmd.extend(['-compression_level', '5', '-f', 'flac'])
+            elif output_format in ['mp4', 'aac', 'm4a']:
+                cmd.extend(['-b:a', '192k', '-f', 'mp4', '-movflags', '+faststart'])
+            elif output_format == 'aiff':
+                cmd.extend(['-sample_fmt', 's16', '-f', 'aiff'])
+            else:
+                cmd.extend(['-f', output_format])
+            
+            cmd.extend(['-y', output_path])
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0 or not os.path.exists(output_path):
+            error_msg = result.stderr or result.stdout or 'Unknown error'
+            raise Exception(error_msg[:1000])
+        
+        if os.path.getsize(output_path) == 0:
+            raise Exception('Output file is empty.')
+        
+        job.status = 'completed'
+        job.output_file_key = output_path
+        job.output_format = output_ext.lstrip('.')
+        job.completed_at = timezone.now()
+        job.save()
+        
+        logger.info(f"Audio splitter completed for job {job_id}")
+        return output_path
+        
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Audio splitter failed for job {job_id}: {error_msg}")
+        job.status = 'failed'
+        job.error_message = error_msg
+        job.completed_at = timezone.now()
+        job.save()
+        raise
+    finally:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"Cleaned up input file: {file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up file {file_path}: {cleanup_error}")

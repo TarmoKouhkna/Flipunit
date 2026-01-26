@@ -63,6 +63,19 @@
         
         <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top: 1.5rem;">Split & Download</button>
     </form>
+
+    <!-- Job Status Area (async) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 1.5rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <div id="jobStatusMessage"><div class="spinner"></div> Preparing job...</div>
+        <div id="jobIdDisplay" style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;"></div>
+        <div id="jobError" style="display: none; margin-top: 0.5rem; color: var(--error-color);"></div>
+    </div>
+
+    <!-- Results Area (async) -->
+    <div id="resultsArea" style="display: none; margin-top: 1.5rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ Split completed!</h3>
+        <a id="downloadJobBtn" href="#" class="btn btn-primary" style="min-width: 220px;">⬇️ Download Split Audio</a>
+    </div>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>How to use:</h3>
@@ -91,6 +104,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const durationInput = document.getElementById('duration');
     const endTimeInput = document.getElementById('end_time');
     const submitBtn = document.getElementById('submit-btn');
+    const jobStatusArea = document.getElementById('jobStatusArea');
+    const jobStatusMessage = document.getElementById('jobStatusMessage');
+    const jobIdDisplay = document.getElementById('jobIdDisplay');
+    const jobError = document.getElementById('jobError');
+    const resultsArea = document.getElementById('resultsArea');
+    const downloadJobBtn = document.getElementById('downloadJobBtn');
     
     // Update UI when file is selected
     fileInput.addEventListener('change', function(e) {
@@ -128,6 +147,85 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    let pollInterval = null;
+
+    function startJobPolling(jobId) {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+        }
+        if (jobStatusArea) {
+            jobStatusArea.style.display = 'block';
+        }
+        if (resultsArea) {
+            resultsArea.style.display = 'none';
+        }
+        if (jobStatusMessage) {
+            jobStatusMessage.innerHTML = '<div class="spinner"></div> Splitting audio...';
+        }
+        if (jobIdDisplay) {
+            jobIdDisplay.textContent = `Job ID: ${jobId}`;
+        }
+        if (jobError) {
+            jobError.style.display = 'none';
+            jobError.textContent = '';
+        }
+
+        pollInterval = setInterval(() => {
+            fetch(`/media-converter/job/status/${jobId}/`, {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (jobStatusMessage) {
+                    if (data.status === 'processing') {
+                        jobStatusMessage.innerHTML = '<div class="spinner"></div> Splitting audio...';
+                    } else if (data.status === 'pending') {
+                        jobStatusMessage.innerHTML = '<div class="spinner"></div> Waiting to start...';
+                    } else if (data.status === 'completed') {
+                        jobStatusMessage.textContent = '✅ Split completed!';
+                    } else if (data.status === 'failed') {
+                        jobStatusMessage.textContent = '❌ Split failed.';
+                    }
+                }
+
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    if (resultsArea) {
+                        resultsArea.style.display = 'block';
+                    }
+                    if (downloadJobBtn) {
+                        downloadJobBtn.href = `/media-converter/job/download/${jobId}/?download=true`;
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Split & Download';
+                    form.style.pointerEvents = 'auto';
+                } else if (data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    if (jobError) {
+                        jobError.textContent = data.error_message || 'Split failed.';
+                        jobError.style.display = 'block';
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Split & Download';
+                    form.style.pointerEvents = 'auto';
+                }
+            })
+            .catch(() => {
+                if (jobError) {
+                    jobError.textContent = 'Unable to fetch job status. Please try again.';
+                    jobError.style.display = 'block';
+                }
+            });
+        }, 2000);
+    }
+
     // Form submission
     let isProcessing = false;
     form.addEventListener('submit', function(e) {
@@ -158,9 +256,26 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData,
             credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
         })
         .then(response => {
             const contentType = response.headers.get('content-type') || '';
+
+            if (contentType.includes('application/json')) {
+                return response.json().then(data => {
+                    if (data.job_id) {
+                        startJobPolling(data.job_id);
+                        return null;
+                    }
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    return null;
+                });
+            }
             
             if (contentType.includes('audio/')) {
                 return response.blob().then(blob => {
@@ -183,7 +298,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Unexpected response: ' + text.substring(0, 200));
             });
         })
-        .then(({ blob, filename }) => {
+        .then((result) => {
+            if (!result) {
+                return;
+            }
+            const { blob, filename } = result;
             // Only trigger download once
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -217,5 +336,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+<style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 0.5rem;
+        vertical-align: middle;
+    }
+</style>
 {% endblock %}
 

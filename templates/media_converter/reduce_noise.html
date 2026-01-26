@@ -60,6 +60,19 @@
         <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem;"></div>
         <span id="processing-message">Processing audio... This may take a few minutes for large files.</span>
     </div>
+
+    <!-- Job Status Area (async) -->
+    <div id="jobStatusArea" style="display: none; margin-top: 1.5rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <div id="jobStatusMessage"><div class="spinner"></div> Preparing job...</div>
+        <div id="jobIdDisplay" style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;"></div>
+        <div id="jobError" style="display: none; margin-top: 0.5rem; color: var(--error-color);"></div>
+    </div>
+
+    <!-- Results Area (async) -->
+    <div id="resultsArea" style="display: none; margin-top: 1.5rem; padding: 1rem; background: var(--surface); border-radius: 6px; text-align: center;">
+        <h3 style="margin-bottom: 0.5rem; color: var(--success-color, #4caf50);">✅ Noise reduced!</h3>
+        <a id="downloadJobBtn" href="#" class="btn btn-primary" style="min-width: 220px;">⬇️ Download Cleaned Audio</a>
+    </div>
     
     <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
         <h3>Tips for best results:</h3>
@@ -83,6 +96,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadContent = document.getElementById('uploadContent');
     const submitBtn = document.getElementById('submit-btn');
     const processingIndicator = document.getElementById('processing-indicator');
+    const jobStatusArea = document.getElementById('jobStatusArea');
+    const jobStatusMessage = document.getElementById('jobStatusMessage');
+    const jobIdDisplay = document.getElementById('jobIdDisplay');
+    const jobError = document.getElementById('jobError');
+    const resultsArea = document.getElementById('resultsArea');
+    const downloadJobBtn = document.getElementById('downloadJobBtn');
     
     // Global state for duplicate prevention
     if (!window._reduceNoiseState) {
@@ -94,6 +113,85 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     const state = window._reduceNoiseState;
+
+    let pollInterval = null;
+
+    function startJobPolling(jobId) {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+        }
+        if (jobStatusArea) {
+            jobStatusArea.style.display = 'block';
+        }
+        if (resultsArea) {
+            resultsArea.style.display = 'none';
+        }
+        if (jobStatusMessage) {
+            jobStatusMessage.innerHTML = '<div class="spinner"></div> Noise reduction queued...';
+        }
+        if (jobIdDisplay) {
+            jobIdDisplay.textContent = `Job ID: ${jobId}`;
+        }
+        if (jobError) {
+            jobError.style.display = 'none';
+            jobError.textContent = '';
+        }
+
+        pollInterval = setInterval(() => {
+            fetch(`/media-converter/job/status/${jobId}/`, {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (jobStatusMessage) {
+                    if (data.status === 'processing') {
+                        jobStatusMessage.innerHTML = '<div class="spinner"></div> Reducing noise...';
+                    } else if (data.status === 'pending') {
+                        jobStatusMessage.innerHTML = '<div class="spinner"></div> Waiting to start...';
+                    } else if (data.status === 'completed') {
+                        jobStatusMessage.textContent = '✅ Noise reduced!';
+                    } else if (data.status === 'failed') {
+                        jobStatusMessage.textContent = '❌ Noise reduction failed.';
+                    }
+                }
+
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    if (resultsArea) {
+                        resultsArea.style.display = 'block';
+                    }
+                    if (downloadJobBtn) {
+                        downloadJobBtn.href = `/media-converter/job/download/${jobId}/?download=true`;
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Reduce Noise & Download';
+                    form.style.pointerEvents = 'auto';
+                } else if (data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    if (jobError) {
+                        jobError.textContent = data.error_message || 'Noise reduction failed.';
+                        jobError.style.display = 'block';
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Reduce Noise & Download';
+                    form.style.pointerEvents = 'auto';
+                }
+            })
+            .catch(() => {
+                if (jobError) {
+                    jobError.textContent = 'Unable to fetch job status. Please try again.';
+                    jobError.style.display = 'block';
+                }
+            });
+        }, 2000);
+    }
     
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
@@ -169,10 +267,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin',
-                signal: state.abortController.signal
+                signal: state.abortController.signal,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
             });
             
             const contentType = response.headers.get('content-type') || '';
+
+            if (contentType.includes('application/json')) {
+                const data = await response.json();
+                if (data.job_id) {
+                    if (processingIndicator) {
+                        processingIndicator.style.display = 'none';
+                    }
+                    startJobPolling(data.job_id);
+                    return;
+                }
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+            }
             
             if (contentType.includes('audio/')) {
                 const blob = await response.blob();
@@ -224,19 +340,18 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', err);
             const errorMessage = err.message || 'Noise reduction failed.';
             alert('Error: ' + errorMessage);
-        } finally {
-            // Always reset
-            console.log('🔓 Releasing lock');
-            state.isProcessing = false;
-            state.downloadTriggered = false;
-            state.abortController = null;
-            
             if (processingIndicator) {
                 processingIndicator.style.display = 'none';
             }
             submitBtn.disabled = false;
             submitBtn.textContent = 'Reduce Noise & Download';
             form.style.pointerEvents = 'auto';
+        } finally {
+            // Always reset
+            console.log('🔓 Releasing lock');
+            state.isProcessing = false;
+            state.downloadTriggered = false;
+            state.abortController = null;
         }
     };
     
@@ -264,6 +379,17 @@ document.addEventListener('DOMContentLoaded', function() {
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
+    }
+    .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 0.5rem;
+        vertical-align: middle;
     }
 </style>
 {% endblock %}
