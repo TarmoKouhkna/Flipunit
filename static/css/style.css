@@ -814,3 +814,13 @@ footer p {
     }
 }
 
+/* Ko-fi floating widget: remove black/dark rectangle behind "Tip Us" button */
+.floatingchat-container-wrap,
+.floatingchat-container-wrap > div,
+#kofi-widget-container,
+div[id*="kofi"][id*="container"],
+div[class*="kofi"][class*="wrap"] {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
