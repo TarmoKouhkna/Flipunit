@@ -178,46 +178,11 @@
     <script src="{% static 'js/interactions.js' %}"></script>
     {% block extra_js %}{% endblock %}
     
-    <!-- Ko-fi Floating Chat Widget -->
-    <script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
-    <script>
-        (function() {
-            var maxRetries = 50; // Maximum 5 seconds (50 * 100ms)
-            var retryCount = 0;
-            
-            function initKoFiWidget() {
-                if (typeof kofiWidgetOverlay !== 'undefined' && kofiWidgetOverlay && typeof kofiWidgetOverlay.draw === 'function') {
-                    try {
-                        kofiWidgetOverlay.draw('flipunit0711', {
-                            'type': 'floating-chat',
-                            'floating-chat.donateButton.text': 'Tip Us',
-                            'floating-chat.donateButton.background-color': '#9AA4B4',
-                            'floating-chat.donateButton.text-color': '#0D0B47'
-                        });
-                    } catch (error) {
-                        console.warn('Ko-fi widget initialization failed:', error);
-                    }
-                } else {
-                    retryCount++;
-                    if (retryCount <= maxRetries) {
-                        // Retry after a short delay if script hasn't loaded yet
-                        setTimeout(initKoFiWidget, 100);
-                    } else {
-                        // Stop retrying after max attempts
-                        console.warn('Ko-fi widget script failed to load after ' + maxRetries + ' attempts');
-                    }
-                }
-            }
-            
-            // Start initialization when DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initKoFiWidget);
-            } else {
-                // DOM already loaded, try immediately
-                initKoFiWidget();
-            }
-        })();
-    </script>
+    <!-- Tip Us – custom link (replaces Ko-fi overlay to avoid black rectangle) -->
+    <a href="https://ko-fi.com/flipunit0711" target="_blank" rel="noopener noreferrer" class="tip-us-link" aria-label="Support us on Ko-fi">
+        <span class="tip-us-icon" aria-hidden="true">☕</span>
+        <span class="tip-us-text">Tip Us</span>
+    </a>
     
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">

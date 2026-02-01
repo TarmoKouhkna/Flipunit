@@ -814,27 +814,47 @@ footer p {
     }
 }
 
-/* Ko-fi floating widget: remove black/dark rectangle behind "Tip Us" button */
-.floatingchat-container-wrap,
-.floatingchat-container-wrap > div,
-.floatingchat-container-wrap > *,
-#kofi-widget-container,
-#kofi-widget-container > *,
-div[id*="kofi"],
-div[class*="kofi"],
-div[class*="floatingchat"],
-[class*="floating-chat"],
-[class*="floatingchat"],
-[data-kofi] {
-    background: transparent !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
+/* Custom "Tip Us" link – replaces Ko-fi overlay (no black rectangle) */
+.tip-us-link {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 9999;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    background: #9AA4B4;
+    color: #0D0B47;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: 9999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-/* Ensure no pseudo-element creates a dark box */
-.floatingchat-container-wrap::before,
-.floatingchat-container-wrap::after,
-#kofi-widget-container::before,
-#kofi-widget-container::after {
-    display: none !important;
+.tip-us-link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    color: #0D0B47;
+}
+.tip-us-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+@media (max-width: 768px) {
+    .tip-us-link {
+        bottom: 20px;
+        left: 20px;
+    }
+}
+[data-theme="dark"] .tip-us-link,
+:root:not([data-theme="light"]) .tip-us-link {
+    background: #6B7280;
+    color: #F3F4F6;
+}
+[data-theme="dark"] .tip-us-link:hover,
+:root:not([data-theme="light"]) .tip-us-link:hover {
+    color: #F3F4F6;
 }
 
