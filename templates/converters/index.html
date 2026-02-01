@@ -9,6 +9,11 @@
     <p>Convert between different units of measurement</p>
 </div>
 
+<section class="intro-text" style="margin-top: 2rem; margin-bottom: 2rem;">
+    <h2>Unit Converters</h2>
+    <p>FlipUnit's unit converters handle length, weight, temperature, volume, area, speed, time, data storage, energy, power, pressure, and more. Get fast, accurate conversions between metric and imperial units with no signup.</p>
+</section>
+
 <div class="grid grid-3">
     {% for converter in converters %}
     <a href="{% url 'converters:tool' converter.url %}" class="category-card">

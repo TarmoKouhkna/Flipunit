@@ -14,14 +14,17 @@ class StaticViewSitemap(Sitemap):
         return datetime.now(timezone.utc)
 
     def items(self):
-        # TEMPORARY: Slim sitemap for GSC quality signal (fewer thin/low-impression URLs).
-        # Keep only high-value pages; re-add others once indexing/trust improves.
-        # Full list available in git history if needed.
+        # Section hubs + key media URLs for GSC quality (unique content, not thin).
         return [
             'home',
             'media_converter:index',
             'media_converter:audio_converter',
             'media_converter:video_converter',
+            'image_converter:index',
+            'pdf_tools:index',
+            'converters:index',
+            'archive_converter:index',
+            'text_converter:index',
         ]
 
     def location(self, item):
