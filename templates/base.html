@@ -43,6 +43,9 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon.png' %}">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
+    <!-- Preload critical CSS to shorten dependency chain (parallel fetch with document) -->
+    <link rel="preload" href="{% static 'css/style.css' %}" as="style">
+    <link rel="preload" href="{% static 'css/hybrid-style.css' %}?v=20250101" as="style">
     <!-- Google Fonts - non-blocking: load after first paint -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -168,8 +171,8 @@
         </div>
     </footer>
 
-    <script src="{% static 'js/main.js' %}"></script>
-    <script src="{% static 'js/interactions.js' %}"></script>
+    <script src="{% static 'js/main.js' %}" defer></script>
+    <script src="{% static 'js/interactions.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
     <!-- gtag (deferred to avoid render-blocking) -->
     <script>
