@@ -29,6 +29,9 @@ if git diff HEAD@{1} HEAD --name-only | grep -q "requirements.txt"; then
     docker-compose exec -T web pip install -r requirements.txt
 fi
 
+echo "📦 Minifying CSS..."
+docker-compose exec -T web python manage.py minify_css
+
 echo "📦 Collecting static files..."
 docker-compose exec -T web python manage.py collectstatic --noinput
 

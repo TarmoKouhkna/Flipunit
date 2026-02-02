@@ -2,14 +2,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google Tag Manager (async, non-blocking) -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-WM6SN3FS');</script>
-    <!-- End Google Tag Manager -->
-    <!-- gtag loaded after paint to avoid render-blocking (see end of body) -->
+    <!-- GTM/gtag loaded after first interaction or 4s timeout (reduces initial JS/main-thread) -->
+    <script>
+    (function(){
+      var done = false;
+      var timeoutId = setTimeout(loadAnalytics, 4000);
+      function loadAnalytics() {
+        if (done) return;
+        done = true;
+        clearTimeout(timeoutId);
+        window.removeEventListener('click', loadAnalytics);
+        window.removeEventListener('scroll', loadAnalytics);
+        window.removeEventListener('keydown', loadAnalytics);
+        var w = window, d = document, s = 'script', l = 'dataLayer', i = 'GTM-WM6SN3FS';
+        w[l] = w[l] || []; w[l].push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
+        var f = d.getElementsByTagName(s)[0], j = d.createElement(s);
+        j.async = true; j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i;
+        f.parentNode.insertBefore(j, f);
+        var g = d.createElement(s); g.async = true;
+        g.src = 'https://www.googletagmanager.com/gtag/js?id=G-ZKP92W4QW9';
+        d.head.appendChild(g);
+        g.onload = function() {
+          w.dataLayer = w.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-ZKP92W4QW9');
+        };
+      }
+      window.addEventListener('click', loadAnalytics, { once: true, passive: true });
+      window.addEventListener('scroll', loadAnalytics, { once: true, passive: true });
+      window.addEventListener('keydown', loadAnalytics, { once: true, passive: true });
+      setTimeout(loadAnalytics, 4000);
+    })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="{% block meta_description %}{{ SITE_DESCRIPTION }}{% endblock %}">
@@ -44,15 +69,15 @@
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
     <!-- Preload critical CSS to shorten dependency chain (parallel fetch with document) -->
-    <link rel="preload" href="{% static 'css/style.css' %}" as="style">
-    <link rel="preload" href="{% static 'css/hybrid-style.css' %}?v=20250101" as="style">
+    <link rel="preload" href="{% static 'css/style.min.css' %}" as="style">
+    <link rel="preload" href="{% static 'css/hybrid-style.min.css' %}?v=20250101" as="style">
     <!-- Google Fonts - non-blocking: load after first paint -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Varela+Round&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Varela+Round&display=swap" rel="stylesheet"></noscript>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <link rel="stylesheet" href="{% static 'css/hybrid-style.css' %}?v=20250101">
+    <link rel="stylesheet" href="{% static 'css/style.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/hybrid-style.min.css' %}?v=20250101">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -174,21 +199,6 @@
     <script src="{% static 'js/main.js' %}" defer></script>
     <script src="{% static 'js/interactions.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
-    <!-- gtag (deferred to avoid render-blocking) -->
-    <script>
-      window.addEventListener('load', function() {
-        var s = document.createElement('script');
-        s.async = true;
-        s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ZKP92W4QW9';
-        document.head.appendChild(s);
-        s.onload = function() {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-ZKP92W4QW9');
-        };
-      });
-    </script>
     <!-- Tip Us – custom link (replaces Ko-fi overlay to avoid black rectangle) -->
     <a href="https://ko-fi.com/flipunit0711" target="_blank" rel="noopener noreferrer" class="tip-us-link" aria-label="Support us on Ko-fi">
         <span class="tip-us-icon" aria-hidden="true">☕</span>

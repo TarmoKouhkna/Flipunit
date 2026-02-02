@@ -181,6 +181,8 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # WhiteNoise configuration for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Long cache for hashed static assets (1 year); WhiteNoise applies where appropriate
+WHITENOISE_MAX_AGE = 31536000
 
 # Media files
 MEDIA_URL = 'media/'
