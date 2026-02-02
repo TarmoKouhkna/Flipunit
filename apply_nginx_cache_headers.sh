@@ -22,10 +22,10 @@ echo "Backing up $NGINX_SITE..."
 sudo cp "$NGINX_SITE" "${NGINX_SITE}.bak.$(date +%Y%m%d_%H%M%S)"
 
 echo "Adding Cache-Control to /static/ and /media/..."
-# Insert add_header after the alias line in location /static/
-sudo sed -i '/alias \/opt\/flipunit\/staticfiles\;/a\        add_header Cache-Control "public, max-age=31536000";' "$NGINX_SITE"
+# Insert add_header after the alias line in location /static/ (path has trailing slash: staticfiles/)
+sudo sed -i '/alias \/opt\/flipunit\/staticfiles\/;/a\        add_header Cache-Control "public, max-age=31536000";' "$NGINX_SITE"
 # Insert add_header after the alias line in location /media/
-sudo sed -i '/alias \/opt\/flipunit\/media\;/a\        add_header Cache-Control "public, max-age=31536000";' "$NGINX_SITE"
+sudo sed -i '/alias \/opt\/flipunit\/media\/;/a\        add_header Cache-Control "public, max-age=31536000";' "$NGINX_SITE"
 
 echo "Testing nginx config..."
 sudo nginx -t
