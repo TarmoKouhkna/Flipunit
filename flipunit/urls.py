@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.sitemaps.views import sitemap as sitemap_view
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, RedirectView
 from django.views.decorators.cache import cache_page
 from . import views
 from .sitemaps import StaticViewSitemap
@@ -123,6 +123,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('favicon.ico', views.favicon_view, name='favicon'),
     path('BingSiteAuth.xml', views.bing_site_auth_view, name='bing_site_auth'),
+    # 301 permanent redirect from /Home and /home to / (fixes GSC 404 validation)
+    path('Home', RedirectView.as_view(url='/', permanent=True)),
+    path('Home/', RedirectView.as_view(url='/', permanent=True)),
+    path('home', RedirectView.as_view(url='/', permanent=True)),
+    path('home/', RedirectView.as_view(url='/', permanent=True)),
     path('', views.home, name='home'),
     path('search/', views.search, name='search'),
     path('privacy/', views.privacy_policy, name='privacy'),

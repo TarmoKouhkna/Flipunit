@@ -77,14 +77,15 @@
         </form>
     </div>
 
-    <!-- Categories Grid -->
+    <!-- Categories Grid (h2 for correct heading order: h1 -> h2 -> h3) -->
     <section class="hybrid-categories" aria-label="Tool categories">
+        <h2 style="margin-bottom: 1.5rem; font-size: 1.25rem; color: var(--text-secondary, #666);">Tool categories</h2>
         <div class="hybrid-categories-grid">
             {% for category in categories %}
             <a href="{% url category.url %}" class="hybrid-category-card" aria-label="{{ category.name }}">
                 <div class="hybrid-category-icon">
                     {% with 'images/icons/'|add:category.icon as icon_path %}
-                    <img src="{% static icon_path %}" alt="{{ category.name }} icon" loading="lazy">
+                    <img src="{% static icon_path %}" alt="" width="64" height="64" loading="lazy">
                     {% endwith %}
                 </div>
                 <h3>{{ category.name }}</h3>

@@ -85,7 +85,7 @@
         <a href="{% url category.url %}" class="category-card">
             <div class="category-icon">
                 {% with 'images/icons/'|add:category.icon as icon_path %}
-                <img src="{% static icon_path %}" alt="{{ category.name }}">
+                <img src="{% static icon_path %}" alt="" width="64" height="64">
                 {% endwith %}
             </div>
             <h3>{{ category.name }}</h3>
