@@ -91,7 +91,7 @@
         <div class="container">
             <div class="hybrid-header-top-row">
                 <a href="{% url 'home' %}" class="hybrid-logo-wrapper" aria-label="Go to homepage">
-                    <img src="{% static 'images/logo.png' %}" alt="" width="120" height="96" class="hybrid-logo-img" style="display: block; height: 6rem; width: auto; background: transparent !important; border: none !important;" onerror="this.style.display='none';">
+                    <img src="{% static 'images/logo.png' %}" alt="" width="120" height="96" class="hybrid-logo-img" fetchpriority="high" style="display: block; height: 6rem; width: auto; background: transparent !important; border: none !important;" onerror="this.style.display='none';">
                     <span class="hybrid-logo-text">{{ SITE_DISPLAY_NAME }}</span>
                 </a>
                 <div class="hybrid-header-actions">
