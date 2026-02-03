@@ -6,7 +6,7 @@ cffi==2.0.0
 charset-normalizer==3.4.4
 cssselect2==0.8.0
 defusedxml==0.7.1
-Django==5.2.9
+Django==5.2.11
 django-seo-js==0.4.1
 idna==3.11
 pdf2image==1.17.0
