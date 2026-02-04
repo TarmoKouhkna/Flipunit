@@ -55,3 +55,6 @@ verify_nginx_sitemap.sh
 
 # Screenshot assets
 assets/
+
+backup_*.sql
+backup_*.tar.gz
