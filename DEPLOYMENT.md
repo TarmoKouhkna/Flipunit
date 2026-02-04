@@ -988,6 +988,39 @@ Congratulations! Your application should now be live at `https://flipunit.eu`.
 
 ---
 
+## Migration from Zone.ee: Phase 2 Backup
+
+When moving to a new server (e.g. Hetzner), run backups on the **current** Zone.ee VPS first.
+
+**Option A – Run the backup script on Zone.ee**
+
+1. From your Mac, push the repo (so Zone.ee can pull), then SSH to Zone.ee and run:
+   ```bash
+   ssh ubuntu@217.146.78.140
+   cd /opt/flipunit && git pull origin main
+   bash backup_zoneee_for_migration.sh
+   ```
+2. Note the backup filenames printed (e.g. `backup_db_20260204_1234.sql`, `backup_media_20260204.tar.gz`).
+3. From your Mac, copy the files and secrets (replace filenames with what was printed):
+   ```bash
+   scp ubuntu@217.146.78.140:/opt/flipunit/backup_db_*.sql .
+   scp ubuntu@217.146.78.140:/opt/flipunit/backup_media_*.tar.gz .
+   scp ubuntu@217.146.78.140:/opt/flipunit/.env ./env.backup
+   scp ubuntu@217.146.78.140:/etc/nginx/sites-available/flipunit.eu ./nginx_flipunit.eu.conf
+   ```
+   Do not commit `.env` or `env.backup`.
+
+**Option B – Run commands manually on Zone.ee**
+
+1. SSH: `ssh ubuntu@217.146.78.140`, then `cd /opt/flipunit`.
+2. Database: `docker-compose exec -T postgres pg_dump -U flipunit_user flipunit > backup_db_$(date +%Y%m%d_%H%M).sql`
+3. Media: `tar -czvf backup_media_$(date +%Y%m%d).tar.gz -C /opt/flipunit media staticfiles`
+4. From your Mac, copy the backup files, `.env`, and nginx config as in Option A step 3.
+
+Use the backup SQL and `.env` (with `ALLOWED_HOSTS` updated to include the new server IP) when deploying on the new server (Phase 3).
+
+---
+
 ## Quick Reference: Important Paths
 
 - Application directory: `/opt/flipunit`
