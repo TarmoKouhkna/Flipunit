@@ -1021,6 +1021,83 @@ Use the backup SQL and `.env` (with `ALLOWED_HOSTS` updated to include the new s
 
 ---
 
+## Migration from Zone.ee: Phase 3 Deploy on Hetzner
+
+Do this after Phase 2 backups are on your Mac and the Hetzner server has Docker, Nginx, and Certbot installed (see main guide).
+
+**Hetzner server IP used below:** `46.225.75.195` — replace with yours if different.
+
+### Step 1: On the Hetzner server – create directory and clone repo
+
+```bash
+ssh root@46.225.75.195
+mkdir -p /opt/flipunit && cd /opt/flipunit
+git clone https://github.com/TarmoKouhkna/Flipunit.git .
+```
+
+### Step 2: From your Mac – copy backup files and .env to Hetzner
+
+From `~/Documents/Flipunit` (where you have the backup files):
+
+```bash
+scp backup_db_20260204_0850.sql root@46.225.75.195:/opt/flipunit/
+scp backup_media_20260204.tar.gz root@46.225.75.195:/opt/flipunit/
+scp env.backup root@46.225.75.195:/opt/flipunit/.env
+scp nginx_flipunit.eu.conf root@46.225.75.195:/tmp/flipunit.eu
+```
+
+(Use your actual backup filenames if different.)
+
+### Step 3: On the Hetzner server – add Hetzner IP to ALLOWED_HOSTS
+
+```bash
+ssh root@46.225.75.195
+nano /opt/flipunit/.env
+```
+
+Ensure a line like this exists (add or edit; use your Hetzner IP):
+
+```env
+ALLOWED_HOSTS=flipunit.eu,www.flipunit.eu,46.225.75.195
+```
+
+Save (Ctrl+O, Enter, Ctrl+X).
+
+### Step 4: On the Hetzner server – restore DB, media, and start app
+
+```bash
+cd /opt/flipunit
+bash deploy_phase3_hetzner.sh backup_db_20260204_0850.sql
+```
+
+(Use your actual backup SQL filename if different.) This starts Postgres, restores the database, extracts media/static, and runs `docker compose build && docker compose up -d`.
+
+### Step 5: On the Hetzner server – configure Nginx
+
+```bash
+sudo mv /tmp/flipunit.eu /etc/nginx/sites-available/flipunit.eu
+sudo ln -sf /etc/nginx/sites-available/flipunit.eu /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Step 6: Verify
+
+- From the server: `curl -H "Host: flipunit.eu" http://localhost:8000/` should return 200.
+- From your Mac (before DNS switch): `curl -H "Host: flipunit.eu" http://46.225.75.195/` should return 200.
+
+### Step 7: SSL (after Phase 4 DNS switch)
+
+Once DNS for flipunit.eu points to the Hetzner IP:
+
+```bash
+ssh root@46.225.75.195
+sudo certbot --nginx -d flipunit.eu -d www.flipunit.eu
+```
+
+Phase 4 is to point the domain’s A records at the Hetzner IP in your DNS panel (e.g. Zone.ee).
+
+---
+
 ## Quick Reference: Important Paths
 
 - Application directory: `/opt/flipunit`
