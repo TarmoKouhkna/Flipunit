@@ -2,7 +2,7 @@
 # Script to check server logs for the 500 error
 # Set VPS_HOST if needed: export VPS_HOST=ubuntu@YOUR_SERVER_IP
 
-VPS_HOST="${VPS_HOST:-ubuntu@217.146.78.140}"
+VPS_HOST="${VPS_HOST:-root@46.225.75.195}"
 echo "🔍 Checking server logs for errors (${VPS_HOST})..."
 echo ""
 

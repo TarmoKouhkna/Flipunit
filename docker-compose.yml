@@ -13,7 +13,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,46.225.75.195}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
       - SITE_URL=${SITE_URL:-https://flipunit.eu}
       - DB_NAME=${DB_NAME:-flipunit}
@@ -87,7 +87,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,46.225.75.195}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
       - SITE_URL=${SITE_URL:-https://flipunit.eu}
       - DB_NAME=${DB_NAME:-flipunit}
@@ -126,7 +126,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,46.225.75.195}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
       - SITE_URL=${SITE_URL:-https://flipunit.eu}
       - DB_NAME=${DB_NAME:-flipunit}
@@ -165,7 +165,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,46.225.75.195}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
       - SITE_URL=${SITE_URL:-https://flipunit.eu}
       - DB_NAME=${DB_NAME:-flipunit}
@@ -204,7 +204,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,46.225.75.195}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
       - SITE_URL=${SITE_URL:-https://flipunit.eu}
       - DB_NAME=${DB_NAME:-flipunit}
@@ -243,7 +243,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,46.225.75.195}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
       - SITE_URL=${SITE_URL:-https://flipunit.eu}
       - DB_NAME=${DB_NAME:-flipunit}
@@ -282,7 +282,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-flipunit.eu,www.flipunit.eu,46.225.75.195}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://flipunit.eu,https://www.flipunit.eu}
       - SITE_URL=${SITE_URL:-https://flipunit.eu}
       - DB_NAME=${DB_NAME:-flipunit}

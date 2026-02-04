@@ -744,7 +744,7 @@ Test everything is working:
 
 Here are useful commands for managing your deployment.
 
-**Deploy from your laptop:** Use `./deploy_to_vps.sh` or `./deploy.sh`. To target your Hetzner server, either pass the host as the first argument (e.g. `./deploy_to_vps.sh ubuntu@YOUR_HETZNER_IP`) or set `export VPS_HOST=ubuntu@YOUR_HETZNER_IP` so all deploy/verify scripts use the correct server.
+**Deploy from your laptop:** Use `./deploy_to_vps.sh` or `./deploy.sh`. Default target is Hetzner: `root@46.225.75.195`. Override with the first argument (e.g. `./deploy_to_vps.sh root@46.225.75.195`) or `export VPS_HOST=root@46.225.75.195`.
 
 ### View Application Logs
 
@@ -990,11 +990,11 @@ Congratulations! Your application should now be live at `https://flipunit.eu`.
 
 ## Migration from Zone.ee: Phase 2 Backup
 
-When moving to a new server (e.g. Hetzner), run backups on the **current** Zone.ee VPS first.
+When moving to a new server (e.g. Hetzner), run backups on the **current** VPS first. (Production is now on Hetzner 46.225.75.195; the commands below use the **previous** Zone.ee server 217.146.78.140 only when pulling backups from it.)
 
-**Option A – Run the backup script on Zone.ee**
+**Option A – Run the backup script on the source VPS**
 
-1. From your Mac, push the repo (so Zone.ee can pull), then SSH to Zone.ee and run:
+1. From your Mac, push the repo (so the source server can pull), then SSH to that server and run (use Zone.ee `ubuntu@217.146.78.140` only if backing up from the old server):
    ```bash
    ssh ubuntu@217.146.78.140
    cd /opt/flipunit && git pull origin main

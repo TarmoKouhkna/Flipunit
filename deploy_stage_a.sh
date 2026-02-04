@@ -12,7 +12,7 @@
 set -e
 
 # Use first argument, or VPS_HOST env var (e.g. export VPS_HOST=ubuntu@YOUR_HETZNER_IP)
-SSH_CONNECTION="${1:-${VPS_HOST:-ubuntu@217.146.78.140}}"
+SSH_CONNECTION="${1:-${VPS_HOST:-root@46.225.75.195}}"
 PROJECT_DIR="/opt/flipunit"
 
 echo "🚀 Stage A Implementation Plan - Complete Deployment"
