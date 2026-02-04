@@ -6,14 +6,14 @@ cffi==2.0.0
 charset-normalizer==3.4.4
 cssselect2==0.8.0
 defusedxml==0.7.1
-Django==5.2.9
+Django==5.2.11
 django-seo-js==0.4.1
 idna==3.11
 pdf2image==1.17.0
 pillow==12.0.0
 psycopg2-binary==2.9.11
 pycparser==2.23
-pypdf==6.6.0
+pypdf==6.6.2
 requests==2.32.5
 sqlparse==0.5.3
 tinycss2==1.5.1
@@ -26,7 +26,7 @@ gunicorn==23.0.0
 weasyprint==68.0
 python-docx==1.1.2
 docx2pdf==0.1.8
-pdfplumber==0.11.4
+pdfplumber>=0.11.9  # 0.11.9+ uses pdfminer.six 20251230 (fixes CVE-2025-64512, GHSA-f83h-ghpp-7wcc)
 pillow-heif==0.13.0
 pymupdf>=1.23.0  # For PDF to SVG conversion
 pypandoc>=1.11  # For PDF ↔ RTF conversion (also requires pandoc binary: brew install pandoc on macOS)
