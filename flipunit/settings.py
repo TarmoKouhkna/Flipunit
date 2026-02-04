@@ -41,12 +41,11 @@ if not SECRET_KEY:
 if os.environ.get('ALLOWED_HOSTS'):
     ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS').split(',')]
 else:
-    # Default hosts: domain names and server IP address
-    # Include localhost and 127.0.0.1 for local development
+    # Default hosts: domain names only. On the server, set ALLOWED_HOSTS in .env to include the VPS IP (e.g. flipunit.eu,www.flipunit.eu,YOUR_SERVER_IP).
     if DEBUG:
-        ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.1.135', 'flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
+        ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.1.135', 'flipunit.eu', 'www.flipunit.eu']
     else:
-        ALLOWED_HOSTS = ['flipunit.eu', 'www.flipunit.eu', '217.146.78.140']
+        ALLOWED_HOSTS = ['flipunit.eu', 'www.flipunit.eu']
 
 # CSRF Trusted Origins - required for HTTPS requests
 CSRF_TRUSTED_ORIGINS = []

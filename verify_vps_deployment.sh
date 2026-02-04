@@ -12,7 +12,8 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-VPS_HOST="${1:-ubuntu@217.146.78.140}"
+# Use first argument, or VPS_HOST env var (e.g. export VPS_HOST=ubuntu@YOUR_HETZNER_IP)
+VPS_HOST="${1:-${VPS_HOST:-ubuntu@217.146.78.140}}"
 PROJECT_DIR="/opt/flipunit"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"

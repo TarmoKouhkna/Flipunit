@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Quick Verification Script - Run this ON the VPS
-# Usage: ssh ubuntu@217.146.78.140 'bash -s' < verify_on_vps.sh
+# Usage: ssh ubuntu@YOUR_SERVER_IP 'bash -s' < verify_on_vps.sh
 # Or: Copy to VPS and run: bash verify_on_vps.sh
 
 set -e

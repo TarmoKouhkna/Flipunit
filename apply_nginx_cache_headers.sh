@@ -1,6 +1,6 @@
 #!/bin/bash
 # Add Cache-Control headers for /static/ and /media/ in nginx (PageSpeed "Use efficient cache lifetimes").
-# Run this ON THE VPS (e.g. after SSH to ubuntu@217.146.78.140):
+# Run this ON THE VPS (e.g. after SSH to your server: ssh ubuntu@YOUR_SERVER_IP):
 #   cd /opt/flipunit && chmod +x apply_nginx_cache_headers.sh && ./apply_nginx_cache_headers.sh
 
 set -e

@@ -31,7 +31,8 @@ echo ""
 
 # Step 2: Deploy to VPS
 echo "📥 Step 2: Deploying to VPS..."
-SSH_CONNECTION="${1:-ubuntu@217.146.78.140}"
+# Use first argument, or VPS_HOST env var, or default (set VPS_HOST for Hetzner e.g. export VPS_HOST=ubuntu@YOUR_HETZNER_IP)
+SSH_CONNECTION="${1:-${VPS_HOST:-ubuntu@217.146.78.140}}"
 PROJECT_DIR="/opt/flipunit"
 
 echo "SSH Connection: $SSH_CONNECTION"
@@ -48,7 +49,8 @@ if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$SSH_CONNECTION" exit 2>/dev/null
     echo "  3. The connection string is correct"
     echo ""
     echo "Usage: ./deploy_to_vps.sh [user@host]"
-    echo "Example: ./deploy_to_vps.sh ubuntu@217.146.78.140"
+    echo "Example: ./deploy_to_vps.sh ubuntu@YOUR_SERVER_IP"
+    echo "Or set VPS_HOST: export VPS_HOST=ubuntu@YOUR_SERVER_IP"
     exit 1
 fi
 

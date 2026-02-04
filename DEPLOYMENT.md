@@ -1,18 +1,18 @@
-# Deployment Guide: Zone.ee VPS with Docker
+# Deployment Guide: Hetzner VPS with Docker
 
-This guide will walk you through deploying your FlipUnit.eu Django application to a Zone.ee VPS using Docker. No prior experience with Docker or server management is required - we'll cover everything step by step.
+This guide will walk you through deploying your FlipUnit.eu Django application to a Hetzner Cloud VPS using Docker. No prior experience with Docker or server management is required - we'll cover everything step by step.
 
 ## What You'll Need
 
 Before starting, make sure you have:
 
-1. **Zone.ee VPS Account**
-   - **Recommended: VPS III** (€18.29/month) - 2 vCPU, 4 GB RAM, 50 GiB SSD
-   - This plan provides enough resources for your Django app with PostgreSQL
-   - Your VPS should be running and you should have SSH access
+1. **Hetzner Cloud Account**
+   - **Recommended: CX22** (or larger) - 2 vCPU, 4 GB RAM, 40 GB SSD (or choose a plan that fits your needs)
+   - Create a server at [Hetzner Cloud Console](https://console.hetzner.cloud/) with Ubuntu 24.04 (or 22.04), and add your SSH public key during creation
+   - Your VPS should be running and you should have SSH access (as `root` or `ubuntu` depending on image)
 
 2. **Your Domain**
-   - Domain: `flipunit.eu` (already registered with Zone.ee)
+   - Domain: `flipunit.eu` (DNS can remain at Zone.ee or your current registrar; you will point A records to your Hetzner server IP)
 
 3. **Your Code**
    - Your Flipunit code should be in a GitHub repository (or you can upload it manually)
@@ -38,9 +38,9 @@ Before starting, make sure you have:
 
 ---
 
-## Step 1: Set Up SSH Key (Before Ordering VPS)
+## Step 1: Set Up SSH Key (Before Creating Server)
 
-**Important**: Zone.ee will ask for your SSH public key during VPS ordering. Let's set this up first!
+**Important**: Hetzner Cloud will ask for your SSH public key when you create a server. Set this up first!
 
 ### 1.1 Check if You Already Have an SSH Key
 
@@ -106,17 +106,16 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGeb6G1zX68sBXpmabDmwxaMT/Aoor2AGGsD7AjK0B33
 
 **Copy the entire line** (from `ssh-ed25519` to the end).
 
-### 1.5 Add to Zone.ee
+### 1.5 Add to Hetzner Cloud
 
-When ordering your VPS from Zone.ee:
-1. Find the "SSH Public Key" field
-2. Paste your entire public key (the line you copied)
-3. Continue with your VPS order
+When creating your server in the Hetzner Cloud Console:
+1. Under "SSH Keys", add your public key (paste the entire line you copied), or choose an existing key
+2. Complete the server creation
 
 **Important Notes:**
-- ✅ The **public key** is safe to share - that's what you paste into Zone.ee
-- 🔒 The **private key** stays on your computer - never share it!
-- After adding your key, you can connect to the VPS without a password
+- The **public key** is safe to share - that's what you add in Hetzner
+- The **private key** stays on your computer - never share it!
+- After adding your key, you can connect to the server without a password
 
 ---
 
@@ -124,38 +123,30 @@ When ordering your VPS from Zone.ee:
 
 ### 2.1 Get Your VPS Information
 
-After your VPS is created, from your Zone.ee control panel you should have:
-- **VPS IP Address** (e.g., `123.45.67.89`)
-- **VPS Hostname** (e.g., `uvn-78-140.tll07.zonevs.eu`)
-- **SSH Username**: Zone.ee uses `ubuntu` (not `root`)
+After your server is created in Hetzner Cloud Console you will have:
+- **Server IP Address** (e.g., `95.217.x.x`) - shown in the server list and details
+- **SSH access**: Ubuntu images typically use user `root`; you can create an `ubuntu` user and use that if you prefer (see Step 3 for `sudo` usage)
 
 ### 2.2 Connect via SSH
 
-**On Mac:**
-Open Terminal and run:
+**On Mac/Linux:**
+Open Terminal and run (use your actual Hetzner server IP):
 ```bash
-ssh ubuntu@your-vps-hostname
+ssh root@your-server-ip
 ```
-Or using IP address:
+If you created an `ubuntu` user:
 ```bash
-ssh ubuntu@your-vps-ip
+ssh ubuntu@your-server-ip
 ```
-
-**Note**: Zone.ee uses the `ubuntu` user, not `root`. You'll use `sudo` for admin commands.
 
 **On Windows:**
-- Use **PuTTY** (download from https://www.putty.org/)
-- Or use **Windows Terminal** (Windows 10/11) with the same command as above
+- Use **PuTTY** (download from https://www.putty.org/) or **Windows Terminal** with the same commands
 
-**If you added your SSH key to Zone.ee:**
-- You should connect automatically without a password!
-
-**If you didn't add an SSH key:**
-- You'll be prompted for a password (Zone.ee will provide this)
+**If you added your SSH key in Hetzner:** you should connect without a password.
 
 **First time connecting?** You may see a message asking to confirm the server's identity. Type `yes` and press Enter.
 
-✅ **Success check**: You should see a command prompt like `ubuntu@your-server:~$`
+✅ **Success check**: You should see a command prompt like `root@your-server:~$` or `ubuntu@your-server:~$`
 
 ---
 
@@ -408,11 +399,13 @@ Add these lines (replace the values with your own):
 SECRET_KEY=your-generated-secret-key-from-step-6.1
 DEBUG=False
 DB_PASSWORD=choose-a-strong-password-here
+ALLOWED_HOSTS=flipunit.eu,www.flipunit.eu,YOUR_SERVER_IP
 ```
 
 **Important:**
 - Replace `your-generated-secret-key-from-step-6.1` with the secret key you copied
 - Replace `choose-a-strong-password-here` with a strong password (at least 16 characters, mix of letters, numbers, and symbols)
+- Replace `YOUR_SERVER_IP` with your Hetzner server's public IP (from `curl ifconfig.me` on the server). This allows direct IP access and health checks.
 - **Never share this file or commit it to GitHub!**
 
 Save the file (Ctrl+O, Enter, Ctrl+X).
@@ -645,31 +638,35 @@ When asked "Command may disrupt existing ssh connections. Proceed?", type `y` an
 
 ## Step 14: Configure DNS
 
-Now we need to point your domain to your VPS.
+Now we need to point your domain to your Hetzner server.
 
-### 14.1 Get Your VPS IP Address
+### 14.1 Get Your Server IP Address
+
+On your Hetzner server (or from the Hetzner Cloud Console), get the public IP:
 
 ```bash
 curl ifconfig.me
 ```
 
-Copy this IP address - you'll need it.
+Copy this IP address - you'll need it for DNS and for `.env` (ALLOWED_HOSTS).
 
-### 14.2 Configure DNS in Zone.ee
+### 14.2 Configure DNS (e.g. at Zone.ee)
 
-1. Log into your Zone.ee control panel
+If your domain is managed at Zone.ee (or another registrar):
+
+1. Log into your DNS control panel (e.g. Zone.ee)
 2. Go to DNS management for `flipunit.eu`
-3. Add or edit these DNS records:
+3. Add or edit these DNS records (use your **Hetzner server IP** from step 14.1):
 
    **A Record:**
-   - Name: `@` (or leave blank, depending on Zone.ee's interface)
-   - Value: `your-vps-ip` (the IP from step 13.1)
-   - TTL: 3600 (or default)
+   - Name: `@` (or leave blank, depending on the interface)
+   - Value: `your-hetzner-server-ip`
+   - TTL: 3600 (or 300 for faster propagation before go-live)
 
    **A Record:**
    - Name: `www`
-   - Value: `your-vps-ip` (same IP)
-   - TTL: 3600 (or default)
+   - Value: `your-hetzner-server-ip` (same IP)
+   - TTL: 3600 (or 300)
 
 4. Save the changes
 
@@ -745,7 +742,9 @@ Test everything is working:
 
 ## Maintenance Commands
 
-Here are useful commands for managing your deployment:
+Here are useful commands for managing your deployment.
+
+**Deploy from your laptop:** Use `./deploy_to_vps.sh` or `./deploy.sh`. To target your Hetzner server, either pass the host as the first argument (e.g. `./deploy_to_vps.sh ubuntu@YOUR_HETZNER_IP`) or set `export VPS_HOST=ubuntu@YOUR_HETZNER_IP` so all deploy/verify scripts use the correct server.
 
 ### View Application Logs
 
@@ -985,7 +984,7 @@ Congratulations! Your application should now be live at `https://flipunit.eu`.
 4. Configure email notifications for errors (optional)
 5. Review and optimize performance as needed
 
-**Need help?** Check the logs first, then consult Django/Docker documentation or Zone.ee support.
+**Need help?** Check the logs first, then consult Hetzner or Django/Docker documentation.
 
 ---
 

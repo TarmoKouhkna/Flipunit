@@ -1,10 +1,12 @@
 #!/bin/bash
 # Script to check server logs for the 500 error
+# Set VPS_HOST if needed: export VPS_HOST=ubuntu@YOUR_SERVER_IP
 
-echo "🔍 Checking server logs for errors..."
+VPS_HOST="${VPS_HOST:-ubuntu@217.146.78.140}"
+echo "🔍 Checking server logs for errors (${VPS_HOST})..."
 echo ""
 
-ssh ubuntu@217.146.78.140 << 'ENDSSH'
+ssh "$VPS_HOST" << 'ENDSSH'
 cd /opt/flipunit
 
 echo "=== Last 100 lines of web container logs ==="
