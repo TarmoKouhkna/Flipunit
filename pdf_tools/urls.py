@@ -12,6 +12,7 @@ urlpatterns = [
     path('to-html/', views.pdf_to_html, name='pdf_to_html'),
     path('html-to-pdf/', views.html_to_pdf, name='html_to_pdf'),
     path('to-text/', views.pdf_to_text, name='pdf_to_text'),
+    path('to-word/', views.pdf_to_word, name='pdf_to_word'),
     path('compress/', views.pdf_compress, name='pdf_compress'),
     path('rotate/', views.pdf_rotate, name='pdf_rotate'),
     path('ocr/', views.pdf_ocr, name='pdf_ocr'),

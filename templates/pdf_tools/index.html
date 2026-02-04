@@ -17,7 +17,7 @@
 <div style="margin-bottom: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border-left: 4px solid var(--primary-color);">
     <h3 style="margin-bottom: 0.75rem; color: var(--primary-color);">✨ Features</h3>
     <ul class="list-indent" style="color: var(--text-secondary); line-height: 1.8;">
-        <li>Convert PDF to PNG, JPG, JPEG, HTML, Text, SVG, or RTF</li>
+        <li>Convert PDF to PNG, JPG, JPEG, HTML, Text, Word (DOCX), SVG, or RTF</li>
         <li>Convert PNG, JPG, JPEG, HTML, Text, SVG, or RTF to PDF</li>
         <li>Merge multiple PDFs into one</li>
         <li>Split PDF into individual pages</li>
@@ -53,6 +53,10 @@
         <a href="{% url 'pdf_tools:pdf_to_text' %}" class="category-card">
             <h3>PDF to Text</h3>
             <p>Extract text content from PDF files</p>
+        </a>
+        <a href="{% url 'pdf_tools:pdf_to_word' %}" class="category-card">
+            <h3>PDF to Word</h3>
+            <p>Convert PDF to Word (DOCX) for editing</p>
         </a>
     </div>
 </div>

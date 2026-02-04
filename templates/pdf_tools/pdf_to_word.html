@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}PDF to Word Converter - Convert PDF to DOCX Online - {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Free online PDF to Word converter - Convert PDF files to DOCX (Microsoft Word) format. Edit PDF content in Word.{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">PDF to Word Converter - Convert PDF to DOCX</h1>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="converter-tool">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Select PDF File</label>
+            <div class="file-upload-area">
+                <input type="file" name="pdf_file" id="pdf_file" accept=".pdf" required>
+                <p style="margin-top: 1rem;">Click to select or drag and drop a PDF file</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Convert to Word (.docx) for editing</p>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" {% if not pdf2docx_available %}disabled{% endif %}>Convert to Word</button>
+    </form>
+
+    <div style="margin-top: 2rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+        <h3 style="margin-bottom: 0.75rem; color: var(--primary-color);">✨ Features</h3>
+        <ul class="list-indent" style="color: var(--text-secondary); line-height: 1.8;">
+            <li><strong>DOCX format:</strong> Output is Microsoft Word (.docx) compatible</li>
+            <li><strong>Text & formatting:</strong> Preserves text, fonts, and basic layout</li>
+            <li><strong>Tables & images:</strong> Extracts tables and images into the document</li>
+            <li><strong>Edit in Word:</strong> Open the file in Word, Google Docs, or similar</li>
+        </ul>
+    </div>
+
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--surface); border-radius: 6px;">
+        <h3>How to use:</h3>
+        <ol class="list-indent" style="margin-top: 0.5rem;">
+            <li>Select a PDF file (max 50MB)</li>
+            <li>Click "Convert to Word"</li>
+            <li>Download the Word document (.docx)</li>
+        </ol>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+            <strong>Note:</strong> Conversion works best with text-based PDFs. Scanned PDFs may need OCR first.
+            {% if not pdf2docx_available %}
+            <span style="color: #ff6b6b;">PDF to Word requires pdf2docx. Install with: pip install pdf2docx</span>
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<a href="{% url 'pdf_tools:index' %}" class="btn btn-secondary">← Back to PDF Tools</a>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('pdf_file');
+    const uploadArea = document.querySelector('.file-upload-area');
+    const form = document.querySelector('.converter-tool');
+    const submitBtn = document.getElementById('submit-btn');
+
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const p = uploadArea.querySelector('p');
+                if (p) p.textContent = 'Selected: ' + e.target.files[0].name;
+            }
+        });
+    }
+
+    if (form && submitBtn) {
+        const originalText = submitBtn.textContent;
+        form.addEventListener('submit', function() {
+            submitBtn.textContent = 'Converting...';
+            submitBtn.disabled = true;
+            setTimeout(function() {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }, 2000);
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

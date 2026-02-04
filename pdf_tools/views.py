@@ -65,6 +65,12 @@ try:
 except ImportError:
     EBOOKLIB_AVAILABLE = False
     epub = None
+try:
+    from pdf2docx import Converter
+    PDF2DOCX_AVAILABLE = True
+except ImportError:
+    PDF2DOCX_AVAILABLE = False
+    Converter = None
 
 def _get_universal_context():
     """Helper function to get context for universal converter template"""
@@ -1391,6 +1397,93 @@ def pdf_to_text(request):
     except Exception as e:
         messages.error(request, f'Error extracting text from PDF: {str(e)}')
         return render(request, 'pdf_tools/pdf_to_text.html')
+
+
+def pdf_to_word(request):
+    """Convert PDF to Word (DOCX) format"""
+    if not PDF2DOCX_AVAILABLE:
+        messages.error(request, 'PDF to Word conversion requires pdf2docx. Install with: pip install pdf2docx')
+        return render(request, 'pdf_tools/pdf_to_word.html', {
+            'pdf2docx_available': PDF2DOCX_AVAILABLE,
+        })
+
+    if request.method != 'POST':
+        return render(request, 'pdf_tools/pdf_to_word.html', {
+            'pdf2docx_available': PDF2DOCX_AVAILABLE,
+        })
+
+    if 'pdf_file' not in request.FILES:
+        messages.error(request, 'Please upload a PDF file.')
+        return render(request, 'pdf_tools/pdf_to_word.html', {
+            'pdf2docx_available': PDF2DOCX_AVAILABLE,
+        })
+
+    pdf_file = request.FILES['pdf_file']
+
+    max_size = 50 * 1024 * 1024  # 50MB
+    if pdf_file.size > max_size:
+        messages.error(request, f'File size exceeds 50MB limit. Your file is {pdf_file.size / (1024 * 1024):.1f}MB.')
+        return render(request, 'pdf_tools/pdf_to_word.html', {
+            'pdf2docx_available': PDF2DOCX_AVAILABLE,
+        })
+
+    if not pdf_file.name.lower().endswith('.pdf'):
+        messages.error(request, 'Please upload a valid PDF file.')
+        return render(request, 'pdf_tools/pdf_to_word.html', {
+            'pdf2docx_available': PDF2DOCX_AVAILABLE,
+        })
+
+    tmp_pdf_path = None
+    tmp_docx_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_pdf:
+            for chunk in pdf_file.chunks():
+                tmp_pdf.write(chunk)
+            tmp_pdf_path = tmp_pdf.name
+
+        tmp_docx_path = tmp_pdf_path.replace('.pdf', '.docx')
+        try:
+            cv = Converter(tmp_pdf_path)
+            cv.convert(tmp_docx_path)
+            cv.close()
+        finally:
+            if tmp_pdf_path and os.path.exists(tmp_pdf_path):
+                try:
+                    os.unlink(tmp_pdf_path)
+                except OSError:
+                    pass
+
+        if not os.path.exists(tmp_docx_path):
+            messages.error(request, 'Conversion produced no output.')
+            return render(request, 'pdf_tools/pdf_to_word.html', {
+                'pdf2docx_available': PDF2DOCX_AVAILABLE,
+            })
+
+        base_name = os.path.splitext(pdf_file.name)[0]
+        safe_name = ''.join(c if c.isalnum() or c in ' ._-' else '_' for c in base_name).strip() or 'converted'
+        download_name = f'{safe_name}.docx'
+
+        with open(tmp_docx_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            response['Content-Disposition'] = f'attachment; filename="{download_name}"'
+        try:
+            os.unlink(tmp_docx_path)
+        except OSError:
+            pass
+        return response
+
+    except Exception as e:
+        for path in (tmp_pdf_path, tmp_docx_path):
+            if path and os.path.exists(path):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+        messages.error(request, f'Error converting PDF to Word: {str(e)}')
+        return render(request, 'pdf_tools/pdf_to_word.html', {
+            'pdf2docx_available': PDF2DOCX_AVAILABLE,
+        })
+
 
 def pdf_compress(request):
     """Compress PDF file size"""

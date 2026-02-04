@@ -198,6 +198,7 @@ def _get_all_tools():
         {'name': 'PDF to HTML', 'url': 'pdf_tools:pdf_to_html', 'category': 'PDF Tools', 'description': 'Convert PDF to HTML', 'keywords': 'PDF HTML'},
         {'name': 'HTML to PDF', 'url': 'pdf_tools:html_to_pdf', 'category': 'PDF Tools', 'description': 'Convert HTML to PDF', 'keywords': 'HTML PDF'},
         {'name': 'PDF to Text', 'url': 'pdf_tools:pdf_to_text', 'category': 'PDF Tools', 'description': 'Extract text from PDF', 'keywords': 'PDF text extract'},
+        {'name': 'PDF to Word', 'url': 'pdf_tools:pdf_to_word', 'category': 'PDF Tools', 'description': 'Convert PDF to Word (DOCX)', 'keywords': 'PDF Word DOCX convert'},
         {'name': 'Compress PDF', 'url': 'pdf_tools:pdf_compress', 'category': 'PDF Tools', 'description': 'Reduce PDF file size', 'keywords': 'PDF compress'},
         {'name': 'Rotate PDF', 'url': 'pdf_tools:pdf_rotate', 'category': 'PDF Tools', 'description': 'Rotate PDF pages', 'keywords': 'PDF rotate'},
         {'name': 'OCR PDF', 'url': 'pdf_tools:pdf_ocr', 'category': 'PDF Tools', 'description': 'Make scanned PDFs searchable', 'keywords': 'PDF OCR'},
