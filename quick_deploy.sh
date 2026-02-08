@@ -7,6 +7,13 @@ set -e
 
 PROJECT_DIR="/opt/flipunit"
 
+# Use "docker compose" (plugin) if "docker-compose" (standalone) is not found
+if command -v docker-compose &>/dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
+    DOCKER_COMPOSE="docker compose"
+fi
+
 echo "🚀 Quick Deployment"
 echo "==================="
 echo ""
@@ -26,23 +33,23 @@ git pull origin main
 # Check if requirements.txt changed (might need to reinstall dependencies)
 if git diff HEAD@{1} HEAD --name-only | grep -q "requirements.txt"; then
     echo "📦 Requirements changed - Installing new dependencies..."
-    docker-compose exec -T web pip install -r requirements.txt
+    $DOCKER_COMPOSE exec -T web pip install -r requirements.txt
 fi
 
 echo "📦 Minifying CSS..."
-docker-compose exec -T web python manage.py minify_css
+$DOCKER_COMPOSE exec -T web python manage.py minify_css
 
 echo "📦 Collecting static files..."
-docker-compose exec -T web python manage.py collectstatic --noinput
+$DOCKER_COMPOSE exec -T web python manage.py collectstatic --noinput
 
 echo "🔄 Restarting web container..."
-docker-compose restart web
+$DOCKER_COMPOSE restart web
 
 echo ""
 echo "✅ Deployment complete!"
 echo ""
 echo "🔍 Verify deployment:"
-echo "   docker-compose logs -f web"
+echo "   $DOCKER_COMPOSE logs -f web"
 echo "   curl -I https://flipunit.eu/pdf-tools/to-epub/"
 
 
