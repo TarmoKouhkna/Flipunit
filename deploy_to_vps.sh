@@ -70,20 +70,20 @@ git pull origin main || {
 
 echo ""
 echo "📦 Checking if ebooklib is installed..."
-if docker-compose exec -T web python -c "import ebooklib; print('ebooklib version:', ebooklib.__version__)" 2>/dev/null; then
+if docker compose exec -T web python -c "import ebooklib; print('ebooklib version:', ebooklib.__version__)" 2>/dev/null; then
     echo "✅ ebooklib is already installed"
 else
     echo "📥 Installing ebooklib..."
-    docker-compose exec -T web pip install ebooklib>=0.18
+    docker compose exec -T web pip install ebooklib>=0.18
 fi
 
 echo ""
 echo "📦 Collecting static files..."
-docker-compose exec -T web python manage.py collectstatic --noinput
+docker compose exec -T web python manage.py collectstatic --noinput
 
 echo ""
 echo "🔄 Restarting web container..."
-docker-compose restart web
+docker compose restart web
 
 echo ""
 echo "⏳ Waiting for container to start..."
@@ -91,7 +91,7 @@ sleep 5
 
 echo ""
 echo "🔍 Checking container status..."
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "✅ Deployment complete!"
@@ -119,7 +119,7 @@ echo ""
 echo "🔍 Next steps:"
 echo "   1. Visit: https://flipunit.eu/pdf-tools/to-epub/"
 echo "   2. Test with a sample PDF file"
-echo "   3. Check logs: ssh $SSH_CONNECTION 'cd $PROJECT_DIR && docker-compose logs -f web'"
+echo "   3. Check logs: ssh $SSH_CONNECTION 'cd $PROJECT_DIR && docker compose logs -f web'"
 echo ""
 echo "✅ Deployment complete!"
 
