@@ -429,7 +429,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Found results area and download button');
         
         // Update download link
-        downloadBtn.href = `/media-converter/job/download/${jobId}/`;
+        downloadBtn.href = `/media-converter/job/download/${jobId}/?download=true`;
         console.log('✅ Download link set to:', downloadBtn.href);
         
         // Use onclick directly for more reliable behavior
