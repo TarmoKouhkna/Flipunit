@@ -45,7 +45,7 @@ def sitemap(request):
         sitemap_instance = StaticViewSitemap()
         xml_lines = [
             '<?xml version="1.0" encoding="UTF-8"?>',
-            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
         ]
         
         # Get all URLs from the sitemap
