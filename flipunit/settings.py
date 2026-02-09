@@ -47,6 +47,9 @@ else:
     else:
         ALLOWED_HOSTS = ['flipunit.eu', 'www.flipunit.eu', '46.225.75.195']
 
+# So the template context processor sets debug=True when DEBUG and request is from localhost (for {% if debug %} CSS branch)
+INTERNAL_IPS = ['127.0.0.1', '::1']
+
 # CSRF Trusted Origins - required for HTTPS requests
 CSRF_TRUSTED_ORIGINS = []
 if os.environ.get('CSRF_TRUSTED_ORIGINS'):
