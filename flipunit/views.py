@@ -165,8 +165,6 @@ def _get_all_tools():
     # Image Converters
     tools.extend([
         {'name': 'Universal Image Converter', 'url': 'image_converter:universal', 'category': 'Image Converters', 'description': 'Convert images to any format', 'keywords': 'JPEG JPG PNG WEBP BMP TIFF GIF ICO SVG AVIF HEIC'},
-        {'name': 'JPEG to PNG', 'url': ('image_converter:convert', 'jpeg-to-png'), 'category': 'Image Converters', 'description': 'Convert JPEG images to PNG', 'keywords': 'JPEG JPG PNG'},
-        {'name': 'PNG to JPG', 'url': ('image_converter:convert', 'png-to-jpg'), 'category': 'Image Converters', 'description': 'Convert PNG images to JPG', 'keywords': 'PNG JPEG JPG'},
         {'name': 'Image Resizer', 'url': 'image_converter:resize', 'category': 'Image Converters', 'description': 'Resize images to custom dimensions', 'keywords': 'JPEG JPG PNG WEBP BMP TIFF GIF resize'},
         {'name': 'Rotate & Flip', 'url': 'image_converter:rotate_flip', 'category': 'Image Converters', 'description': 'Rotate or flip images', 'keywords': 'JPEG JPG PNG rotate flip'},
         {'name': 'Remove EXIF', 'url': 'image_converter:remove_exif', 'category': 'Image Converters', 'description': 'Remove EXIF metadata from images', 'keywords': 'EXIF metadata JPEG JPG PNG'},

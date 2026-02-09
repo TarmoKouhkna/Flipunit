@@ -12,7 +12,6 @@ urlpatterns = [
     path('grayscale/', views.convert_grayscale, name='grayscale'),
     path('merge/', views.merge_images, name='merge'),
     path('watermark/', views.watermark_image, name='watermark'),
-    path('<str:converter_type>/', views.convert_image, name='convert'),
     path('job/status/<uuid:job_id>/', views.job_status, name='job_status'),
     path('job/download/<uuid:job_id>/', views.download_result, name='download_result'),
 ]

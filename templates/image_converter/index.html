@@ -30,7 +30,7 @@
 <h2 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Converters</h2>
 <div class="grid grid-2" style="margin-bottom: 2rem;">
     {% for converter in converters %}
-    <a href="{% if converter.url_name == 'universal' %}{% url 'image_converter:universal' %}{% elif converter.url_name == 'resize' %}{% url 'image_converter:resize' %}{% else %}{% url 'image_converter:convert' converter.url %}{% endif %}" class="category-card">
+    <a href="{% url 'image_converter:universal' %}" class="category-card">
         <h3>{{ converter.name }}</h3>
         <p>{{ converter.description }}</p>
     </a>

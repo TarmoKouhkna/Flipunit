@@ -68,16 +68,26 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon.png' %}">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
-    <!-- Preload critical CSS to shorten dependency chain (parallel fetch with document) -->
+    <!-- Preload critical CSS (minified in production, full in dev) -->
+    {% if debug %}
+    <link rel="preload" href="{% static 'css/style.css' %}" as="style">
+    <link rel="preload" href="{% static 'css/hybrid-style.css' %}?v=20250101" as="style">
+    {% else %}
     <link rel="preload" href="{% static 'css/style.min.css' %}" as="style">
     <link rel="preload" href="{% static 'css/hybrid-style.min.css' %}?v=20250101" as="style">
+    {% endif %}
     <!-- Google Fonts - non-blocking: load after first paint -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Varela+Round&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Varela+Round&display=swap" rel="stylesheet"></noscript>
+    {% if debug %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/hybrid-style.css' %}?v=20250101">
+    {% else %}
     <link rel="stylesheet" href="{% static 'css/style.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/hybrid-style.min.css' %}?v=20250101">
+    {% endif %}
     {% block extra_css %}{% endblock %}
 </head>
 <body>
