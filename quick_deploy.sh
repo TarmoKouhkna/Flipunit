@@ -36,6 +36,9 @@ if git diff HEAD@{1} HEAD --name-only | grep -q "requirements.txt"; then
     $DOCKER_COMPOSE exec -T web pip install -r requirements.txt
 fi
 
+echo "📦 Running migrations..."
+$DOCKER_COMPOSE exec -T web python manage.py migrate --noinput
+
 echo "📦 Minifying CSS..."
 $DOCKER_COMPOSE exec -T web python manage.py minify_css
 

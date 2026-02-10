@@ -46,28 +46,13 @@ COPY flipunit/urls.py /app/flipunit/urls.py
 # Create directories for media and static files
 RUN mkdir -p /app/media /app/staticfiles
 
+# Copy and use optimized entrypoint (skips collectstatic on restart to prevent 504)
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
-# Create entrypoint script for better error handling
-# Calculate workers: (2 * CPU cores) + 1, default to 9 for 8-core system
-RUN echo '#!/bin/bash\n\
-set -e\n\
-python manage.py migrate\n\
-python manage.py collectstatic --noinput\n\
-# Calculate workers based on CPU cores (default to 9 for 8-core)\n\
-CPU_COUNT=$(nproc 2>/dev/null || echo 8)\n\
-WORKERS=$((2 * CPU_COUNT + 1))\n\
-# Cap at reasonable maximum\n\
-if [ $WORKERS -gt 17 ]; then\n\
-    WORKERS=17\n\
-fi\n\
-# Start with 9 workers for 8-core system, adjust as needed\n\
-WORKERS=9\n\
-exec gunicorn flipunit.wsgi:application --bind 0.0.0.0:8000 --workers $WORKERS --threads 2 --timeout 600 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -\n\
-' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
-# Use entrypoint script
 CMD ["/app/entrypoint.sh"]
 
 
