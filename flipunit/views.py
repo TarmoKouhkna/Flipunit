@@ -5,6 +5,7 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.conf import settings
 from django.db import connection
 from django.core.cache import cache
+from django.views.decorators.cache import cache_page
 import os
 from .models import Feedback
 
@@ -17,6 +18,7 @@ def get_client_ip(request):
         ip = request.META.get('REMOTE_ADDR')
     return ip
 
+@cache_page(300)  # Cache for 5 minutes - home page content is static (GET only; POST for feedback bypasses cache)
 def home(request):
     """Home page"""
     if request.method == 'POST' and 'feedback' in request.POST:
@@ -480,10 +482,10 @@ def health_check(request):
         health_status['checks']['redis'] = f'error: {str(e)}'
         health_status['status'] = 'unhealthy'
     
-    # Check Celery workers (basic check via Redis)
+    # Check Celery workers (basic check via Redis) - use timeout to avoid blocking
     try:
         from celery import current_app
-        inspect = current_app.control.inspect()
+        inspect = current_app.control.inspect(timeout=2)
         active_workers = inspect.active()
         if active_workers:
             health_status['checks']['celery'] = f'ok: {len(active_workers)} workers active'
