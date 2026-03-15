@@ -7,6 +7,7 @@
 {% block og_description %}{{ SITE_DESCRIPTION }}{% endblock %}
 
 {% block extra_css %}
+<link rel="preload" href="{% static 'images/icons/sprite.svg' %}" as="image">
 <style>
 /* Remove container-medium padding since we have our own layout */
 .main-content .container-medium {
@@ -84,9 +85,7 @@
             {% for category in categories %}
             <a href="{% url category.url %}" class="hybrid-category-card" aria-label="{{ category.name }}">
                 <div class="hybrid-category-icon">
-                    {% with 'images/icons/'|add:category.icon as icon_path %}
-                    <img src="{% static icon_path %}" alt="" width="64" height="64" loading="lazy">
-                    {% endwith %}
+                    <svg width="64" height="64" fill="#83254b" aria-hidden="true"><use href="{% static 'images/icons/sprite.svg' %}#{{ category.icon_id }}"/></svg>
                 </div>
                 <h3>{{ category.name }}</h3>
                 <p>{{ category.description }}</p>

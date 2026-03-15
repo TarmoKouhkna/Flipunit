@@ -836,7 +836,8 @@ header:not(.hybrid-header) {
     transform: scale(1.1) rotate(5deg);
 }
 
-.hybrid-category-icon img {
+.hybrid-category-icon img,
+.hybrid-category-icon svg {
     width: 100%;
     height: 100%;
     object-fit: contain;

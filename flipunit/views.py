@@ -18,7 +18,7 @@ def get_client_ip(request):
         ip = request.META.get('REMOTE_ADDR')
     return ip
 
-@cache_page(300)  # Cache for 5 minutes - home page content is static (GET only; POST for feedback bypasses cache)
+@cache_page(900)  # Cache for 15 minutes - home page content is static (GET only; POST for feedback bypasses cache)
 def home(request):
     """Home page"""
     if request.method == 'POST' and 'feedback' in request.POST:
@@ -43,73 +43,73 @@ def home(request):
                 'name': 'Color Code Generator & Picker',
                 'url': 'color_picker:index',
                 'description': 'Pick colors from screen, convert between color formats, and generate color codes',
-                'icon': 'color-picker.svg'
+                'icon_id': 'icon-color-picker',
             },
             {
                 'name': 'Image Conversion & Editing',
                 'url': 'image_converter:index',
                 'description': 'Convert images between different formats and edit them',
-                'icon': 'image-converters.svg'
+                'icon_id': 'icon-image-converters',
             },
             {
                 'name': 'Media Converters',
                 'url': 'media_converter:index',
                 'description': 'Convert media files and download audio.',
-                'icon': 'media-converters.svg'
+                'icon_id': 'icon-media-converters',
             },
             {
                 'name': 'PDF Tools',
                 'url': 'pdf_tools:index',
                 'description': 'Merge, split, and convert PDF files',
-                'icon': 'pdf-tools.svg'
+                'icon_id': 'icon-pdf-tools',
             },
             {
                 'name': 'Unit Converters',
                 'url': 'converters:index',
                 'description': 'Convert between different units of measurement',
-                'icon': 'unit-converters.svg'
+                'icon_id': 'icon-unit-converters',
             },
             {
                 'name': 'Utilities',
                 'url': 'utilities:index',
                 'description': 'Calculator, converters, generators, QR codes, and more',
-                'icon': 'utilities.svg'
+                'icon_id': 'icon-utilities',
             },
             {
                 'name': 'Currency & Crypto',
                 'url': 'currency_converter:index',
                 'description': 'Convert between currencies and cryptocurrencies with real-time rates',
-                'icon': 'currency-crypto.svg'
+                'icon_id': 'icon-currency-crypto',
             },
             {
                 'name': 'Archive Converters',
                 'url': 'archive_converter:index',
                 'description': 'Convert between ZIP, RAR, 7Z, and TAR.GZ formats. Extract ISO files.',
-                'icon': 'archive-converters.svg'
+                'icon_id': 'icon-archive-converters',
             },
             {
                 'name': 'Text & String Converters',
                 'url': 'text_converter:index',
                 'description': 'Convert text formats: case, JSON/XML/YAML, HTML/Markdown, Base64, and more',
-                'icon': 'text-converters.svg'
+                'icon_id': 'icon-text-converters',
             },
             {
                 'name': 'Developer Converters',
                 'url': 'developer_converter:index',
                 'description': 'Code minify, CSV/JSON, SQL, regex, JWT, and more',
-                'icon': 'developer-converters.svg'
+                'icon_id': 'icon-developer-converters',
             },
             {
                 'name': 'Website Status Checker',
                 'url': 'isdown:index',
                 'description': 'Check instantly if any website is online or down',
-                'icon': 'website-status.svg'
+                'icon_id': 'icon-website-status',
             },
             {
                 'name': 'YouTube Thumbnail Downloader',
                 'url': 'youtube_thumbnail:index',
                 'description': 'Download YouTube thumbnails (HD, HQ, MQ, Default)',
-                'icon': 'youtube-thumbnail.svg'
+                'icon_id': 'icon-youtube-thumbnail',
             },
         ]
     }
